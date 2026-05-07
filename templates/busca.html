@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Seleção de Produto - MyGames{% endblock %}
+
+{% block content %}
+<div class="container-busca">
+    <header class="busca-header">
+        <h2>Olá, {{ session['player_nome'] }}!</h2>
+        <p>Qual item você deseja vender hoje?</p>
+    </header>
+
+    <!-- Campo de Busca Autocomplete -->
+    <div class="search-wrapper">
+        <input type="text" id="inputBusca" class="search-box" 
+               placeholder="Digite o modelo do console ou nome do jogo..." 
+               onkeyup="buscar()" autocomplete="off">
+    </div>
+
+    <div id="listaProdutos" class="grid-produtos">
+        <!-- Os produtos aparecerão aqui via JavaScript -->
+    </div>
+</div>
+
+<script>
+    async function buscar() {
+        const termo = document.getElementById('inputBusca').value;
+        if (termo.length < 2) {
+            document.getElementById('listaProdutos').innerHTML = '';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/buscar_produtos?q=${termo}`);
+            const produtos = await response.json();
+
+            const container = document.getElementById('listaProdutos');
+            container.innerHTML = '';
+
+            if (produtos.length === 0) {
+                container.innerHTML = '<p style="color: #666; grid-column: 1/-1; text-align: center;">Nenhum produto encontrado.</p>';
+                return;
+            }
+
+            produtos.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'card-produto';
+                card.onclick = () => window.location.href = `/pericia/${p.id}`;
+                
+                card.innerHTML = `
+                    <div class="card-img-wrapper">
+                        <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
+                    </div>
+                    <h4>${p.nome_produto}</h4>
+                    <span class="plataforma-badge">${p.plataforma}</span>
+                `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error("Erro na busca:", error);
+        }
+    }
+</script>
+
+<style>
+    /* Estilos específicos para a grade de busca no modo Black */
+    .container-busca { max-width: 900px; margin: auto; padding: 20px; }
+    .busca-header { margin-bottom: 30px; }
+    .search-wrapper { margin-bottom: 40px; }
+    .search-box { 
+        width: 100%; padding: 18px; border-radius: 12px; border: 2px solid #333; 
+        background: #1e1e1e; color: #fff; font-size: 18px; outline: none; transition: 0.3s;
+    }
+    .search-box:focus { border-color: #00ff00; box-shadow: 0 0 15px rgba(0, 255, 0, 0.1); }
+    
+    .grid-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 25px; }
+    .card-produto { 
+        background: #1e1e1e; border: 1px solid #333; border-radius: 15px; padding: 20px; 
+        text-align: center; cursor: pointer; transition: 0.3s;
+    }
+    .card-produto:hover { transform: translateY(-5px); border-color: #00ff00; }
+    .card-img-wrapper { height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
+    .card-produto img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+    .plataforma-badge { background: #333; color: #00ff00; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+</style>
+{% endblock %}

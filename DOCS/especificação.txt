@@ -1,0 +1,230 @@
+PROJETO MYGAMES - ESPECIFICAÇÃO TÉCNICA V1.8 (CONSOLIDADA)
+DOCUMENTO FINAL (Fluxo Detalhado, Regras e Arquitetura de Dados)
+Data de Atualização: 30 de Abril de 2026
+
+1. ESCOPO E CANAIS DE ACESSO
+----------------------------------------------------------------------
+A aplicação MyGames opera em três frentes principais de acesso:
+• Acesso Direto: Via domínio próprio da aplicação[cite: 1, 4].
+• Redirecionamento: Tráfego vindo do site lojatrocagame.com.br[cite: 1, 4].
+• Interface de Terceiros (Chatbot): Integração via API/Webhook para receber 
+  leads e dados do sistema de chatbot contratado (Caixa Preta)[cite: 1, 4].
+
+2. JORNADA DETALHADA DO USUÁRIO (O FLUXO)
+----------------------------------------------------------------------
+Etapa 1: Identificação (Lead)
+• Campos Coletados: Nome Completo, E-mail, WhatsApp (Celular) e Cidade/Estado[cite: 1, 4].
+• O sistema deve registrar a origem do lead (Direto, Lojatroca ou Chatbot)[cite: 1, 4].
+
+Etapa 2: Busca e Identificação Visual (Intenção de Venda)
+• Campo de Busca: O usuário informa qual produto deseja vender[cite: 1, 4].
+• Box de Produtos Afins: Ao iniciar a digitação, o sistema deve abrir um box 
+  suspenso com uma lista de sugestões baseadas no catálogo mestre[cite: 1, 4].
+• Dicas de Busca: Exibição de dicas dinâmicas (ex: "Busque pelo modelo exato")[cite: 1, 4].
+• Autocomplete: Busca no catálogo com exibição de miniaturas (thumbnails)[cite: 1, 4].
+
+Etapa 3: Perícia e Condição (Personalização do Item)
+• Confirmação Visual: Exibição obrigatória da imagem oficial do catálogo[cite: 1, 4].
+• Seletor de Quantidade: Define quantas unidades o usuário quer vender[cite: 1, 4].
+• Checklist Dinâmico (Sem Hardcode): Lista de condições carregada via banco.
+  - Estado da carcaça e mídias (riscos, marcas).
+  - Presença de Caixa e Manual.
+  - Para Consoles: Quantidade de Controles e Cabos Originais.
+• Evidências: Campo para upload de fotos e comentários livres[cite: 1, 4].
+
+Etapa 4: Consolidação (Carrinho Inverso)
+• Exibição do resumo dos itens periciados para conferência[cite: 1, 4].
+• Multi-item: Opção "+ Adicionar novo produto" para o mesmo protocolo[cite: 1, 4].
+
+Etapa 5: Finalização e Protocolo
+• Geração do número de protocolo único (ex: MG-2026-XXXX)[cite: 1, 4].
+• Notificação WhatsApp: Envio imediato da confirmação ao cliente[cite: 1, 4].
+
+3. ARQUITETURA DE DADOS (MySQL)
+----------------------------------------------------------------------
+3.1 Tabela: clientes_usuarios
+- id (INT, PK, AI): ID Único[cite: 4].
+- nome_completo (VARCHAR): Nome do cliente[cite: 4].
+- email (VARCHAR): E-mail para cotação[cite: 4].
+- whatsapp (VARCHAR): Celular para notificações[cite: 4].
+- cpf (VARCHAR): Coletado no pós-aceite[cite: 4].
+- chave_pix (VARCHAR): Para pagamento em dinheiro[cite: 4].
+- cep (VARCHAR(9)): CEP para logística reversa[cite: 4].
+- logradouro (VARCHAR): Nome da rua/avenida e número[cite: 4].
+- bairro (VARCHAR): Bairro do cliente[cite: 4].
+- cidade (VARCHAR): Cidade do cliente[cite: 4].
+- estado (VARCHAR): Nome completo digitado (ex: "Paraná").
+- uf (CHAR(2)): Sigla processada internamente (ex: "PR").
+- complemento (VARCHAR): Apto, Bloco, etc[cite: 4].
+- origem_lead (VARCHAR): Identifica a porta de entrada[cite: 4].
+
+3.2 Tabela: protocolos_recompra
+- id (INT, PK, AI): ID do protocolo[cite: 4].
+- cliente_id (INT, FK): Relacionamento com clientes_usuarios[cite: 4].
+- numero_protocolo (VARCHAR): Código único gerado[cite: 4].
+- status (ENUM): Aberto, Aguardando Fotos, Aceito, Recusado, Finalizado[cite: 4].
+- valor_total_pix (DECIMAL 10,2): Soma total em dinheiro[cite: 4].
+- valor_total_credito (DECIMAL 10,2): Soma total em crédito loja[cite: 4].
+- qtd_caixas (INT): Quantidade de volumes para frete[cite: 4].
+- codigo_rastreio (VARCHAR): Código da logística reversa[cite: 4].
+- data_criacao (TIMESTAMP): Registro de abertura[cite: 4].
+
+3.3 Tabela: itens_periciados
+- id (INT, PK, AI): ID do item[cite: 4].
+- protocolo_id (INT, FK): Relacionamento com protocolos_recompra[cite: 4].
+- produto_id (INT, FK): Relacionamento com catalogo_mestre[cite: 4].
+- quantidade (INT): Quantidade periciada[cite: 4].
+- fotos_json (JSON): URLs das evidências[cite: 4].
+- comentarios (TEXT): Observações do usuário[cite: 4].
+- valor_pix_unitario (DECIMAL 10,2): Snapshot do valor no aceite[cite: 4].
+- valor_cred_unitario (DECIMAL 10,2): Snapshot do valor no aceite[cite: 4].
+
+3.4 Tabelas de Configuração (Checklist Dinâmico)
+- categorias_avaliacao: id, nome_categoria, slug, tipo_produto, obrigatorio[cite: 4].
+- opcoes_estado: id, categoria_id (FK), descricao, fator_depreciacao, 
+  valor_fixo_extra, exibir_ordem[cite: 4].
+- pericia_selecionada: item_id (FK), opcao_id (FK)[cite: 4].
+
+3.5 Tabela: catalogo_mestre
+- id (INT, PK, AI): ID único do produto[cite: 4].
+- nome_produto (VARCHAR): Nome oficial do item[cite: 4].
+- categoria (ENUM): 'Console', 'Jogo', 'Acessório'[cite: 4].
+- plataforma (VARCHAR): Ex: 'PS5', 'Xbox', 'Switch'[cite: 4].
+- valor_venda_ref (DECIMAL 10,2): Preço de venda na loja[cite: 4].
+- valor_pix_base (DECIMAL 10,2): Valor base impecável (dinheiro)[cite: 4].
+- valor_cred_base (DECIMAL 10,2): Valor base impecável (crédito)[cite: 4].
+- foto_oficial_url (VARCHAR): Link da imagem obrigatória[cite: 4].
+- sku_interno (VARCHAR): Código de integração[cite: 4].
+- ativo (BOOLEAN): Status de exibição no sistema[cite: 4].
+
+4. LOGÍSTICA E COMUNICAÇÃO FINAL
+----------------------------------------------------------------------
+• E-mail de Resultado: Tabela comparativa detalhada (Crédito vs PIX)[cite: 1, 4].
+• Dados Pós-Aceite: Coleta de CPF, Chave PIX e Endereço apenas após aceite[cite: 1, 4].
+• Logística: Geração automática de frete baseada na qtd_caixas[cite: 1, 4].
+----------------------------------------------------------------------
+
+-- 3.1 Tabela: clientes_usuarios
+-- Armazena o lead inicial e os dados logísticos coletados no pós-aceite.
+CREATE TABLE clientes_usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome_completo VARCHAR(255),
+    email VARCHAR(150),
+    whatsapp VARCHAR(20),
+    cpf VARCHAR(14),           -- Coletado no pós-aceite[cite: 5]
+    chave_pix VARCHAR(100),    -- Coletado no pós-aceite[cite: 5]
+    cep VARCHAR(9),            -- Logística Reversa[cite: 5]
+    logradouro VARCHAR(255),   -- Logística Reversa[cite: 5]
+    bairro VARCHAR(100),       -- Logística Reversa[cite: 5]
+    cidade VARCHAR(100),
+    estado VARCHAR(40),
+    uf char(2)
+    complemento VARCHAR(100),
+    origem_lead VARCHAR(50)    -- Direto, Lojatroca ou Chatbot[cite: 5]
+);
+
+-- 3.2 Tabela: protocolos_recompra
+-- Cabeçalho da transação e controle de logística[cite: 5].
+CREATE TABLE protocolos_recompra (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cliente_id INT,
+    numero_protocolo VARCHAR(20),
+    status ENUM('Aberto', 'Aguardando Fotos', 'Aceito', 'Recusado', 'Finalizado'),
+    valor_total_pix DECIMAL(10,2),
+    valor_total_credito DECIMAL(10,2),
+    qtd_caixas INT,            -- Define o frete reverso[cite: 5]
+    codigo_rastreio VARCHAR(50),
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cliente_id) REFERENCES clientes_usuarios(id)
+);
+
+-- 3.3 Tabela: itens_periciados
+-- Itens individuais e seus valores fixados no momento da cotação[cite: 5].
+CREATE TABLE itens_periciados (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    protocolo_id INT,
+    produto_id INT,
+    quantidade INT,
+    fotos_json JSON,           -- URLs das evidências[cite: 5]
+    comentarios TEXT,
+    valor_pix_unitario DECIMAL(10,2),  -- Snapshot do valor[cite: 5]
+    valor_cred_unitario DECIMAL(10,2), -- Snapshot do valor[cite: 5]
+    FOREIGN KEY (protocolo_id) REFERENCES protocolos_recompra(id),
+    FOREIGN KEY (produto_id) REFERENCES catalogo_mestre(id)
+);
+
+-- 3.4 Tabelas de Configuração (Checklist Dinâmico)
+-- Permite que a Etapa 3 seja montada dinamicamente[cite: 5].
+
+CREATE TABLE categorias_avaliacao (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome_categoria VARCHAR(100), -- Ex: "Estado da Mídia"[cite: 5]
+    slug VARCHAR(50),
+    tipo_produto ENUM('Console', 'Jogo', 'Acessório', 'Todos'),
+    obrigatorio BOOLEAN
+);
+
+CREATE TABLE opcoes_estado (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    categoria_id INT,
+    descricao VARCHAR(255),      -- Ex: "Com riscos leves"[cite: 5]
+    fator_depreciacao DECIMAL(5,2), -- Ex: 0.85[cite: 5]
+    valor_fixo_extra DECIMAL(10,2), -- Ex: +50.00[cite: 5]
+    exibir_ordem INT,
+    FOREIGN KEY (categoria_id) REFERENCES categorias_avaliacao(id)
+);
+
+CREATE TABLE pericia_selecionada (
+    item_id INT,
+    opcao_id INT,
+    PRIMARY KEY (item_id, opcao_id),
+    FOREIGN KEY (item_id) REFERENCES itens_periciados(id),
+    FOREIGN KEY (opcao_id) REFERENCES opcoes_estado(id)
+);
+
+-- Arquitetura do projeto MyGames:
+
+/mygames
+├── server.py           # Gestor de rotas e comunicação (Flask)
+├── engine.py           # Processamento, cálculos e banco de dados
+├── templates/          # Arquivos HTML (Estrutura das telas)
+└── static/             # Assets (CSS gamer, JS interativo, Imagens)
+
+A arquitetura do projeto MyGames segue o padrão de separação de responsabilidades (SoC), garantindo que a interface visual, a 
+lógica de comunicação e o motor de regras de negócio sejam independentes. Isso facilita a manutenção e permite que o visual "gamer" 
+seja evoluído sem afetar os cálculos complexos.
+
+Abaixo está a descrição detalhada dos três pilares fundamentais:
+
+1. Camada de Apresentação (Frontend)
+Esta camada é responsável pela experiência visual e interatividade do usuário.
+
+Arquivos HTML Independentes: Localizados na pasta /templates, eles definem a estrutura das páginas (Identificação, Busca, 
+Perícia e Carrinho) sem conter lógica de programação (hardcode).
+
+Folhas de Estilo (CSS): Localizadas em /static/css, definem a identidade visual gamer (Dark Mode, cores neon, fontes modernas e 
+botões interativos).
+
+Scripts de Interface (JS): Gerenciam o comportamento dinâmico, como o autocomplete na busca e a atualização em tempo real dos 
+valores de cotação na tela de perícia.
+
+2. Camada de Servidor (server.py)
+Atua como o "maestro" da aplicação, utilizando o framework Flask para gerenciar o fluxo de dados.
+
+Roteamento: Define as URLs e decide qual arquivo HTML exibir para cada etapa da jornada do usuário.
+
+Gerenciamento de Sessão: Mantém os dados do lead e os itens que estão sendo adicionados ao "carrinho" durante a navegação.
+
+Ponto de Integração: Recebe os dados de fontes externas (como o Chatbot/Caixa Preta) e os encaminha para processamento.
+
+3. Camada de Inteligência e Dados (engine.py)
+É o núcleo técnico do sistema, onde reside toda a "verdade" do negócio.
+
+Lógica de Cálculo: Processa o valor_base do catalogo_mestre contra os fatores_depreciacao vindos das tabelas de configuração para 
+gerar o valor final (PIX e Crédito).
+
+Interface com o Banco de Dados (MySQL): Realiza todas as consultas e persistência de dados nas tabelas de clientes, protocolos, 
+itens e configurações dinâmicas.
+
+Snapshot Financeiro: Garante que os valores unitários sejam "congelados" na tabela itens_periciados no momento do aceite, protegendo 
+a transação contra mudanças de preço posteriores no catálogo.

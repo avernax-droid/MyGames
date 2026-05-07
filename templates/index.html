@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyGames - Iniciar Venda</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Fonte Gamer Moderna -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Barra de Progresso Estilo XP Bar -->
+        <div class="xp-bar-container">
+            <div class="xp-bar-fill" style="width: 20%;"></div>
+            <span class="xp-text">MISSÃO: IDENTIFICAÇÃO (20%)</span>
+        </div>
+
+        <header>
+            <h1>MY<span>GAMES</span></h1>
+            <p>Transforme seus jogos usados em crédito ou PIX rápido.</p>
+        </header>
+
+        <main class="card-lead">
+            <form action="/identificar" method="POST">
+                <!-- Campo Oculto para Origem do Lead -->
+                <input type="hidden" name="origem_lead" value="Direto">
+
+                <div class="input-group">
+                    <label for="nome">Nome Completo</label>
+                    <input type="text" id="nome" name="nome_completo" placeholder="Como você é conhecido no game?" required>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label for="email">E-mail</label>
+                        <input type="email" id="email" name="email" placeholder="Para enviarmos a cotação" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="whatsapp">WhatsApp</label>
+                        <input type="tel" id="whatsapp" name="whatsapp" placeholder="(00) 00000-0000" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="input-group">
+                        <label for="cidade">Cidade</label>
+                        <input type="text" id="cidade" name="cidade" placeholder="Sua cidade" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="estado">Estado (UF)</label>
+                        <input type="text" id="estado" name="estado" maxlength="2" placeholder="Ex: SP" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-glow">INICIAR BUSCA DE PRODUTOS</button>
+            </form>
+        </main>
+    </div>
+</body>
+</html>

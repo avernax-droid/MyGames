@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyGames - {% block title %}{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- ESTRUTURA DE FASES CENTRALIZADA (STEPPER) --- */
+        .fases-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            max-width: 800px;
+            margin: 30px auto 50px;
+            position: relative;
+            padding: 0 10px;
+        }
+
+        /* A Linha que liga os círculos */
+        .fases-container::before {
+            content: "";
+            position: absolute;
+            top: 15px; 
+            left: 50px;
+            right: 50px;
+            height: 2px;
+            background: #333;
+            z-index: 1;
+        }
+
+        .fase-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+            position: relative;
+        }
+
+        /* Círculo Externo */
+        .circulo-externo {
+            width: 30px;
+            height: 30px;
+            background: #121212;
+            border: 2px solid #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+            transition: 0.3s;
+        }
+
+        /* Círculo Interno (O "Ponto" Verde) */
+        .circulo-interno {
+            width: 14px;
+            height: 14px;
+            background: transparent; 
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .fase-nome {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        /* Lógica de Ativação: Ativa se a fase atual for maior ou igual ao passo */
+        .fase-item.concluida .circulo-externo {
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+
+        .fase-item.concluida .circulo-interno {
+            background: #00ff00;
+            box-shadow: 0 0 8px #00ff00;
+        }
+
+        .fase-item.concluida .fase-nome {
+            color: #00ff00;
+        }
+
+        .client-logo[src*="404"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- BARRA AUTOMÁTICA: Controlada pelo server.py através da variável fase_atual -->
+        <div class="fases-container">
+            <!-- Fase 1 -->
+            <div class="fase-item {{ 'concluida' if fase_atual >= 1 }}">
+                <div class="circulo-externo"><div class="circulo-interno"></div></div>
+                <span class="fase-nome">Identificação</span>
+            </div>
+
+            <!-- Fase 2 -->
+            <div class="fase-item {{ 'concluida' if fase_atual >= 2 }}">
+                <div class="circulo-externo"><div class="circulo-interno"></div></div>
+                <span class="fase-nome">Produto</span>
+            </div>
+
+            <!-- Fase 3 -->
+            <div class="fase-item {{ 'concluida' if fase_atual >= 3 }}">
+                <div class="circulo-externo"><div class="circulo-interno"></div></div>
+                <span class="fase-nome">Avaliação</span>
+            </div>
+
+            <!-- Fase 4 -->
+            <div class="fase-item {{ 'concluida' if fase_atual >= 4 }}">
+                <div class="circulo-externo"><div class="circulo-interno"></div></div>
+                <span class="fase-nome">Oferta</span>
+            </div>
+        </div>
+
+        <header>
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='images/logo-cliente.png') }}" alt="Logo Cliente" class="client-logo" onerror="this.style.display='none'">
+                <h1>MY<span>GAMES</span></h1>
+            </div>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/ux-helper.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

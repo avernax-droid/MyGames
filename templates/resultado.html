@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Sua Oferta - MyGames{% endblock %}
+
+{% block content %}
+<div class="container-resultado">
+    <div class="card-oferta">
+        <header class="oferta-header">
+            <span class="pix-badge">PAGAMENTO VIA PIX</span>
+            <div class="produto-nome-display">{{ cotacao.produto }}</div>
+        </header>
+        
+        <div class="valor-container">
+            <span class="simbolo-monetario">R$</span>
+            <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
+        </div>
+        
+        <div class="info-estado">
+            Estado avaliado: <strong>{{ cotacao.estado }}</strong>
+        </div>
+
+        <!-- PONTUAL: Inclusão de campos de Agendamento dentro do formulário -->
+        <div class="acoes-finais">
+            <form action="{{ url_for('finalizar') }}" method="POST" style="text-align: left;">
+                
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #333;">
+                    <label style="color: #bbb; font-size: 0.8rem; display: block; margin-bottom: 10px; text-transform: uppercase;">Agende sua entrega/coleta:</label>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <input type="date" name="data_entrega" required 
+                               style="flex: 2; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
+                        
+                        <select name="periodo_entrega" required 
+                                style="flex: 1; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
+                            <option value="Manhã">Manhã</option>
+                            <option value="Tarde">Tarde</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Campos invisíveis mantidos -->
+                <input type="hidden" name="produto_nome" value="{{ cotacao.produto }}">
+                <input type="hidden" name="valor_final" value="{{ cotacao.valor_final }}">
+                
+                <button type="submit" class="btn-whatsapp-glow" style="width: 100%; border: none; cursor: pointer;">
+                    ACEITAR E AGENDAR ENTREGA
+                </button>
+            </form>
+            
+            <a href="/busca" class="btn-refazer">Avaliar outro produto</a>
+        </div>
+
+        <footer class="oferta-footer">
+            <p>* Valor sujeito a conferência física dos itens.</p>
+            <p>Pagamento realizado imediatamente após a perícia.</p>
+        </footer>
+    </div>
+</div>
+
+<style>
+    /* Estilos originais mantidos integralmente */
+    .container-resultado { 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        padding: 20px; 
+        min-height: 70vh; 
+    }
+    
+    .card-oferta { 
+        background: #1e1e1e; 
+        border: 2px solid #00ff00; 
+        border-radius: 24px; 
+        padding: 40px; 
+        text-align: center; 
+        max-width: 500px; 
+        width: 100%; 
+        box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
+    }
+
+    .pix-badge { 
+        background: #00ff00; 
+        color: #000; 
+        padding: 6px 16px; 
+        border-radius: 50px; 
+        font-weight: bold; 
+        font-size: 12px; 
+        letter-spacing: 1px;
+    }
+
+    .produto-nome-display { 
+        margin-top: 20px; 
+        color: #bbb; 
+        text-transform: uppercase; 
+        font-size: 16px; 
+        letter-spacing: 1px; 
+    }
+
+    .valor-container { margin: 30px 0; }
+    .simbolo-monetario { color: #00ff00; font-size: 24px; vertical-align: top; margin-right: 5px; font-weight: bold; }
+    .valor-pix { color: #00ff00; font-size: 72px; font-weight: bold; line-height: 1; }
+
+    .info-estado { color: #fff; margin-bottom: 30px; font-size: 18px; }
+    .info-estado strong { color: #00ff00; }
+
+    .btn-whatsapp-glow { 
+        display: block; 
+        background: #ffffff; 
+        color: #000; 
+        text-decoration: none; 
+        padding: 20px; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        font-size: 18px; 
+        transition: 0.3s; 
+        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+        font-family: 'Rajdhani', sans-serif;
+    }
+
+    .btn-whatsapp-glow:hover { 
+        background: #00ff00; 
+        transform: translateY(-3px); 
+        box-shadow: 0 10px 20px rgba(0, 255, 0, 0.2);
+    }
+
+    .btn-refazer { 
+        display: block; 
+        margin-top: 25px; 
+        color: #555; 
+        text-decoration: none; 
+        font-size: 14px; 
+        transition: 0.2s;
+    }
+    .btn-refazer:hover { color: #888; }
+
+    .oferta-footer { 
+        border-top: 1px solid #333; 
+        margin-top: 40px; 
+        padding-top: 20px; 
+        color: #666; 
+        font-size: 13px; 
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}

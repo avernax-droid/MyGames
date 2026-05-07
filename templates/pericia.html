@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Avaliação Técnica - MyGames{% endblock %}
+
+{% block content %}
+<div class="container-pericia">
+    <header class="pericia-header">
+        <h2>Estado de Conservação</h2>
+        <p class="instrucao">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+    </header>
+
+    <form action="/cotar" method="POST" class="form-pericia">
+        <!-- Listagem dinâmica das opções vindas do motor de cálculo (engine.py) -->
+        <div class="opcoes-wrapper">
+            {% for opcao in opcoes %}
+            <label class="radio-label">
+                <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
+                <div class="opcao-card">
+                    <div class="check-indicator"></div>
+                    <div class="opcao-info">
+                        <strong>{{ opcao.descricao }}</strong>
+                    </div>
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+
+        <button type="submit" class="btn-cotar-glow">CALCULAR OFERTA FINAL</button>
+    </form>
+
+    <a href="/busca" class="btn-voltar">← Voltar para seleção de produto</a>
+</div>
+
+<style>
+    .container-pericia { max-width: 650px; margin: auto; padding: 20px; }
+    .pericia-header { text-align: center; margin-bottom: 35px; }
+    .pericia-header h2 { color: #00ff00; font-size: 28px; margin-bottom: 10px; }
+    .instrucao { color: #888; font-size: 15px; }
+
+    .opcoes-wrapper { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
+    
+    /* Esconde o rádio padrão */
+    .radio-label input[type="radio"] { display: none; }
+
+    /* Card da opção */
+    .opcao-card {
+        display: flex;
+        align-items: center;
+        background: #1e1e1e;
+        border: 2px solid #333;
+        border-radius: 12px;
+        padding: 20px;
+        cursor: pointer;
+        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .opcao-card:hover { border-color: #555; background: #252525; }
+
+    /* Indicador circular de seleção */
+    .check-indicator {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #555;
+        border-radius: 50%;
+        margin-right: 20px;
+        position: relative;
+        transition: 0.3s;
+    }
+
+    /* Estado selecionado */
+    .radio-label input[type="radio"]:checked + .opcao-card {
+        border-color: #00ff00;
+        background: rgba(0, 255, 0, 0.05);
+    }
+
+    .radio-label input[type="radio"]:checked + .opcao-card .check-indicator {
+        border-color: #00ff00;
+        background: #00ff00;
+        box-shadow: 0 0 10px #00ff00;
+    }
+
+    .opcao-info strong { font-size: 17px; color: #fff; }
+
+    /* Botão de ação */
+    .btn-cotar-glow {
+        width: 100%;
+        background: #00ff00;
+        color: #000;
+        border: none;
+        padding: 20px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: 0.3s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .btn-cotar-glow:hover {
+        background: #00cc00;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        transform: translateY(-2px);
+    }
+
+    .btn-voltar {
+        display: block;
+        text-align: center;
+        margin-top: 25px;
+        color: #666;
+        text-decoration: none;
+        font-size: 14px;
+        transition: 0.2s;
+    }
+    .btn-voltar:hover { color: #888; }
+</style>
+{% endblock %}

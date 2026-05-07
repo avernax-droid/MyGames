@@ -1,0 +1,251 @@
+MEMÓRIA DE CONTEXTO: PROJETO MYGAMES (V1.7)
+1. O QUE É O PROJETO
+O MyGames é um sistema de logística reversa e recompra de produtos gamers (consoles e jogos usados). 
+Ele funciona como uma "esteira" que transforma a intenção de venda do cliente em um protocolo de envio para a loja.
+
+2. COMO O SISTEMA É ACESSADO (3 PORTAS)
+Direto: Link próprio do MyGames[cite: 7].
+
+Redirecionamento: Usuários vindos do site principal (lojatrocagame.com.br)[cite: 7].
+
+API/Chatbot: Interface para receber dados de sistemas de terceiros (a "Caixa Preta" mencionada)[cite: 7].
+
+3. O FLUXO DE TELAS (INTERPRETAÇÃO DO BENCHMARK)
+Interpretei que a aplicação deve ser estritamente visual e intuitiva[cite: 7]:
+
+Etapa 1 (Captação): O sistema primeiro "garante" o lead (Nome, WhatsApp, E-mail)[cite: 7].
+
+Etapa 2 (A Busca Inteligente): O usuário busca o que quer vender. Ao digitar, abre-se um box de produtos afins. Existem dicas de 
+busca para evitar erros[cite: 7].
+
+Etapa 3 (A Perícia Visual): O sistema exibe a foto oficial do item escolhido. O usuário seleciona a quantidade e marca as condições 
+em um checklist dinâmico (caixa, manual, riscos)[cite: 7].
+
+Etapa 4 (Carrinho): Permite adicionar vários itens antes de gerar o protocolo final[cite: 7].
+
+4. REGRAS DE NEGÓCIO E DADOS
+Precificação: O motor (engine.py) usa a planilha "2025" para calcular dois valores: PIX (dinheiro) e Crédito (troca na loja)[cite: 7].
+
+Logística: O protocolo gera um WhatsApp imediato. Após o aceite da cotação por e-mail, o sistema coleta dados sensíveis (CPF, PIX, 
+Endereço) e gera o código de frete reverso baseado no número de caixas[cite: 7].
+
+Prioridade: Este projeto é a prioridade número 1, o MyMiles está em segundo plano por enquanto[cite: 2].
+
+💡 Dica para o próximo chat:
+Quando você voltar, pode apenas dizer: "Gemini, leia o descritivo de contexto do MyGames e o PDF V1.7 que vou anexar. Vamos continuar 
+de onde paramos."
+
+=====
+
+30/04
+
+o projeto é um sistema de logística reversa e recompra de produtos gamers (consoles, jogos e acessórios). O objetivo principal é 
+automatizar o fluxo que vai desde o interesse do usuário em vender um item até o recebimento desse produto pela loja, com precificação dinâmica e inteligente.
+
+Aqui estão os pilares que sustentam o projeto:
+
+Multicanalidade: O sistema atende usuários via acesso direto, redirecionamentos (como da lojatrocagame.com.br) e até integrações com 
+chatbots externos ("Caixa Preta").
+
+Precificação Dinâmica (Sem Hardcode): Diferente de sistemas rígidos, o MyGames usa tabelas de configuração (categorias_avaliacao e 
+opcoes_estado) para calcular o valor de recompra com base em fatores de depreciação e valores fixos, dependendo do estado físico do 
+item.
+
+Carrinho Inverso: A jornada permite que o usuário adicione múltiplos itens a um único protocolo de venda, consolidando a transação.
+
+Logística Reversa Integrada: O sistema calcula e gera o frete de retorno com base na quantidade de caixas, utilizando os dados de 
+endereço coletados após o aceite da cotação.
+
+Dualidade de Pagamento: O motor de cálculo (engine.py) gera simultaneamente duas ofertas para o cliente: valor em dinheiro (via PIX) 
+e valor em crédito para uso na loja, sendo o crédito geralmente mais vantajoso para incentivar a troca.
+
+====
+refresh
+
+REFRESH DE MEMÓRIA: PROJETO MYGAMES (V1.8)
+1. CONTEXTO DO PROJETO
+Objetivo: Sistema de recompra e logística reversa de games (Consoles, Jogos, Acessórios).
+
+Módulo Principal: engine.py (Cálculos e Banco de Dados).
+
+Servidor: server.py (Flask gerenciando rotas e templates).
+
+Arquitetura: Separação total entre lógica de negócio (engine.py) e interface visual (HTMLs independentes em /templates).
+
+2. ESTADO DA ARQUITETURA DE DADOS (MySQL)
+Tabelas Consolidadas: clientes_usuarios, protocolos_recompra, itens_periciados e catalogo_mestre.
+
+Diferencial Técnico: Fim do hardcode. A Etapa 3 (Perícia) é montada dinamicamente pelas tabelas categorias_avaliacao e opcoes_estado.
+
+Logística: Endereço completo, CPF e Chave PIX são coletados apenas no pós-aceite da cotação.
+
+3. IDENTIDADE VISUAL (UI/UX)
+Tema: Gamer / High-Tech Dark Mode.
+
+Estética: Fundo escuro (#0f172a), detalhes em Laranja Neon (ações) e Azul Elétrico (créditos).
+
+Gamificação: Uso de "XP Bar" para indicar o progresso nas etapas.
+
+4. ONDE PARAMOS
+Tela Inicial (Etapa 1): O código HTML (index.html) e CSS (style.css) para captura de leads foi gerado e validado visualmente.
+
+Próximo Passo: Iniciar a Etapa 2 (Busca), focando no sistema de autocomplete que consome o catalogo_mestre via server.py.
+
+====
+
+01/05
+
+Checklist de Evolução: Projeto MyGames (V1.8+)
+1. Reestruturação do Banco de Dados (MySQL)
+Tarefa: Atualizar o script de criação da tabela clientes_usuarios para suportar a nova lógica geográfica e de auditoria.  
+
+Ação: Incluir coluna estado_nome (VARCHAR 100) para o nome completo.
+
+Ação: Manter coluna estado_uf (CHAR 2) para a sigla processada.
+
+2. Implementação do Auxiliar de Interface (ux-helper.js)
+Tarefa: Criar este novo módulo para gerenciar a interatividade da tela de Seleção.
+
+Máscara de Telefone: Desenvolver lógica que permita edição em qualquer posição do texto (sem travar o cursor) e formate como (00) 00000-0000.
+
+Autocomplete de Cidades: Implementar chamada fetch para a API do IBGE que filtre cidades conforme o usuário digita.
+
+Mapeador de Estados: Criar função que, ao selecionar a cidade, preencha automaticamente o nome do estado e sua respectiva UF.
+
+3. Ajustes nos Templates (HTML/CSS)
+Tarefa: Adaptar os arquivos visuais para os novos recursos de UX.
+
+base.html: Incluir a chamada do script ux-helper.js e preparar o container da logo do cliente no header.  
+
+selecao.html:
+
+Remover travas de maxlength no campo de telefone.
+
+Adicionar container dinâmico (dropdown) para exibir as sugestões de cidades vindas do IBGE.
+
+style.css: Criar a estilização do dropdown de cidades com a estética High-Tech Dark Mode (Fundo #1e293b e hover em Laranja Neon #fb923c).  
+
+4. Orquestração no Maestro (server.py)
+Tarefa: Atualizar as rotas para processar os novos dados.  
+
+Rota /selecionar (POST): Ajustar para receber estado_nome e estado_uf e repassar ao motor.
+
+Gestão de Sessão: Garantir que o cliente_id e os novos dados geográficos sejam persistidos para as próximas etapas (Busca e Perícia).  
+
+5. Atualização do Motor (engine.py)
+Tarefa: Refinar a comunicação com o banco de dados.  
+
+Função salvar_lead: Atualizar a query SQL para inserir os novos campos de estado na tabela clientes_usuarios.
+
+Preparação da Etapa 2: Deixar pronta a estrutura que receberá os itens buscados no catalogo_mestre.  
+
+🛠️ Resumo dos Módulos Envolvidos
+templates/base.html (Estrutura global e Assets)  
+
+templates/selecao.html (Interface da Etapa 1)  
+
+static/js/ux-helper.js (Novo - Lógica de Máscaras e API IBGE)
+
+static/css/style.css (Estilização do Dropdown Gamer)  
+
+server.py (Rotas e Sessão)  
+
+engine.py (Persistência no MySQL)  
+
+Quando você voltar, podemos começar pela codificação do ux-helper.js ou pelos ajustes no MySQL.
+
+=====
+
+01/05
+
+Relatório de Progresso: Projeto MyGames
+1. Onde Paramos (Ponto de Parada)
+O catálogo de produtos foi populado com sucesso via script Python (popula_catalogo.py). O banco de dados mygames_db já contém 
+64 itens reais extraídos do seu Excel. Além disso, realizamos a limpeza e a correção das plataformas via SQL.
+
+2. O que foi Concluído hoje
+Integração com o Banco: Configuramos o acesso via porta 3307 no WSL2/Ubuntu.
+
+Segurança de Acesso: Criamos o usuário dev_gamer com a senha projeto123 para contornar restrições do usuário root.
+
+Automação de Carga: O script Python agora possui uma função de limpeza que ignora títulos e trata erros de conversão de moeda 
+("Analise", "R$", etc.).
+
+Sanitização de Dados: Corrigimos via SQL as plataformas que estavam trocadas (Sony/Microsoft/Nintendo) e padronizamos nomes 
+repetidos como "Controle (Sony)" e "Controle (Microsoft)".
+
+Estrutura de Perícia: Definimos as tabelas de categorias_avaliacao e opcoes_estado para o cálculo de depreciação (Etapa 3).
+
+3. Ambiente Atualizado
+Schema: mygames_db.
+
+Usuário DB: dev_gamer.
+
+Host/Porta: 127.0.0.1:3307.
+
+Status do Catálogo: 64 registros ativos.
+
+4. Próximos Passos (Pendentes)
+Testar a Etapa 3 (Perícia): Verificar se o engine.py está buscando corretamente as perguntas de estado e aplicando os fatores 
+(0.90, 0.75, etc.) sobre o valor_pix_base.
+
+Ajuste Fino: Corrigir manualmente o item Fat - 500GB que ainda consta como Nintendo no banco (deve ser Sony).
+
+Fluxo de Lead: Testar a gravação final dos dados do cliente no banco após a cotação.
+
+Nota para o Refresh: "IA, os produtos já estão no banco mygames_db via porta 3307. Paramos na inserção das categorias de 
+avaliação para iniciar os testes da Etapa 3."
+
+
+=====
+07/05
+
+1. O que já Concluímos (Base Sólida)
+Identificação (Fase 1): O sistema captura o lead inicial (Nome, E-mail, WhatsApp, Cidade). Criamos a lógica de "Login Silencioso": se o e-mail já existe, o sistema recupera o ID do cliente em vez de criar um duplicado.
+
+Catálogo e Busca (Fase 2): Implementamos a busca em tempo real (autocomplete) consumindo o banco mygames_db. O usuário seleciona o console/jogo e o ID fica salvo na sessão.
+
+Perícia Técnica (Fase 3): Criamos a interface de seleção de estado de conservação, onde o usuário escolhe entre as opções (Excelente, Bom, etc.).
+
+Cálculo de Cotação (Fase 4): O engine.py já processa o Valor Base vs. Fator de Depreciação e apresenta o valor final em uma tela de oferta.
+
+UX & Máscaras: O arquivo ux-helper.js está funcional com máscaras de Telefone, CPF e CEP, além da integração com a API ViaCEP para preenchimento automático de endereço.
+
+Banco de Dados: Ajustamos a conexão para a porta 3307 (WSL2) e corrigimos o erro de protocolos duplicados adicionando um timestamp ao código gerado.
+
+2. O Fluxo de Transição (Onde estamos agora)
+Atualmente, o sistema exibe o resultado da cotação e pula para um botão de WhatsApp. Identificamos que este fluxo é frágil porque:
+
+O WhatsApp exige ação manual do usuário (ele pode fechar a aba e você perde o registro).
+
+O usuário pode finalizar sem ter preenchido dados essenciais (CPF, Endereço, PIX).
+
+Não há uma confirmação formal (E-mail) enviada pelo sistema.
+
+3. Alterações Pendentes (Próximos Passos)
+Para alinhar com sua nova diretriz, precisamos implementar:
+
+A. Firewall de Cadastro & Login (Fase 5)
+Alteração no server.py: Antes de mostrar qualquer confirmação, o sistema deve interceptar o usuário.
+
+Se Cadastro Incompleto: Redireciona para cadastro_complementar.html (CPF, CEP, Endereço, PIX).
+
+Se Cadastro Completo: Segue direto para a finalização.
+
+Persistência: Garantir que esses dados "sensíveis" sejam salvos no banco de dados na tabela clientes_usuarios.
+
+B. Substituição do WhatsApp por E-mail (Back-end)
+Novo Módulo de E-mail: Criar no engine.py a função que utiliza smtplib para disparar o resumo da compra (Protocolo, Item, Valor e Data de Entrega) diretamente para o e-mail do cliente.
+
+Gatilho Automático: O e-mail deve ser disparado pelo servidor no momento em que a proposta é gravada no banco, sem depender de clique externo do usuário.
+
+C. Gestão de Itens Múltiplos
+Lógica de Carrinho: Perguntar ao usuário: "Deseja avaliar outro item ou finalizar?".
+
+Outro item: Limpa a sessão do produto atual e volta para /busca.
+
+Finalizar: Dispara o processo de e-mail e encerra a jornada.
+
+D. Tela de Sucesso (Fim da Missão)
+Novo sucesso.html: Remover o botão de WhatsApp e substituir por uma confirmação de e-mail enviado, exibindo o protocolo final e um botão para "Novo Agendamento" (que limpa a sessão e desloga, se necessário).
+

@@ -1,4 +1,14 @@
 __pycache__/
-*.pyc
-.venv/
+env/
+venv/
 .env
+*.pyc
+.vscode/
+
+# Arquivos de dados e scripts de carga
+Troca Game Avaliação - Geral.xlsx
+base
+popula_catalogo.py
+
+# Documentação de estrutura
+estrutura.txt
