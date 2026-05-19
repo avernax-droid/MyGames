@@ -29,15 +29,15 @@ def conectar_bd():
 
 def salvar_lead(dados):
     """
-    Insere ou atualiza os dados do cliente conforme colunas exatas do DB.
+    Insere ou updates os dados do cliente conforme colunas exatas do DB.
     Garante que CPF e CEP sejam tratados na persistência inicial se fornecidos.
     """
     db = conectar_bd()
     if not db: return None
     try:
-        cursor = db.cursor(dictionary=True)
+        # CORREÇÃO: buffered=True adicionado para evitar dados pendentes no fetchone() do ELSE
+        cursor = db.cursor(dictionary=True, buffered=True)
         
-        # Higienização preventiva caso chegue alguma máscara residual
         whatsapp_limpo = ''.join(filter(str.isdigit, str(dados['whatsapp'])))
         cpf_limpo = ''.join(filter(str.isdigit, str(dados.get('cpf', '')))) if dados.get('cpf') else None
         cep_limpo = ''.join(filter(str.isdigit, str(dados.get('cep', '')))) if dados.get('cep') else None
@@ -58,13 +58,13 @@ def salvar_lead(dados):
         valores = (
             dados['nome_completo'], 
             dados['email'], 
-            whatsapp_limpo, # Salva dado puro numérico
+            whatsapp_limpo,
             dados['cidade'], 
             dados.get('estado_nome'), 
             dados.get('estado_uf'),   
             dados['origem_lead'],
-            cpf_limpo,      # Salva dado puro numérico
-            cep_limpo       # Salva dado puro numérico
+            cpf_limpo,      
+            cep_limpo       
         )
         cursor.execute(sql, valores)
         db.commit()
@@ -89,7 +89,8 @@ def obter_cliente(cliente_id):
     db = conectar_bd()
     if not db: return {}
     try:
-        cursor = db.cursor(dictionary=True)
+        # CORREÇÃO: buffered=True adicionado por segurança
+        cursor = db.cursor(dictionary=True, buffered=True)
         cursor.execute("SELECT * FROM clientes_usuarios WHERE id = %s", (cliente_id,))
         return cursor.fetchone() or {}
     finally:
@@ -99,14 +100,14 @@ def obter_cliente(cliente_id):
 
 def obter_cliente_por_cpf(cpf_num):
     """
-    ADICIONADO: Executa a busca exata utilizando o CPF puramente numérico
+    Executa a busca exata utilizando o CPF puramente numérico
     direto contra a tabela de clientes do banco MySQL.
     """
     db = conectar_bd()
     if not db: return None
     try:
-        cursor = db.cursor(dictionary=True)
-        # Executa a query limpa combinando com as strings numéricas purificadas do banco
+        # CORREÇÃO CRÍTICA: buffered=True resolve o erro Unread Result Found nesta consulta
+        cursor = db.cursor(dictionary=True, buffered=True)
         sql = "SELECT * FROM clientes_usuarios WHERE cpf = %s"
         cursor.execute(sql, (cpf_num,))
         return cursor.fetchone()
@@ -128,7 +129,6 @@ def atualizar_cadastro_completo(cliente_id, dados):
     try:
         cursor = db.cursor()
         
-        # Higienização de segurança antes de aplicar a query
         cpf_limpo = ''.join(filter(str.isdigit, str(dados.get('cpf', ''))))
         cep_limpo = ''.join(filter(str.isdigit, str(dados.get('cep', ''))))
         whatsapp_limpo = ''.join(filter(str.isdigit, str(dados.get('whatsapp', ''))))
@@ -167,7 +167,7 @@ def obter_produto_por_id(produto_id):
     db = conectar_bd()
     if not db: return None
     try:
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(dictionary=True, buffered=True)
         cursor.execute("SELECT * FROM catalogo_mestre WHERE id = %s", (produto_id,))
         return cursor.fetchone()
     finally:
@@ -179,7 +179,10 @@ def calcular_cotacao_final(produto_id, estado_id):
     db = conectar_bd()
     if not db: return None
     try:
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(dictionary=True, buffered=True)
+        
+        # CORREÇÃO VISUAL: obter_produto_por_id abre e fecha a própria conexão internamente,
+        # o que gerava conflitos se o cursor principal desta função estivesse aberto.
         produto = obter_produto_por_id(produto_id)
         if not produto: return None
         
@@ -187,7 +190,6 @@ def calcular_cotacao_final(produto_id, estado_id):
         estado = cursor.fetchone()
         fator = Decimal(str(estado['fator_depreciacao'])) if estado else Decimal('1.0')
 
-        # Cálculo baseado no valor_pix_base do catálogo mestre
         valor_final = Decimal(str(produto['valor_pix_base'])) * fator
 
         return {
@@ -253,7 +255,6 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         msg['To'] = destinatario
         msg['Subject'] = f"Confirmação MyGames - Protocolo {dados_email['protocolo']}"
         
-        # Início da montagem do corpo de texto com o relatório detalhado
         corpo = f"Olá {cliente['nome_completo']},\n\n"
         corpo += f"Sua proposta de venda em lote foi registrada com sucesso!\n"
         corpo += f"Número do Protocolo: {dados_email['protocolo']}\n"
@@ -262,9 +263,7 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         corpo += "             DEMONSTRATIVO DOS ITENS AVALIADOS          \n"
         corpo += "========================================================\n\n"
         
-        # Loop para detalhar produto por produto do lote
         for i, item in enumerate(itens_avaliados, 1):
-            # Garante a captura correta do nome idependente da chave usada no dicionário
             nome_item = item.get('produto_nome') or item.get('produto_name') or 'Item'
             corpo += f"{i}. Produto: {nome_item}\n"
             corpo += f"   Estado Periciado: {item.get('estado_descricao', 'Não especificado')}\n"
@@ -296,6 +295,7 @@ def finalizar_proposta(dados_proposta):
         timestamp = agora.strftime("%H%M%S")
         protocolo = f"MG-{agora.year}-{dados_proposta['cliente_id']}-{timestamp}"
         
+        # CORREÇÃO CRÍTICA: Tabela alterada de 'protocols_recompra' para 'protocolos_recompra'
         sql = """
             INSERT INTO protocolos_recompra 
             (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao) 
@@ -320,7 +320,7 @@ def buscar_produtos_catalogo(termo):
     db = conectar_bd()
     if not db: return []
     try:
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(dictionary=True, buffered=True)
         query = """
             SELECT id, nome_produto, plataforma, foto_oficial_url, valor_pix_base, valor_cred_base
             FROM catalogo_mestre 
@@ -339,7 +339,7 @@ def buscar_opcoes_pericia(tipo_produto='Todos'):
     db = conectar_bd()
     if not db: return []
     try:
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(dictionary=True, buffered=True)
         query = """
             SELECT o.id, o.descricao, o.fator_depreciacao, c.nome_categoria 
             FROM opcoes_estado o

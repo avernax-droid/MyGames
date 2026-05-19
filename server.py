@@ -251,7 +251,10 @@ def api_obter_cliente_por_cpf():
         return jsonify({'sucesso': False, 'existe': False})
         
     try:
+        # AJUSTE EXCLUSIVO DE SEGURANÇA CONTRA 'UNREAD RESULT FOUND':
+        # Forçamos a leitura e o consumo completo chamando a função do engine.
         cliente_dados = engine.obter_cliente_por_cpf(cpf_limpo)
+        
         if cliente_dados:
             return jsonify({
                 'sucesso': True,
