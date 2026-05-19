@@ -12,3 +12,7 @@ popula_catalogo.py
 
 # Documentação de estrutura
 estrutura.txt
+
+# Arquivos temporários e uploads locais
+logo.jpeg:Zone.Identifier
+static/uploads/

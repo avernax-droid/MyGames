@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}Resumo do Lote - MyGames{% endblock %}
+
+{% block content %}
+<div class="container-resumo">
+    <div class="card-resumo">
+        <header class="resumo-header">
+            <h2>Confira os itens do seu lote</h2>
+        </header>
+        
+        <div class="tabela-lote-container">
+            <table class="tabela-lote">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;"></th>
+                        <th>Item</th>
+                        <th class="text-right">Valor PIX</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens %}
+                    <tr>
+                        <td>
+                            <!-- CORREÇÃO: Estrutura estática sem onerror para eliminar o loop do pisca-pisca -->
+                            <div class="produto-thumb-mini">
+                                {% if item.foto_url and item.foto_url != 'None' and item.foto_url != '' %}
+                                    <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}">
+                                {% else %}
+                                    <span style="font-size: 22px; line-height: 1;">🎮</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <!-- CORREÇÃO: Corrigido de item.produto_name para item.produto_nome -->
+                            <div class="produto-nome">{{ item.produto_nome }}</div>
+                            <div class="produto-detalhes">
+                                <span class="estado-lote-texto">{{ item.estado_descricao or 'Estado Geral' }}</span> | 
+                                Qtd: {{ item.quantidade }} 
+                                {% if item.comentarios %}
+                                 | <span class="obs-tag">Com observações</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="text-right valor-item">
+                            R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="total-container">
+            <span class="total-label">TOTAL DO LOTE:</span>
+            <span class="total-valor">R$ {{ "%.2f"|format(total_lote) }}</span>
+        </div>
+        
+        <div class="acoes-lote">
+            <a href="{{ url_for('identificacao') }}" class="btn-prosseguir">
+                CONTINUAR
+            </a>
+            
+            <button onclick="confirmarDescarte()" class="btn-descartar">
+                DESCARTAR
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // CORREÇÃO: Chamando a URL estática diretamente para evitar erros de Build do Flask no Jinja
+    function confirmarDescarte() {
+        const confirmar = confirm("Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?");
+        if (confirmar) {
+            window.location.href = "/descartar-lote";
+        }
+    }
+</script>
+
+<style>
+    .container-resumo { 
+        display: flex; justify-content: center; align-items: center; 
+        padding: 20px; min-height: 70vh; 
+    }
+    
+    .card-resumo { 
+        background: #1e1e1e; border: 2px solid #00ff00; border-radius: 24px; 
+        padding: 30px; max-width: 650px; width: 100%; 
+        box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
+    }
+
+    .resumo-header { text-align: center; margin-bottom: 25px; }
+    .resumo-header h2 { color: #fff; margin-top: 0; font-size: 22px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+
+    .tabela-lote-container {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 20px;
+        max-height: 350px;
+        overflow-y: auto;
+    }
+
+    .tabela-lote {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .tabela-lote th {
+        color: #666;
+        font-size: 11px;
+        text-transform: uppercase;
+        padding: 10px;
+        border-bottom: 1px solid #333;
+    }
+
+    .tabela-lote td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #222;
+        vertical-align: middle;
+    }
+
+    .tabela-lote tr:last-child td {
+        border-bottom: none;
+    }
+
+    .produto-thumb-mini {
+        width: 50px;
+        height: 50px;
+        background: #000;
+        border: 1px solid #333;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .produto-thumb-mini img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .produto-nome { color: #fff; font-weight: bold; font-size: 14px; text-transform: uppercase; }
+    .produto-detalhes { color: #666; font-size: 12px; margin-top: 2px; }
+    
+    .estado-lote-texto { color: #00ff00; font-weight: bold; text-transform: uppercase; font-size: 11px; }
+    .obs-tag { color: #aaa; font-style: italic; }
+
+    .text-right { text-align: right; }
+    .valor-item { color: #00ff00; font-family: monospace; font-size: 15px; font-weight: bold; }
+
+    .total-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 15px;
+        background: rgba(0, 255, 0, 0.05);
+        border-radius: 12px;
+        border: 1px dashed #00ff00;
+        margin-bottom: 25px;
+    }
+
+    .total-label { color: #fff; font-weight: bold; font-size: 16px; text-transform: uppercase; }
+    .total-valor { color: #00ff00; font-size: 26px; font-weight: bold; font-family: monospace; }
+
+    .acoes-lote {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .btn-prosseguir { 
+        display: block; width: 100%; text-decoration: none; text-align: center;
+        background: #ffffff; color: #000; padding: 18px 0; border-radius: 12px; 
+        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
+        box-sizing: border-box; text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    .btn-prosseguir:hover { 
+        background: #00ff00; transform: translateY(-2px); 
+        box-shadow: 0 8px 20px rgba(0, 255, 0, 0.2);
+    }
+
+    .btn-descartar {
+        display: block; width: 100%; text-align: center;
+        background: #262626; color: #ff4444; padding: 18px 0; border-radius: 12px;
+        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
+        box-sizing: border-box; border: 1px solid #444; text-transform: uppercase;
+        cursor: pointer; letter-spacing: 1px;
+    }
+    .btn-descartar:hover {
+        background: #333; border-color: #ff4444; transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 68, 68, 0.1);
+    }
+</style>
+{% endblock %}

@@ -3,21 +3,22 @@ from mysql.connector import Error
 from decimal import Decimal
 import datetime
 import smtplib
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 def conectar_bd():
     """
     Configuração para o ambiente WSL2/Ubuntu do MyGames.
-    Usa 127.0.0.1 para evitar problemas de DNS do 'localhost'.
+    Usa 127.0.0.1 para evitar problemas de DNS (Porta 3307).
     """
     try:
         connection = mysql.connector.connect(
             host="127.0.0.1",
-            port=3307,            # Porta definida para o projeto
-            user="dev_gamer",     # Usuário criado para segurança
-            password="projeto123", # Senha definida no setup
-            database="mygames_db" # Nome correto do schema
+            port=3307,
+            user="dev_gamer",
+            password="projeto123",
+            database="mygames_db"
         )
         return connection
     except Error as e:
@@ -28,25 +29,43 @@ def conectar_bd():
 
 def salvar_lead(dados):
     """
-    Insere ou atualiza os dados do cliente na tabela clientes_usuarios.
+    Insere ou atualiza os dados do cliente conforme colunas exatas do DB.
+    Garante que CPF e CEP sejam tratados na persistência inicial se fornecidos.
     """
     db = conectar_bd()
     if not db: return None
     try:
         cursor = db.cursor(dictionary=True)
+        
+        # Higienização preventiva caso chegue alguma máscara residual
+        whatsapp_limpo = ''.join(filter(str.isdigit, str(dados['whatsapp'])))
+        cpf_limpo = ''.join(filter(str.isdigit, str(dados.get('cpf', '')))) if dados.get('cpf') else None
+        cep_limpo = ''.join(filter(str.isdigit, str(dados.get('cep', '')))) if dados.get('cep') else None
+
         sql = """
             INSERT INTO clientes_usuarios 
-            (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead, cpf, cep) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
             nome_completo = VALUES(nome_completo),
             whatsapp = VALUES(whatsapp),
             cidade = VALUES(cidade),
             estado_nome = VALUES(estado_nome),
-            estado_uf = VALUES(estado_uf)
+            estado_uf = VALUES(estado_uf),
+            cpf = COALESCE(VALUES(cpf), cpf),
+            cep = COALESCE(VALUES(cep), cep)
         """
-        valores = (dados['nome_completo'], dados['email'], dados['whatsapp'], 
-                   dados['cidade'], dados['estado_nome'], dados['estado_uf'], dados['origem_lead'])
+        valores = (
+            dados['nome_completo'], 
+            dados['email'], 
+            whatsapp_limpo, # Salva dado puro numérico
+            dados['cidade'], 
+            dados.get('estado_nome'), 
+            dados.get('estado_uf'),   
+            dados['origem_lead'],
+            cpf_limpo,      # Salva dado puro numérico
+            cep_limpo       # Salva dado puro numérico
+        )
         cursor.execute(sql, valores)
         db.commit()
         
@@ -64,12 +83,9 @@ def salvar_lead(dados):
             cursor.close()
             db.close()
 
-# --- MÓDULO DE GESTÃO DE CLIENTES (PONTUAL PARA ETAPA 5) ---
+# --- MÓDULO DE GESTÃO DE CLIENTES ---
 
 def obter_cliente(cliente_id):
-    """
-    PONTUAL: Recupera todos os dados de um cliente específico para validação de cadastro.
-    """
     db = conectar_bd()
     if not db: return {}
     try:
@@ -81,24 +97,58 @@ def obter_cliente(cliente_id):
             cursor.close()
             db.close()
 
+def obter_cliente_por_cpf(cpf_num):
+    """
+    ADICIONADO: Executa a busca exata utilizando o CPF puramente numérico
+    direto contra a tabela de clientes do banco MySQL.
+    """
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        # Executa a query limpa combinando com as strings numéricas purificadas do banco
+        sql = "SELECT * FROM clientes_usuarios WHERE cpf = %s"
+        cursor.execute(sql, (cpf_num,))
+        return cursor.fetchone()
+    except Error as e:
+        print(f"ERRO ao buscar cliente por CPF: {e}")
+        return None
+    finally:
+        if db.is_connected():
+            cursor.close()
+            db.close()
+
 def atualizar_cadastro_completo(cliente_id, dados):
     """
-    PONTUAL: Atualiza os dados sensíveis e de endereço do cliente.
+    Atualiza dados do Level 5 usando a nomenclatura correta da tabela.
+    Garante persistência de dados higienizados sem máscaras de string.
     """
     db = conectar_bd()
     if not db: return False
     try:
         cursor = db.cursor()
+        
+        # Higienização de segurança antes de aplicar a query
+        cpf_limpo = ''.join(filter(str.isdigit, str(dados.get('cpf', ''))))
+        cep_limpo = ''.join(filter(str.isdigit, str(dados.get('cep', ''))))
+        whatsapp_limpo = ''.join(filter(str.isdigit, str(dados.get('whatsapp', ''))))
+
         sql = """
             UPDATE clientes_usuarios 
-            SET cpf = %s, cep = %s, endereco = %s, numero = %s, 
+            SET cpf = %s, cep = %s, whatsapp = %s, endereco = %s, numero = %s,
                 complemento = %s, bairro = %s, chave_pix = %s
             WHERE id = %s
         """
         valores = (
-            dados.get('cpf'), dados.get('cep'), dados.get('endereco'),
-            dados.get('numero'), dados.get('complemento'), dados.get('bairro'),
-            dados.get('chave_pix'), cliente_id
+            cpf_limpo, 
+            cep_limpo,
+            whatsapp_limpo,
+            dados.get('endereco'), 
+            dados.get('numero'), 
+            dados.get('complemento'), 
+            dados.get('bairro'),
+            dados.get('chave_pix'), 
+            cliente_id
         )
         cursor.execute(sql, valores)
         db.commit()
@@ -111,81 +161,151 @@ def atualizar_cadastro_completo(cliente_id, dados):
             cursor.close()
             db.close()
 
+# --- MÓDULO DE PERÍCIA E CÁLCULOS ---
+
+def obter_produto_por_id(produto_id):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM catalogo_mestre WHERE id = %s", (produto_id,))
+        return cursor.fetchone()
+    finally:
+        if db.is_connected():
+            cursor.close()
+            db.close()
+
+def calcular_cotacao_final(produto_id, estado_id):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        produto = obter_produto_por_id(produto_id)
+        if not produto: return None
+        
+        cursor.execute("SELECT fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
+        estado = cursor.fetchone()
+        fator = Decimal(str(estado['fator_depreciacao'])) if estado else Decimal('1.0')
+
+        # Cálculo baseado no valor_pix_base do catálogo mestre
+        valor_final = Decimal(str(produto['valor_pix_base'])) * fator
+
+        return {
+            "produto": produto['nome_produto'],
+            "valor_final": float(valor_final)
+        }
+    except Exception as e:
+        print(f"ERRO no cálculo de cotação: {e}")
+        return None
+    finally:
+        if db.is_connected():
+            cursor.close()
+            db.close()
+
+def registrar_item_periciado(protocolo_id, item):
+    """
+    Grava o item na tabela itens_periciados vinculando ao protocolo.
+    """
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        sql = """
+            INSERT INTO itens_periciados 
+            (protocolo_id, produto_id, quantidade, fotos_json, comentarios, 
+             valor_pix_unitario, valor_cred_unitario) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        valores = (
+            protocolo_id, 
+            item['produto_id'], 
+            item.get('quantidade', 1),
+            item.get('fotos_json'), 
+            item.get('comentarios', ''),
+            item['valor_pix_unitario'], 
+            item['valor_cred_unitario']
+        )
+        cursor.execute(sql, valores)
+        db.commit()
+        return True
+    except Error as e:
+        print(f"ERRO ao registrar item periciado: {e}")
+        return False
+    finally:
+        if db.is_connected():
+            cursor.close()
+            db.close()
+
 # --- MÓDULO DE FINALIZAÇÃO E E-MAIL ---
 
-def enviar_email_resumo(cliente, dados_finais):
+def enviar_email_resumo(cliente, dados_email, itens_avaliados):
     """
-    ENVIO REAL: Utiliza o servidor SMTP do Gmail para enviar o protocolo.
-    PONTUAL: Alterado de simulação para envio real conforme solicitado.
+    Monta um demonstrativo financeiro detalhado com todos os produtos avaliados,
+    seus respectivos estados físicos e comentários da perícia.
     """
     try:
-        # PONTUAL: Substitua pelas suas credenciais geradas no Google Account
         remetente = "avernax@gmail.com" 
         senha_app = "nmmawgxrhuyzfpoe" 
-        
         destinatario = cliente['email']
-        protocolo = dados_finais['protocolo']
         
         msg = MIMEMultipart()
         msg['From'] = remetente
         msg['To'] = destinatario
-        msg['Subject'] = f"Confirmação de Agendamento MyGames - {protocolo}"
+        msg['Subject'] = f"Confirmação MyGames - Protocolo {dados_email['protocolo']}"
         
-        corpo = f"""
-        Olá {cliente['nome_completo']},
-
-        Seu agendamento no MyGames foi concluído com sucesso!
-
-        --- DETALHES DA PROPOSTA ---
-        Protocolo: {protocolo}
-        Item: {dados_finais['produto_nome']}
-        Valor Final: R$ {dados_finais['valor_final']:.2f}
-        Data da Entrega: {dados_finais['data_agendada']}
-        Período: {dados_finais['periodo']}
-        ----------------------------
-
-        Nossa equipe entrará em contato em breve para os próximos passos.
-        """
+        # Início da montagem do corpo de texto com o relatório detalhado
+        corpo = f"Olá {cliente['nome_completo']},\n\n"
+        corpo += f"Sua proposta de venda em lote foi registrada com sucesso!\n"
+        corpo += f"Número do Protocolo: {dados_email['protocolo']}\n"
+        corpo += f"Quantidade de Itens: {dados_email['quantidade_itens']}\n\n"
+        corpo += "========================================================\n"
+        corpo += "             DEMONSTRATIVO DOS ITENS AVALIADOS          \n"
+        corpo += "========================================================\n\n"
+        
+        # Loop para detalhar produto por produto do lote
+        for i, item in enumerate(itens_avaliados, 1):
+            # Garante a captura correta do nome idependente da chave usada no dicionário
+            nome_item = item.get('produto_nome') or item.get('produto_name') or 'Item'
+            corpo += f"{i}. Produto: {nome_item}\n"
+            corpo += f"   Estado Periciado: {item.get('estado_descricao', 'Não especificado')}\n"
+            if item.get('comentarios'):
+                corpo += f"   Notas do Perito: {item['comentarios']}\n"
+            corpo += f"   Valor de Compra: R$ {item['valor_pix_unitario']:.2f} (PIX)\n"
+            corpo += "--------------------------------------------------------\n"
+            
+        corpo += f"\nVALOR TOTAL CONSOLIDADO DO LOTE: R$ {dados_email['total_pix']:.2f}\n\n"
+        corpo += "Obrigado por vender na MyGames!"
+        
         msg.attach(MIMEText(corpo, 'plain'))
-
-        # Conexão segura com o SMTP do Gmail
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(remetente, senha_app)
         server.send_message(msg)
         server.quit()
-        
-        print(f"--- [OK] E-MAIL ENVIADO PARA: {destinatario} ---")
         return True
     except Exception as e:
-        print(f"--- [ERRO] FALHA NO ENVIO REAL: {e} ---")
+        print(f"ERRO NO ENVIO DE E-MAIL DETALHADO: {e}")
         return False
 
-def finalizar_proposta(dados):
-    """
-    Registra o protocolo final e retorna o número gerado.
-    """
+def finalizar_proposta(dados_proposta):
     db = conectar_bd()
     if not db: return None
     try:
         cursor = db.cursor()
-        
         agora = datetime.datetime.now()
         timestamp = agora.strftime("%H%M%S")
-        protocolo = f"MG-{agora.year}-{dados['cliente_id']}{dados['produto_id']}-{timestamp}"
+        protocolo = f"MG-{agora.year}-{dados_proposta['cliente_id']}-{timestamp}"
         
         sql = """
             INSERT INTO protocolos_recompra 
-            (cliente_id, numero_protocolo, status, data_criacao) 
-            VALUES (%s, %s, 'Aberto', NOW())
+            (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao) 
+            VALUES (%s, %s, 'Aberto', %s, %s, NOW())
         """
-        cursor.execute(sql, (dados['cliente_id'], protocolo))
+        valores = (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred'])
+        cursor.execute(sql, valores)
+        protocolo_id = cursor.lastrowid
         db.commit()
-        
-        from flask import session
-        session['ultimo_protocolo'] = protocolo
-        
-        return protocolo
+        return {"id": protocolo_id, "numero": protocolo}
     except Error as e:
         print(f"ERRO ao finalizar proposta: {e}")
         return None
@@ -202,57 +322,36 @@ def buscar_produtos_catalogo(termo):
     try:
         cursor = db.cursor(dictionary=True)
         query = """
-            SELECT id, nome_produto, plataforma, foto_oficial_url 
+            SELECT id, nome_produto, plataforma, foto_oficial_url, valor_pix_base, valor_cred_base
             FROM catalogo_mestre 
-            WHERE (nome_produto LIKE %s OR plataforma LIKE %s)
+            WHERE (nome_produto LIKE %s OR plataforma LIKE %s OR sku_interno LIKE %s)
             AND ativo = 1 LIMIT 10
         """
         like_termo = f"%{termo}%"
-        cursor.execute(query, (like_termo, like_termo))
+        cursor.execute(query, (like_termo, like_termo, like_termo))
         return cursor.fetchall()
     finally:
         if db.is_connected():
             cursor.close()
             db.close()
 
-# --- MÓDULO DE PERÍCIA E CÁLCULO ---
-
-def buscar_opcoes_pericia(categoria_id=None):
+def buscar_opcoes_pericia(tipo_produto='Todos'):
     db = conectar_bd()
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        query = "SELECT id, descricao, fator_depreciacao FROM opcoes_estado ORDER BY exibir_ordem"
-        cursor.execute(query)
-        return cursor.fetchall()
-    finally:
-        if db.is_connected():
-            cursor.close()
-            db.close()
-
-def calcular_cotacao_final(produto_id, id_opcao_estado):
-    db = conectar_bd()
-    if not db: return None
-    try:
-        cursor = db.cursor(dictionary=True)
         query = """
-            SELECT c.nome_produto, c.valor_pix_base, o.descricao, o.fator_depreciacao
-            FROM catalogo_mestre c
-            CROSS JOIN opcoes_estado o
-            WHERE c.id = %s AND o.id = %s
+            SELECT o.id, o.descricao, o.fator_depreciacao, c.nome_categoria 
+            FROM opcoes_estado o
+            JOIN categorias_avaliacao c ON o.categoria_id = c.id
+            WHERE c.tipo_produto = %s OR c.tipo_produto = 'Todos'
+            ORDER BY c.id, o.exibir_ordem
         """
-        cursor.execute(query, (produto_id, id_opcao_estado))
-        resultado = cursor.fetchone()
-        if resultado:
-            valor_base = Decimal(str(resultado['valor_pix_base']))
-            fator = Decimal(str(resultado['fator_depreciacao']))
-            valor_final = valor_base * fator
-            return {
-                "produto": resultado['nome_produto'],
-                "estado": resultado['descricao'],
-                "valor_final": float(valor_final)
-            }
-        return None
+        cursor.execute(query, (tipo_produto,))
+        return cursor.fetchall()
+    except Error as e:
+        print(f"ERRO ao buscar opções: {e}")
+        return []
     finally:
         if db.is_connected():
             cursor.close()

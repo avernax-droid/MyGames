@@ -3,45 +3,50 @@
 {% block title %}Agendamento Concluído{% endblock %}
 
 {% block content %}
-<div class="card-lead" style="text-align: center;">
+<div class="card-lead" style="text-align: center; max-width: 550px; margin: auto;">
     <div class="xp-bar-container">
-        <!-- Barra 100% Completa -->
         <div class="xp-bar-fill" style="width: 100%;"></div>
         <span class="xp-text">MISSION ACCOMPLISHED</span>
     </div>
 
     <header style="margin-bottom: 30px;">
-        <div style="font-size: 60px; color: #00ff00; margin-bottom: 10px;">✓</div>
-        <h2 style="font-family: 'Rajdhani', sans-serif; color: var(--neon-orange); text-transform: uppercase; margin: 0;">
+        <div style="font-size: 60px; color: #00ffcc; margin-bottom: 10px;">✓</div>
+        <h2 style="font-family: 'Rajdhani', sans-serif; color: #ff8c00; text-transform: uppercase; margin: 0;">
             Protocolo Gerado!
         </h2>
-        <p style="color: var(--text-dim); margin-top: 5px;">
-            Um resumo foi enviado para <strong>{{ session.get('player_email') }}</strong>.
+        <p style="color: #888; margin-top: 5px;">
+            Um resumo detalhado com o demonstrativo dos itens foi enviado para <strong>{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
         </p>
     </header>
 
-    <!-- BOX DE PROTOCOLO DINÂMICO -->
-    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px dashed var(--neon-blue); margin-bottom: 25px;">
-        <span style="display: block; font-size: 0.75rem; color: var(--neon-blue); margin-bottom: 5px; text-transform: uppercase;">Código de Rastreio</span>
-        <strong style="font-size: 1.3rem; letter-spacing: 1px; color: #fff;">
-            {{ session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
+    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px dashed #00d4ff; margin-bottom: 25px;">
+        <span style="display: block; font-size: 0.75rem; color: #00d4ff; margin-bottom: 5px; text-transform: uppercase;">Código de Protocolo</span>
+        <strong style="font-size: 1.5rem; letter-spacing: 2px; color: #fff; font-family: 'Courier New', monospace;">
+            {{ protocolo if protocolo else session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
         </strong>
     </div>
 
-    <!-- RESUMO VISUAL NO CARD -->
-    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; margin-bottom: 30px; font-size: 0.9rem; border-left: 3px solid var(--neon-blue);">
-        <p style="margin: 5px 0; color: var(--text-dim);"><strong>Item:</strong> <span style="color: #fff;">{{ session.get('produto_nome', 'Produto') }}</span></p>
-        <p style="margin: 5px 0; color: var(--text-dim);"><strong>Valor:</strong> <span style="color: #00ff00;">R$ {{ "%.2f"|format(session.get('valor_final', 0)) }}</span></p>
+    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; margin-bottom: 30px; font-size: 0.95rem; border-left: 4px solid #00ffcc;">
+        <p style="margin: 8px 0; color: #aaa;"><strong>Total de Itens do Lote:</strong> <span style="color: #fff;">{{ session.get('itens_avaliados', [])|length }}</span></p>
+        <p style="margin: 8px 0; color: #aaa;"><strong>Valor Total da Proposta:</strong> <span style="color: #00ffcc; font-weight: bold; font-size: 1.2rem;">R$ {{ "%.2f"|format(total_lote) }}</span></p>
     </div>
 
-    <!-- Botão para Novo Agendamento (Mantém o login, limpa apenas o produto) -->
-    <a href="{{ url_for('novo_agendamento') }}" 
-       class="btn-glow" 
-       style="text-decoration: none; display: block; padding: 20px; text-transform: uppercase;">
-        AVALIAR OUTRO ITEM
-    </a>
-
-    <!-- PONTUAL: Link alterado para a rota /sair, garantindo a limpeza total da sessão -->
-    <a href="{{ url_for('sair') }}" class="btn-refazer" style="display: inline-block; margin-top: 25px;">Sair e encerrar</a>
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        <!-- Botão 'Avaliar Outro Item' removido para forçar o encerramento seguro da sessão do lote -->
+        <a href="{{ url_for('sair') }}" 
+           class="btn-glow-exit"
+           style="text-decoration: none; display: block; padding: 18px; text-transform: uppercase; background: #ff8c00; color: #000; font-weight: bold; border-radius: 8px; font-family: 'Rajdhani', sans-serif; font-size: 1.1rem;">
+            Encerrar Sessão de {{ session.get('player_nome', 'Jogador') }}
+        </a>
+    </div>
 </div>
+
+<style>
+    .card-lead { background: #1e1e1e; padding: 40px; border-radius: 20px; border: 1px solid #333; }
+    .xp-bar-container { background: #000; height: 25px; position: relative; border-radius: 50px; margin-bottom: 30px; overflow: hidden; border: 1px solid #333; }
+    .xp-bar-fill { background: linear-gradient(90deg, #00ffcc, #00aa88); height: 100%; transition: 1s ease-out; }
+    .xp-text { position: absolute; width: 100%; text-align: center; top: 3px; font-size: 12px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
+    .btn-glow-exit { transition: 0.3s; }
+    .btn-glow-exit:hover { box-shadow: 0 0 20px rgba(255, 140, 0, 0.4); transform: translateY(-2px); filter: brightness(1.1); }
+</style>
 {% endblock %}

@@ -1,160 +1,284 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
-import engine  # Importa o motor de lógica e banco de dados
-import datetime
+from werkzeug.utils import secure_filename
+from datetime import datetime
+import engine  # Motor de lógica e banco de dados
+import json
 
 app = Flask(__name__)
-app.secret_key = 'mygames_key_2026' # Chave para criptografia de sessão
+app.secret_key = 'mygames_key_2026'
+
+# --- FILTROS CUSTOMIZADOS PARA O JINJA2 ---
+@app.template_filter('from_json')
+def from_json_filter(value):
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return []
+    return value
+
+# --- CONFIGURAÇÃO DE UPLOADS ---
+UPLOAD_FOLDER = 'static/uploads/pericia'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- ROTAS DE NAVEGAÇÃO ---
 
 @app.route('/')
 def index():
-    """
-    Etapa 1: Identificação do Cliente.
-    """
-    return render_template('selecao.html', fase_atual=1)
-
-@app.route('/selecionar', methods=['POST'])
-def selecionar():
-    """
-    Processa o lead e redireciona para a busca.
-    """
-    dados_lead = {
-        'nome_completo': request.form.get('nome_completo'),
-        'email': request.form.get('email'),
-        'whatsapp': request.form.get('whatsapp'),
-        'cidade': request.form.get('cidade'),
-        'estado_nome': request.form.get('estado_nome'), 
-        'estado_uf': request.form.get('estado_uf'),     
-        'origem_lead': request.form.get('origem_lead', 'Direto')
-    }
-
-    cliente_id = engine.salvar_lead(dados_lead)
-
-    if cliente_id:
-        session['cliente_id'] = cliente_id
-        session['player_nome'] = dados_lead['nome_completo']
-        session['player_email'] = dados_lead['email']
-        return redirect(url_for('busca'))
-    else:
-        return "Erro ao processar identificação.", 500
+    if 'itens_avaliados' not in session:
+        session['itens_avaliados'] = []
+    return render_template('busca.html', fase_atual=1)
 
 @app.route('/busca')
 def busca():
-    """
-    Etapa 2: Seleção do Produto.
-    """
-    if 'cliente_id' not in session:
-        return redirect(url_for('index'))
-    
-    return render_template('busca.html', fase_atual=2)
-
-# --- ETAPA 3: AVALIAÇÃO TÉCNICA (PERÍCIA) ---
+    if 'itens_avaliados' not in session:
+        session['itens_avaliados'] = []
+    return render_template('busca.html', fase_atual=1)
 
 @app.route('/pericia/<int:produto_id>')
 def pericia(produto_id):
-    """
-    Etapa 3: Estado de Conservação.
-    """
-    if 'cliente_id' not in session:
-        return redirect(url_for('index'))
-
-    opcoes = engine.buscar_opcoes_pericia()
+    produto = engine.obter_produto_por_id(produto_id)
+    
+    tipo_produto = 'Console'
+    if produto:
+        nome = produto.get('nome_produto', '').upper()
+        if any(x in nome for x in ['JOGO', 'CD', 'DVD', 'MIDIA']):
+            tipo_produto = 'Jogo'
+    
+    opcoes = engine.buscar_opcoes_pericia(tipo_produto)
     session['produto_selecionado_id'] = produto_id
     
-    return render_template('pericia.html', opcoes=opcoes, produto_id=produto_id, fase_atual=3)
+    return render_template('pericia.html', opcoes=opcoes, produto_id=produto_id, fase_atual=1)
 
+# 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
 @app.route('/cotar', methods=['POST'])
 def cotar():
-    """
-    Etapa 4: Oferta Final.
-    """
-    if 'cliente_id' not in session or 'produto_selecionado_id' not in session:
-        return redirect(url_for('index'))
-
-    estado_id = request.form.get('estado_id')
     produto_id = session.get('produto_selecionado_id')
-
-    session['estado_conservacao_id'] = estado_id
+    estado_id = request.form.get('estado_id')
+    comentarios = request.form.get('comentarios', '')
+    
+    fotos_salvas = []
+    if 'fotos' in request.files:
+        files = request.files.getlist('fotos')
+        for file in files:
+            if file and allowed_file(file.filename):
+                ts = datetime.now().strftime("%H%M%S")
+                cli_prefix = session.get('cliente_id', 'anon')
+                filename = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                fotos_salvas.append(filename)
 
     resultado = engine.calcular_cotacao_final(produto_id, estado_id)
 
     if resultado:
-        session['produto_nome'] = resultado['produto']
-        session['valor_final'] = resultado['valor_final']
-        return render_template('resultado.html', cotacao=resultado, fase_atual=4)
-    else:
-        return "Erro ao calcular cotação final.", 500
+        produto_info = engine.obter_produto_por_id(produto_id)
+        foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
+        resultado['foto_url'] = foto_url_final
 
-# --- ETAPA 5: FIREWALL DE CADASTRO E FINALIZAÇÃO ---
+        tipo_produto = 'Console'
+        if produto_info:
+            nome = produto_info.get('nome_produto', '').upper()
+            if any(x in nome for x in ['JOGO', 'CD', 'DVD', 'MIDIA']):
+                tipo_produto = 'Jogo'
+        
+        opcoes = engine.buscar_opcoes_pericia(tipo_produto)
+        descricao_estado = "Estado Selecionado"
+        if opcoes:
+            for op in opcoes:
+                if str(op.get('id')) == str(estado_id):
+                    descricao_estado = op.get('descricao')
+                    break
+        
+        resultado['descricao'] = descricao_estado
 
-@app.route('/finalizar', methods=['POST'])
-def finalizar():
-    """
-    Etapa 5: Validação rigorosa e fechamento automático com e-mail.
-    """
-    if 'cliente_id' not in session:
-        return redirect(url_for('index'))
-
-    cliente_id = session.get('cliente_id')
-
-    if request.form.get('cadastro_completado') == '1':
-        dados_cadastro = {
-            'cpf': request.form.get('cpf'),
-            'cep': request.form.get('cep'),
-            'endereco': request.form.get('endereco'),
-            'numero': request.form.get('numero'),
-            'bairro': request.form.get('bairro'),
-            'complemento': request.form.get('complemento'),
-            'chave_pix': request.form.get('chave_pix')
+        novo_item = {
+            'produto_id': produto_id,
+            'produto_nome': resultado['produto'],
+            'valor_pix_unitario': resultado['valor_final'],
+            'valor_cred_unitario': resultado['valor_final'] * 1.2,
+            'fotos_json': json.dumps(fotos_salvas), 
+            'comentarios': comentarios,
+            'quantidade': 1,
+            'estado_descricao': descricao_estado,
+            'foto_url': foto_url_final
         }
-        engine.atualizar_cadastro_completo(cliente_id, dados_cadastro)
+        
+        lista_atual = session.get('itens_avaliados', [])
+        lista_atual.append(novo_item)
+        session['itens_avaliados'] = lista_atual
+        session['item_atual'] = novo_item 
+        
+        return render_template('resultado.html', cotacao=resultado, fase_atual=2)
     
-    cliente = engine.obter_cliente(cliente_id)
-    campos_obrigatorios = ['cpf', 'cep', 'endereco', 'numero', 'bairro', 'chave_pix']
-    
-    if any(not cliente.get(campo) for campo in campos_obrigatorios):
-        return render_template('cadastro_complementar.html', cliente=cliente, fase_atual=5)
+    return "Erro ao calcular cotação.", 500
 
-    dados_finais = {
-        'cliente_id': cliente_id,
-        'produto_id': session.get('produto_selecionado_id'),
-        'produto_nome': session.get('produto_nome'),
-        'valor_final': session.get('valor_final'),
-        'data_agendada': request.form.get('data_entrega'),
-        'periodo': request.form.get('periodo_entrega')
+# 4ª TELA: NOVO RESUMO DO LOTE (Carrinho antes da identificação)
+@app.route('/resumo')
+def resumo():
+    itens = session.get('itens_avaliados', [])
+    if not itens:
+        return redirect(url_for('busca'))
+    
+    total_lote = sum(item['valor_pix_unitario'] for item in itens)
+    return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
+
+# Rota de descarte total das avaliações do lote limpando a Session
+@app.route('/descartar-lote')
+def descartar_lote():
+    session.pop('itens_avaliados', None)
+    session.pop('item_atual', None)
+    session.pop('produto_selecionado_id', None)
+    return redirect(url_for('busca'))
+
+# Rota assíncrona para ejetar apenas a última avaliação sem redirecionar a página
+@app.route('/descartar-atual')
+def descartar_atual():
+    lista_atual = session.get('itens_avaliados', [])
+    if lista_atual:
+        lista_atual.pop()
+        session['itens_avaliados'] = lista_atual
+    session.pop('item_atual', None)
+    session.pop('produto_selecionado_id', None)
+    return jsonify({'status': 'sucesso', 'mensagem': 'Avaliação descartada com sucesso.'})
+
+# 5ª TELA: CADASTRO COMPLETO UNIFICADO
+@app.route('/identificacao', methods=['GET'])
+def identificacao():
+    itens = session.get('itens_avaliados', [])
+    if not itens:
+        return redirect(url_for('busca'))
+    
+    return render_template('cadastro_complementar.html', fase_atual=5, cliente={})
+
+@app.route('/finalizar-lote', methods=['POST'])
+def finalizar_lote():
+    itens = session.get('itens_avaliados', [])
+    if not itens:
+        return redirect(url_for('busca'))
+    
+    # HIGIENIZAÇÃO DE STRINGS: Extrai apenas números puros eliminando qualquer tipo de máscara
+    cpf_puro = ''.join(filter(str.isdigit, request.form.get('cpf', '')))
+    cep_puro = ''.join(filter(str.isdigit, request.form.get('cep', '')))
+    whatsapp_puro = ''.join(filter(str.isdigit, request.form.get('whatsapp', '')))
+        
+    dados_cadastro_lote = {
+        'nome_completo': request.form.get('nome'),  
+        'email': request.form.get('email'),
+        'whatsapp': whatsapp_puro,  
+        'cidade': request.form.get('cidade'),
+        'estado_nome': request.form.get('estado_nome'),
+        'estado_uf': request.form.get('estado_uf'),
+        'cpf': cpf_puro,  
+        'cep': cep_puro,  
+        'endereco': request.form.get('endereco'),
+        'numero': request.form.get('numero'),
+        'complemento': request.form.get('complemento'),
+        'bairro': request.form.get('bairro'),
+        'chave_pix': request.form.get('chave_pix'),
+        'origem_lead': request.form.get('origem_lead', 'Direto')
     }
 
-    protocolo = engine.finalizar_proposta(dados_finais)
+    cliente_id = engine.salvar_lead(dados_cadastro_lote)
 
-    if protocolo:
-        dados_finais['protocolo'] = protocolo
-        # DISPARO DE E-MAIL PELO BACK-END (Agora Real via engine.py)
-        engine.enviar_email_resumo(cliente, dados_finais)
-        return render_template('sucesso.html', fase_atual=5)
-    else:
-        return "Erro ao finalizar o agendamento no sistema.", 500
+    if cliente_id:
+        engine.atualizar_cadastro_completo(cliente_id, dados_cadastro_lote)
+        
+        session['cliente_id'] = cliente_id
+        session['player_nome'] = dados_cadastro_lote['nome_completo']
+        session['player_email'] = dados_cadastro_lote['email']
+        
+        return redirect(url_for('finalizar'))
+        
+    return "Erro na identificação do lote.", 500
 
-# --- API E GESTÃO DE SESSÃO ---
+# 6ª TELA: PROCESSAMENTO DE PROTOCOLO E FINALIZAÇÃO
+@app.route('/finalizar', methods=['GET', 'POST'])
+def finalizar():
+    if 'cliente_id' not in session:
+        return redirect(url_for('identificacao'))
 
-@app.route('/novo_agendamento')
-def novo_agendamento():
-    """ Limpa dados do produto anterior para permitir nova avaliação do mesmo cliente """
-    session.pop('produto_selecionado_id', None)
-    session.pop('produto_nome', None)
-    session.pop('valor_final', None)
-    session.pop('estado_conservacao_id', None)
-    session.pop('ultimo_protocolo', None)
-    session.pop('data_entrega', None)
-    session.pop('periodo_entrega', None)
-    return redirect(url_for('busca'))
+    cliente_id = session.get('cliente_id')
+    itens = session.get('itens_avaliados', [])
+
+    if not itens:
+        return redirect(url_for('busca'))
+
+    cliente = engine.obter_cliente(cliente_id)
+    
+    total_pix = sum(item['valor_pix_unitario'] for item in itens)
+    total_cred = sum(item['valor_cred_unitario'] for item in itens)
+
+    dados_protocolo = {
+        'cliente_id': cliente_id,
+        'total_pix': total_pix,
+        'total_cred': total_cred
+    }
+
+    res_protocolo = engine.finalizar_proposta(dados_protocolo)
+
+    if res_protocolo:
+        for item in itens:
+            engine.registrar_item_periciado(res_protocolo['id'], item)
+        
+        dados_email = {
+            'protocolo': res_protocolo['numero'],
+            'quantidade_itens': len(itens),
+            'total_pix': total_pix
+        }
+        
+        # AJUSTE CRÍTICO: Passando a lista real de itens avaliados para detalhar no corpo do e-mail
+        engine.enviar_email_resumo(cliente, dados_email, itens)
+        
+        # AJUSTE DE CORREÇÃO: Passando o valor total real do lote para exibição no HTML final
+        return render_template('sucesso.html', protocolo=res_protocolo['numero'], total_lote=total_pix, fase_atual=6)
+    
+    return "Erro ao finalizar agendamento.", 500
+
+# ROTA DE API: Consulta cliente via CPF (Foco estrito em dado puro numérico)
+@app.route('/api/obter_cliente_por_cpf')
+def api_obter_cliente_por_cpf():
+    cpf_raw = request.args.get('cpf', '')
+    cpf_limpo = ''.join(filter(str.isdigit, cpf_raw))
+    
+    if not cpf_limpo or len(cpf_limpo) != 11:
+        return jsonify({'sucesso': False, 'existe': False})
+        
+    try:
+        cliente_dados = engine.obter_cliente_por_cpf(cpf_limpo)
+        if cliente_dados:
+            return jsonify({
+                'sucesso': True,
+                'existe': True,
+                'cliente': {
+                    'nome_completo': cliente_dados.get('nome_completo', ''),
+                    'nome': cliente_dados.get('nome_completo', ''),  
+                    'email': cliente_dados.get('email', ''),
+                    'whatsapp': cliente_dados.get('whatsapp', ''),
+                    'cep': cliente_dados.get('cep', ''),
+                    'bairro': cliente_dados.get('bairro', ''),
+                    'endereco': cliente_dados.get('endereco', ''),
+                    'numero': cliente_dados.get('numero', ''),
+                    'complemento': cliente_dados.get('complemento', ''),
+                    'cidade': cliente_dados.get('cidade', ''),
+                    'estado_uf': cliente_dados.get('estado_uf', ''),
+                    'estado_nome': cliente_dados.get('estado_nome', ''),
+                    'chave_pix': cliente_dados.get('chave_pix', '')
+                }
+            })
+    except Exception as e:
+        print(f"Erro na API de CPF: {e}")
+        
+    return jsonify({'sucesso': False, 'existe': False})
 
 @app.route('/sair')
 def sair():
-    """ 
-    PONTUAL: Limpa totalmente a sessão para forçar novo login/identificação.
-    Resolve a falha onde o firewall era pulado por conta de sessão persistente.
-    """
     session.clear()
     return redirect(url_for('index'))
 

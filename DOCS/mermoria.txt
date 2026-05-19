@@ -196,56 +196,240 @@ Fluxo de Lead: Testar a gravação final dos dados do cliente no banco após a c
 Nota para o Refresh: "IA, os produtos já estão no banco mygames_db via porta 3307. Paramos na inserção das categorias de 
 avaliação para iniciar os testes da Etapa 3."
 
-
 =====
 07/05
 
-1. O que já Concluímos (Base Sólida)
-Identificação (Fase 1): O sistema captura o lead inicial (Nome, E-mail, WhatsApp, Cidade). Criamos a lógica de "Login Silencioso": se o e-mail já existe, o sistema recupera o ID do cliente em vez de criar um duplicado.
+Resumo do Sprint: Rumo à v1.0
+Hoje transformamos um protótipo funcional em uma aplicação estruturada e segura.
 
-Catálogo e Busca (Fase 2): Implementamos a busca em tempo real (autocomplete) consumindo o banco mygames_db. O usuário seleciona o console/jogo e o ID fica salvo na sessão.
+O que foi implementado:
+Segurança e Fluxo (Firewall de Cadastro):
 
-Perícia Técnica (Fase 3): Criamos a interface de seleção de estado de conservação, onde o usuário escolhe entre as opções (Excelente, Bom, etc.).
+Implementamos uma barreira lógica na rota /finalizar. Agora, o sistema consulta o MySQL e só permite a conclusão do agendamento se o 
+perfil do "Player" estiver completo (CPF, Endereço, CEP e Chave PIX).
 
-Cálculo de Cotação (Fase 4): O engine.py já processa o Valor Base vs. Fator de Depreciação e apresenta o valor final em uma tela de oferta.
+Comunicação Real (SMTP Gmail):
 
-UX & Máscaras: O arquivo ux-helper.js está funcional com máscaras de Telefone, CPF e CEP, além da integração com a API ViaCEP para preenchimento automático de endereço.
+Migramos da simulação no terminal para o envio real de e-mails. O engine.py agora se conecta ao servidor do Google e despacha o 
+protocolo de agendamento diretamente para o cliente.
 
-Banco de Dados: Ajustamos a conexão para a porta 3307 (WSL2) e corrigimos o erro de protocolos duplicados adicionando um timestamp ao código gerado.
+Gestão de Sessão (Logout):
 
-2. O Fluxo de Transição (Onde estamos agora)
-Atualmente, o sistema exibe o resultado da cotação e pula para um botão de WhatsApp. Identificamos que este fluxo é frágil porque:
+Criamos a rota /sair e o comando session.clear(). Isso resolveu o problema de persistência de dados entre diferentes usuários, 
+garantindo que cada encerramento limpe a memória do navegador.
 
-O WhatsApp exige ação manual do usuário (ele pode fechar a aba e você perde o registro).
+Organização de Arquivos:
 
-O usuário pode finalizar sem ter preenchido dados essenciais (CPF, Endereço, PIX).
+Separamos o front-end em pastas profissionais (static/ para CSS/JS e templates/ para HTML).
 
-Não há uma confirmação formal (E-mail) enviada pelo sistema.
+Criamos o diretório DOCS/ para centralizar especificações e memórias de cálculo, mantendo a raiz do projeto limpa.
 
-3. Alterações Pendentes (Próximos Passos)
-Para alinhar com sua nova diretriz, precisamos implementar:
+Versionamento Profissional:
 
-A. Firewall de Cadastro & Login (Fase 5)
-Alteração no server.py: Antes de mostrar qualquer confirmação, o sistema deve interceptar o usuário.
+Limpamos o repositório via .gitignore.
 
-Se Cadastro Incompleto: Redireciona para cadastro_complementar.html (CPF, CEP, Endereço, PIX).
+Consolidamos o progresso com um commit estruturado e selamos o dia com a Tag v1.0 no GitHub.
 
-Se Cadastro Completo: Segue direto para a finalização.
+🚀 Próximos Passos Sugeridos
+Agora que a base técnica está sólida, podemos focar em UX (Experiência do Usuário) e Gestão de Dados:
 
-Persistência: Garantir que esses dados "sensíveis" sejam salvos no banco de dados na tabela clientes_usuarios.
+1. Painel Administrativo (Backoffice)
+O que é: Uma área restrita (ex: /admin) onde você possa ver todos os protocolos gerados, sem precisar abrir o MySQL Workbench.
 
-B. Substituição do WhatsApp por E-mail (Back-end)
-Novo Módulo de E-mail: Criar no engine.py a função que utiliza smtplib para disparar o resumo da compra (Protocolo, Item, Valor e Data de Entrega) diretamente para o e-mail do cliente.
+Por que: Facilita a gestão das compras de jogos que estão entrando.
 
-Gatilho Automático: O e-mail deve ser disparado pelo servidor no momento em que a proposta é gravada no banco, sem depender de clique externo do usuário.
+2. Validação de Dados no Front-end
+O que é: Adicionar máscaras de entrada (ex: 000.000.000-00 para CPF e 00000-000 para CEP).
 
-C. Gestão de Itens Múltiplos
-Lógica de Carrinho: Perguntar ao usuário: "Deseja avaliar outro item ou finalizar?".
+Por que: Evita que o usuário digite dados errados que quebrem a lógica do banco de dados ou dificultem o contato posterior.
 
-Outro item: Limpa a sessão do produto atual e volta para /busca.
+3. Melhoria na Busca (Autocomplete Visual)
+O que é: Exibir a foto do console/jogo diretamente na lista de sugestões enquanto o usuário digita.
 
-Finalizar: Dispara o processo de e-mail e encerra a jornada.
+Por que: Dá um ar muito mais moderno e "gamer" para a aplicação.
 
-D. Tela de Sucesso (Fim da Missão)
-Novo sucesso.html: Remover o botão de WhatsApp e substituir por uma confirmação de e-mail enviado, exibindo o protocolo final e um botão para "Novo Agendamento" (que limpa a sessão e desloga, se necessário).
+4. Upload de Fotos Reais
+O que é: Na etapa de perícia, permitir que o usuário anexe uma foto real do item dele.
 
+Por que: Aumenta a segurança para você avaliar o estado físico antes de confirmar o valor final.
+
+💡 Dica de Mestre
+Antes de começar a v1.1 amanhã, lembre-se de sempre criar uma nova "branch" (ramificação) se for testar algo muito arriscado. Assim, 
+sua v1.0 continuará sempre intacta e funcional no GitHub.
+
+
+====
+11/05/2026
+Relatório de Progresso: Projeto MyGames
+1. O que já está funcionando (Status: OK)
+Módulos Base: server.py e engine.py estão conectados e comunicando com o banco MySQL na porta 3307.
+
+Identificação (Level 1): Captura de leads e salvamento na tabela clientes_usuarios está funcional.
+
+Busca (Level 2): Busca dinâmica no catalogo_mestre via API funcionando.
+
+Perícia & Fotos (Level 3):
+
+A lista de opções de estado agora aparece (corrigimos o filtro que separava "Console" de "Todos").
+
+O upload de fotos está operacional: os arquivos estão sendo salvos fisicamente em static/uploads/pericia/ e o caminho está sendo preparado para o banco.
+
+Persistência (Protocolo): O sistema já consegue gerar o protocolo (ex: MG-2026...) e salvar o "snapshot" da proposta no banco de dados.
+
+2. O que corrigimos no "Motor" (Engine & Server)
+Sincronização de Banco: Ajustamos os nomes das colunas de logradouro para endereco e de estado/uf para estado_nome/estado_uf para bater com o seu DESCRIBE da tabela.
+
+Filtros de Busca: A função buscar_opcoes_pericia agora é inclusiva, trazendo categorias específicas do produto + categorias gerais.
+
+Cálculo Financeiro: A função calcular_cotacao_final foi restaurada e agora entrega as chaves exatas que o server.py espera (produto e valor_final).
+
+3. Pendências para quando você voltar
+Existem três pontos específicos que precisam de atenção imediata para fechar o ciclo sem erros:
+
+A. Ajuste no "Firewall" de Cadastro (Level 5)
+O que acontece: O sistema está pulando a página de CEP/CPF porque acha que os dados já estão completos.
+
+Ação: No server.py, precisamos mudar a lista campos_obrigatorios para usar o termo endereco em vez de logradouro. Isso forçará a parada na tela de perfil caso o endereço esteja vazio.
+
+B. Erro de Redirecionamento Final (Página de Sucesso)
+O que acontece: Erro 500 (BuildError) ao tentar clicar ou renderizar o botão final.
+
+Ação: No arquivo templates/sucesso.html, alterar o link de novo_agendamento para index.
+
+C. Validação do UX-CEP
+O que acontece: O preenchimento automático do endereço ao digitar o CEP precisa ser testado visualmente na tela do Level 5.
+
+Ação: Verificar se o JavaScript injetado no HTML de cadastro está disparando o fetch para a API ViaCEP corretamente.
+
+4. Resumo Técnico dos Arquivos
+Para o seu "refresh", estes são os estados atuais:
+
+engine.py: Limpo, funcional e sincronizado com o banco.
+
+server.py: Lógica de rotas OK, pendente apenas pequeno ajuste nos campos_obrigatorios.
+
+pericia.html: Já possui o enctype para fotos e o contador de arquivos em JS.
+
+cadastro_complementar.html: Possui o script de busca de CEP integrado.
+
+Quando você voltar, é só me dizer: "IA, vamos aplicar as correções finais de redirecionamento e validar o Firewall do Level 5". Estarei pronto!
+
+====
+11/05
+
+O que já foi consolidado (Status: OK)
+1. Arquitetura de Dados (Database Sincronizado)
+clientes_usuarios: Sincronizada com o Level 5. As colunas agora batem com o código (endereco em vez de logradouro, inclusão de numero, estado_uf, etc.).
+
+itens_periciados: Preparada para o modelo 1:N. Agora ela aceita fotos_json (para múltiplas imagens) e está vinculada corretamente ao protocolo_id.
+
+catalogo_mestre: Validada. O uso de ENUM para categorias permite que o motor de perícia filtre corretamente entre "Console" e "Jogo".
+
+2. Motor de Lógica (engine.py)
+As funções de INSERT e UPDATE foram mapeadas para as colunas reais do banco.
+
+A função de registro de itens foi adaptada para receber objetos JSON de fotos.
+
+A função de e-mail foi preparada para gerar um extrato detalhado (Lista de Itens + Valores).
+
+3. Servidor e Sessão (server.py)
+Buffer de Itens: A sessão agora gerencia uma lista (itens_avaliados), permitindo que o usuário avalie vários produtos antes de fechar o protocolo.
+
+Gestão de Fotos: Implementado timestamp no nome dos arquivos para evitar que fotos de produtos diferentes se sobrescrevam.
+
+Firewall Level 5: A barreira de CPF/Endereço está funcional e alinhada com os nomes das colunas do MySQL.
+
+🟡 O que falta corrigir/implementar (Pendências)
+A. Ajuste Fino no E-mail Final
+Problema: O sistema estava disparando e-mails a cada item.
+
+Correção Pendente: Mover a chamada enviar_email_resumo para fora do loop na rota /finalizar, garantindo um e-mail único com a tabela de todos os produtos discriminados.
+
+B. Visualização do Carrinho (templates/resultado.html)
+Necessidade: Ajustar a página que mostra a "Oferta" para que ela exiba as informações do último item adicionado à lista da sessão, ou talvez uma pequena lista do que já foi avaliado até agora.
+
+C. Reset da Sessão Pós-Protocolo
+Necessidade: Garantir que, após o sucesso, o session['itens_avaliados'] seja limpo ([]), para que um novo agendamento do mesmo usuário comece do zero.
+
+D. Redirecionamento de Fluxo
+Necessidade: Validar se o link no sucesso.html está realmente levando para /busca e se o cliente_id permanece íntegro para evitar reidentificação desnecessária.
+
+📘 Resumo para o seu "Refresh"
+Quando você voltar, o foco será: "Testar o checkout único com múltiplos itens e validar o envio do e-mail consolidado."
+
+=====
+12/05
+
+Resumo de Contexto: Modelo de Integração MyGames
+1. O Problema Identificado (Sistema)
+O computador apresentou instabilidade (apps fechando) devido a um APPCRASH no driver de vídeo Intel (igfxCUIService.exe). Foram executados sfc /scannow (reparou arquivos) e dism /restorehealth para estabilizar o Windows 11 e proteger o ambiente de desenvolvimento (VS Code, Docker, MySQL).
+
+2. A Solução Proposta: Modelo 2 (Webhook Push + Handover)
+Este modelo foi escolhido para integrar o Agente IA (WhatsApp/Caixa Preta) ao site MyGames (Flask/Python).
+
+O Fluxo Técnico (Passo a Passo):
+
+Coleta: O Chatbot coleta os dados do usuário e do console no WhatsApp.
+
+Disparo (POST): O Chatbot faz uma requisição HTTP POST enviando um JSON para o seu servidor (server.py).
+
+Exemplo de payload: {"cliente": "Antonio", "produto": "PS5", "condicao": "usado"}.
+
+Processamento: Seu engine.py recebe o JSON, valida os dados, salva no MySQL e gera um ID_TRANSACAO único.
+
+Resposta (Ack): Seu servidor responde ao POST do chatbot com esse ID (ex: {"status": "ok", "id": 1025}).
+
+Link de Handover: O Chatbot recebe o ID e entrega ao usuário um link dinâmico: mygames.com.br/proposta/1025.
+
+3. Por que este modelo?
+Integridade: O dado não viaja pela URL (onde poderia ser editado), mas sim por uma comunicação segura entre servidores (Back-to-Back).
+
+Experiência do Usuário: Ao clicar no link, o site já "sabe" quem é o cliente e o que ele quer vender, eliminando a redigitação.
+
+Automação: Permite que o seu scraper.py comece a buscar preços de referência assim que o dado cai no banco, antes mesmo do usuário abrir o site.
+
+4. Pauta para a Reunião com a Empresa de IA
+Confirmação de Webhooks: Eles suportam enviar um POST JSON ao final de um fluxo?
+
+Captura de Resposta: O chatbot consegue ler o ID que meu servidor retornar e injetá-lo em uma URL?
+
+Autenticação: Como faremos o handshake de segurança (API Key no Header)?
+
+==== 
+
+Relatório de Evolução — Projeto MyGames (18/05/2026)
+1. O que foi FEITO e CONSOLIDADO hoje:
+Ajuste da 3ª Tela (Oferta/Resultado Individual):
+
+Remoção completa dos avisos textuais de rodapé sobre conferência física e pagamento imediato.
+
+Correção da exibição do estado real do produto através do mapeamento da variável cotacao.descricao, eliminando o texto fixo genérico "Item Periciado".
+
+Inovação de UX (Descarte Assíncrono): Inclusão do botão "DESCARTAR AVALIAÇÃO". Implementamos uma chamada assíncrona (fetch) para a rota /descartar-atual. Se o usuário clica em descartar, o produto ejetado some da tela dinamicamente exibindo uma mensagem de sucesso, mas ele permanece na página para decidir se deseja fechar o lote ou voltar para buscar outros itens.
+
+Ajuste da 4ª Tela (Resumo do Lote / Carrinho):
+
+Remoção do selo "RESUMO DA SUA OFERTA", do link "← Adicionar mais produtos" e do aviso de vinculação do perfil.
+
+Mudança do botão de ação principal para o texto literal "CONTINUAR".
+
+Ajuste na tabela do lote para ler e exibir corretamente a descrição do estado correspondente de cada item (estado_descricao) e correção de variáveis de indexação (produto_name para produto_nome).
+
+Correção do Loop de Imagens ("Pisca-Pisca"): Substituição do método JavaScript onerror por uma condicional nativa estável do Jinja2. Produtos sem imagem no banco agora exibem um ícone fixo sólido (🎮) sem sobrecarregar o navegador.
+
+Validação do Descarte Geral: O botão "DESCARTAR" do lote foi amarrado à rota /descartar-lote, limpando toda a Session do backend com sucesso e retornando o usuário para a estaca zero.
+
+2. O que precisa ser ALTERADO e IMPLEMENTADO amanhã:
+Fase de Identificação (Unificação de UX):
+
+Eliminar a antiga tela intermediária que capturava apenas os dados de lead (Nome, E-mail, WhatsApp) e a antiga tela complementar de documentos.
+
+Criar o arquivo templates/cadastro_completo.html (o nó que gerou o erro 500 / TemplateNotFound no final do dia de hoje). Este formulário unificado agregará em três blocos visuais limpos: Dados Pessoais (Nome, CPF, WhatsApp, E-mail), Endereço de Coleta (CEP, Rua, Número, Bairro, Cidade, UF) e Dados de Pagamento (Chave PIX).
+
+Inteligência de Autopreenchimento por CPF:
+
+Ativar o comportamento no front-end do novo formulário para escutar o campo de CPF.
+
+Testar o endpoint /api/obter_cliente_por_cpf que já deixamos pronto no seu server.py hoje. Quando um cliente antigo digitar seu CPF, o JavaScript preencherá instantaneamente todos os seus dados pessoais, endereço e PIX salvos no banco.
+
+Quando estiver pronto amanhã, basta me dizer: "Vamos continuar o MyGames de onde paramos ontem" e nós daremos o pontapé inicial criando o template de cadastro completo e testando o fluxo de ponta a ponta.

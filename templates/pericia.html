@@ -9,27 +9,88 @@
         <p class="instrucao">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
     </header>
 
-    <form action="/cotar" method="POST" class="form-pericia">
-        <!-- Listagem dinâmica das opções vindas do motor de cálculo (engine.py) -->
+    <!-- O enctype="multipart/form-data" é essencial para o envio das fotos -->
+    <form action="/cotar" method="POST" enctype="multipart/form-data" class="form-pericia">
+        
         <div class="opcoes-wrapper">
-            {% for opcao in opcoes %}
-            <label class="radio-label">
-                <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
-                <div class="opcao-card">
-                    <div class="check-indicator"></div>
-                    <div class="opcao-info">
-                        <strong>{{ opcao.descricao }}</strong>
+            <p class="label-secao">Selecione o estado do item:</p>
+            {% if opcoes %}
+                {% for opcao in opcoes %}
+                <label class="radio-label">
+                    <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
+                    <div class="opcao-card">
+                        <div class="check-indicator"></div>
+                        <div class="opcao-info">
+                            <strong>{{ opcao.descricao }}</strong>
+                        </div>
                     </div>
+                </label>
+                {% endfor %}
+            {% else %}
+                <div class="alert-error">
+                    <p>Nenhuma opção de estado encontrada no sistema.</p>
+                    <small>Verifique se as tabelas de categorias e opções estão populadas corretamente.</small>
                 </div>
-            </label>
-            {% endfor %}
+            {% endif %}
         </div>
 
-        <button type="submit" class="btn-cotar-glow">CALCULAR OFERTA FINAL</button>
+        <div class="upload-section">
+            <p class="label-secao">Fotos do Produto (Opcional):</p>
+            <div class="file-drop-area" id="drop-area">
+                <span class="fake-btn">Escolher Fotos</span>
+                <span class="file-msg" id="file-msg">ou arraste as imagens aqui</span>
+                <input type="file" name="fotos" id="file-input" class="file-input" accept="image/*" multiple>
+            </div>
+            <p class="file-hint">Envie fotos nítidas da frente, verso e selos de garantia.</p>
+        </div>
+
+        <div class="obs-section">
+            <p class="label-secao">Observações Adicionais:</p>
+            <textarea name="comentarios" class="text-obs" placeholder="Ex: Acompanha caixa original, detalhe no analógico, etc."></textarea>
+        </div>
+
+        <!-- CORREÇÃO: Botão alterado para "AVALIAR" -->
+        <button type="submit" class="btn-cotar-glow">AVALIAR</button>
     </form>
 
-    <a href="/busca" class="btn-voltar">← Voltar para seleção de produto</a>
+    <!-- CORREÇÃO: Removido completamente o link de "Voltar para seleção de produto" daqui -->
 </div>
+
+<script>
+    // Gerenciador de feedback de upload de arquivos
+    const fileInput = document.getElementById('file-input');
+    const fileMsg = document.getElementById('file-msg');
+    
+    fileInput.addEventListener('change', function() {
+        const count = this.files.length;
+        if (count > 0) {
+            fileMsg.innerText = count + (count > 1 ? " arquivos selecionados" : " arquivo selecionado");
+            fileMsg.style.color = "#00ff00";
+            fileMsg.style.fontWeight = "bold";
+        } else {
+            fileMsg.innerText = "ou arraste as imagens aqui";
+            fileMsg.style.color = "#888";
+        }
+    });
+
+    // Efeito visual ao arrastar arquivos sobre a área
+    const dropArea = document.getElementById('drop-area');
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = "#00ff00";
+            dropArea.style.background = "rgba(0, 255, 0, 0.05)";
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = "#444";
+            dropArea.style.background = "rgba(26, 26, 26, 1)";
+        });
+    });
+</script>
 
 <style>
     .container-pericia { max-width: 650px; margin: auto; padding: 20px; }
@@ -37,29 +98,36 @@
     .pericia-header h2 { color: #00ff00; font-size: 28px; margin-bottom: 10px; }
     .instrucao { color: #888; font-size: 15px; }
 
-    .opcoes-wrapper { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
+    .label-secao { color: #aaa; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .opcoes-wrapper { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+    .alert-error { 
+        color: #ff4444; 
+        text-align: center; 
+        padding: 20px; 
+        border: 1px dashed #ff4444; 
+        border-radius: 12px; 
+        background: rgba(255, 68, 68, 0.05);
+    }
     
-    /* Esconde o rádio padrão */
     .radio-label input[type="radio"] { display: none; }
 
-    /* Card da opção */
     .opcao-card {
         display: flex;
         align-items: center;
         background: #1e1e1e;
         border: 2px solid #333;
         border-radius: 12px;
-        padding: 20px;
+        padding: 15px 20px;
         cursor: pointer;
-        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: 0.3s;
     }
 
     .opcao-card:hover { border-color: #555; background: #252525; }
 
-    /* Indicador circular de seleção */
     .check-indicator {
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         border: 2px solid #555;
         border-radius: 50%;
         margin-right: 20px;
@@ -67,7 +135,6 @@
         transition: 0.3s;
     }
 
-    /* Estado selecionado */
     .radio-label input[type="radio"]:checked + .opcao-card {
         border-color: #00ff00;
         background: rgba(0, 255, 0, 0.05);
@@ -79,9 +146,40 @@
         box-shadow: 0 0 10px #00ff00;
     }
 
-    .opcao-info strong { font-size: 17px; color: #fff; }
+    .upload-section { margin-bottom: 30px; }
+    .file-drop-area {
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 25px;
+        background: #1a1a1a;
+        border: 2px dashed #444;
+        border-radius: 12px;
+        transition: 0.3s;
+        text-align: center;
+        justify-content: center;
+    }
+    
+    .file-input { position: absolute; left: 0; top: 0; height: 100%; width: 100%; opacity: 0; cursor: pointer; }
+    .fake-btn { background: #333; color: #fff; padding: 8px 15px; border-radius: 5px; font-size: 13px; margin-right: 10px; }
+    .file-msg { color: #888; font-size: 14px; }
+    .file-hint { color: #555; font-size: 12px; margin-top: 8px; }
 
-    /* Botão de ação */
+    .obs-section { margin-bottom: 30px; }
+    .text-obs {
+        width: 100%;
+        height: 100px;
+        background: #1e1e1e;
+        border: 2px solid #333;
+        border-radius: 12px;
+        padding: 15px;
+        color: #fff;
+        font-family: inherit;
+        resize: none;
+        transition: 0.3s;
+    }
+    .text-obs:focus { border-color: #00ff00; outline: none; background: #252525; }
+
     .btn-cotar-glow {
         width: 100%;
         background: #00ff00;
@@ -102,16 +200,5 @@
         box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         transform: translateY(-2px);
     }
-
-    .btn-voltar {
-        display: block;
-        text-align: center;
-        margin-top: 25px;
-        color: #666;
-        text-decoration: none;
-        font-size: 14px;
-        transition: 0.2s;
-    }
-    .btn-voltar:hover { color: #888; }
 </style>
 {% endblock %}

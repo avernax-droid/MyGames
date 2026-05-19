@@ -6,10 +6,11 @@
 <section class="card-lead">
     <header class="form-header">
         <h2>Dados do Cliente</h2>
-        <p>Preencha os campos abaixo para iniciar sua avaliação.</p>
+        <p>Preencha os campos abaixo para vincular e salvar o seu lote.</p>
     </header>
 
-    <form action="/selecionar" method="POST">
+    <!-- ALTERAÇÃO: Action apontando para a nova rota de identificação pós-lote -->
+    <form action="/identificacao" method="POST">
         <input type="hidden" name="origem_lead" value="Direto">
 
         <div class="input-group">
@@ -47,7 +48,8 @@
             </div>
         </div>
 
-        <button type="submit" class="btn-glow">AVANÇAR PARA PRODUTOS</button>
+        <!-- ALTERAÇÃO: Texto do botão atualizado para condizer com o novo momento do fluxo -->
+        <button type="submit" class="btn-glow">AVANÇAR PARA DOCUMENTOS</button>
     </form>
 </section>
 {% endblock %}

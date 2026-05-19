@@ -5,141 +5,211 @@
 {% block content %}
 <div class="container-resultado">
     <div class="card-oferta">
-        <header class="oferta-header">
-            <span class="pix-badge">PAGAMENTO VIA PIX</span>
-            <div class="produto-nome-display">{{ cotacao.produto }}</div>
-        </header>
         
-        <div class="valor-container">
-            <span class="simbolo-monetario">R$</span>
-            <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
-        </div>
-        
-        <div class="info-estado">
-            Estado avaliado: <strong>{{ cotacao.estado }}</strong>
-        </div>
+        <!-- Bloco dinâmico que será ocultado após o descarte bem-sucedido -->
+        <div id="dados-avaliacao-container">
+            <header class="oferta-header">
+                <!-- Mini foto referente ao produto -->
+                <div class="produto-thumb-wrapper">
+                    <img src="{{ cotacao.foto_url or 'https://via.placeholder.com/150' }}" alt="{{ cotacao.produto }}" class="produto-mini-foto">
+                </div>
+                <!-- Nome do produto -->
+                <div class="produto-nome-display">{{ cotacao.produto }}</div>
+            </header>
+            
+            <div class="valor-container">
+                <span class="simbolo-monetario">R$</span>
+                <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
+            </div>
+            
+            <!-- CORREÇÃO: Exibe diretamente a descrição real do estado vinda do motor -->
+            <div class="info-estado">
+                <span class="badge-estado-selecionado">
+                    {{ cotacao.descricao }}
+                </span>
+            </div>
 
-        <!-- PONTUAL: Inclusão de campos de Agendamento dentro do formulário -->
-        <div class="acoes-finais">
-            <form action="{{ url_for('finalizar') }}" method="POST" style="text-align: left;">
-                
-                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #333;">
-                    <label style="color: #bbb; font-size: 0.8rem; display: block; margin-bottom: 10px; text-transform: uppercase;">Agende sua entrega/coleta:</label>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <input type="date" name="data_entrega" required 
-                               style="flex: 2; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
-                        
-                        <select name="periodo_entrega" required 
-                                style="flex: 1; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
-                            <option value="Manhã">Manhã</option>
-                            <option value="Tarde">Tarde</option>
-                        </select>
+            <div class="revisao-pericia">
+                {% if session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]' %}
+                <div class="galeria-revisao">
+                    <p class="label-mini">Fotos enviadas:</p>
+                    <div class="fotos-grid">
+                        {% for foto in session['item_atual']['fotos_json']|from_json %}
+                        <img src="{{ url_for('static', filename='uploads/pericia/' + foto) }}" class="thumb-revisao">
+                        {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
-                <!-- Campos invisíveis mantidos -->
-                <input type="hidden" name="produto_nome" value="{{ cotacao.produto }}">
-                <input type="hidden" name="valor_final" value="{{ cotacao.valor_final }}">
-                
-                <button type="submit" class="btn-whatsapp-glow" style="width: 100%; border: none; cursor: pointer;">
-                    ACEITAR E AGENDAR ENTREGA
-                </button>
-            </form>
-            
-            <a href="/busca" class="btn-refazer">Avaliar outro produto</a>
+                {% if session['item_atual']['comentarios'] %}
+                <div class="obs-revisao">
+                    <p class="label-mini">Suas observações:</p>
+                    <p class="texto-comentario">"{{ session['item_atual']['comentarios'] }}"</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
 
-        <footer class="oferta-footer">
-            <p>* Valor sujeito a conferência física dos itens.</p>
-            <p>Pagamento realizado imediatamente após a perícia.</p>
-        </footer>
+        <!-- Bloco de Feedback visual pós-descarte (inicia oculto) -->
+        <div id="feedback-descarte" class="msg-feedback-descarte" style="display: none;">
+            <div class="icone-lixeira">🗑️</div>
+            <h3>Avaliação descartada com sucesso!</h3>
+            <p>Este item foi ejetado e não fará parte do lote.</p>
+        </div>
+
+        <!-- ÁREA DE AÇÕES REORGANIZADA COM OS TRÊS BOTÕES -->
+        <div class="acoes-finais">
+            <a href="{{ url_for('resumo') }}" class="btn-bloco-oferta btn-fechar-lote">
+                FECHAR
+            </a>
+            
+            <a href="{{ url_for('busca') }}" class="btn-bloco-oferta btn-voltar-produtos">
+                VOLTAR PARA MAIS PRODUTOS
+            </a>
+
+            <!-- Novo botão que dispara a requisição assíncrona -->
+            <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-bloco-oferta btn-descartar-avaliacao">
+                DESCARTAR AVALIAÇÃO
+            </button>
+        </div>
     </div>
 </div>
 
+<script>
+    function executarDescarteIndividual() {
+        if (confirm("Deseja realmente descartar a avaliação deste produto?")) {
+            // Dispara a rota assincronamente em background para o servidor
+            fetch('/descartar-atual')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sucesso') {
+                        // Esconde o container com os dados e valores do item avaliado
+                        document.getElementById('dados-avaliacao-container').style.display = 'none';
+                        // Oculta o próprio botão de descarte que acabou de ser executado
+                        document.getElementById('btn-descarte-acao').style.display = 'none';
+                        // Exibe a mensagem de feedback estática
+                        document.getElementById('feedback-descarte').style.display = 'block';
+                    }
+                })
+                .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
+        }
+    }
+</script>
+
 <style>
-    /* Estilos originais mantidos integralmente */
     .container-resultado { 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        padding: 20px; 
-        min-height: 70vh; 
+        display: flex; justify-content: center; align-items: center; 
+        padding: 20px; min-height: 70vh; 
     }
     
     .card-oferta { 
-        background: #1e1e1e; 
-        border: 2px solid #00ff00; 
-        border-radius: 24px; 
-        padding: 40px; 
-        text-align: center; 
-        max-width: 500px; 
-        width: 100%; 
+        background: #1e1e1e; border: 2px solid #00ff00; border-radius: 24px; 
+        padding: 30px; text-align: center; max-width: 500px; width: 100%; 
         box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
     }
 
-    .pix-badge { 
-        background: #00ff00; 
-        color: #000; 
-        padding: 6px 16px; 
-        border-radius: 50px; 
-        font-weight: bold; 
-        font-size: 12px; 
-        letter-spacing: 1px;
+    .produto-thumb-wrapper {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 5px;
     }
 
-    .produto-nome-display { 
-        margin-top: 20px; 
-        color: #bbb; 
-        text-transform: uppercase; 
-        font-size: 16px; 
-        letter-spacing: 1px; 
+    .produto-mini-foto {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 8px;
+        object-fit: contain;
     }
 
-    .valor-container { margin: 30px 0; }
-    .simbolo-monetario { color: #00ff00; font-size: 24px; vertical-align: top; margin-right: 5px; font-weight: bold; }
-    .valor-pix { color: #00ff00; font-size: 72px; font-weight: bold; line-height: 1; }
+    .produto-nome-display { color: #fff; text-transform: uppercase; font-size: 18px; font-weight: bold; }
 
-    .info-estado { color: #fff; margin-bottom: 30px; font-size: 18px; }
-    .info-estado strong { color: #00ff00; }
+    .valor-container { margin: 20px 0; }
+    .simbolo-monetario { color: #00ff00; font-size: 24px; vertical-align: top; font-weight: bold; }
+    .valor-pix { color: #00ff00; font-size: 54px; font-weight: bold; line-height: 1; font-family: monospace; }
 
-    .btn-whatsapp-glow { 
-        display: block; 
-        background: #ffffff; 
-        color: #000; 
-        text-decoration: none; 
-        padding: 20px; 
-        border-radius: 12px; 
-        font-weight: bold; 
-        font-size: 18px; 
-        transition: 0.3s; 
-        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
-        font-family: 'Rajdhani', sans-serif;
+    /* Estilização da descrição limpa do estado do produto */
+    .info-estado { margin-bottom: 25px; }
+    .badge-estado-selecionado {
+        display: inline-block;
+        background: rgba(0, 255, 0, 0.08);
+        border: 1px solid #00ff00;
+        color: #00ff00;
+        padding: 8px 18px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 14px;
+        text-transform: uppercase;
     }
 
-    .btn-whatsapp-glow:hover { 
-        background: #00ff00; 
-        transform: translateY(-3px); 
-        box-shadow: 0 10px 20px rgba(0, 255, 0, 0.2);
+    .revisao-pericia { 
+        background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; 
+        margin-bottom: 20px; text-align: left; border: 1px solid #333;
+    }
+    .label-mini { color: #666; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; }
+    .fotos-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+    .thumb-revisao { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #444; }
+    .texto-comentario { color: #aaa; font-size: 13px; font-style: italic; margin: 0; }
+
+    /* Estilo para a caixa de feedback visual após o descarte */
+    .msg-feedback-descarte {
+        padding: 25px 15px;
+        margin-bottom: 20px;
+        border: 1px dashed #ff4444;
+        border-radius: 12px;
+        background: rgba(255, 68, 68, 0.02);
+    }
+    .icone-lixeira { font-size: 36px; margin-bottom: 8px; }
+    .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 6px 0; font-size: 16px; text-transform: uppercase; }
+    .msg-feedback-descarte p { color: #777; margin: 0; font-size: 13px; }
+
+    .acoes-finais {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 25px;
     }
 
-    .btn-refazer { 
-        display: block; 
-        margin-top: 25px; 
-        color: #555; 
-        text-decoration: none; 
-        font-size: 14px; 
-        transition: 0.2s;
+    /* Estilo unificado para os botões em bloco */
+    .btn-bloco-oferta { 
+        display: block; width: 100%; text-decoration: none; text-align: center;
+        padding: 16px 0; border-radius: 12px; font-weight: bold; font-size: 16px; 
+        transition: 0.3s; font-family: inherit; box-sizing: border-box; 
+        text-transform: uppercase; letter-spacing: 1px;
     }
-    .btn-refazer:hover { color: #888; }
 
-    .oferta-footer { 
-        border-top: 1px solid #333; 
-        margin-top: 40px; 
-        padding-top: 20px; 
-        color: #666; 
-        font-size: 13px; 
-        line-height: 1.6;
+    .btn-fechar-lote { 
+        background: #ffffff; color: #000; 
+    }
+    .btn-fechar-lote:hover { 
+        background: #00ff00; transform: translateY(-2px); 
+        box-shadow: 0 8px 15px rgba(0, 255, 0, 0.2);
+    }
+
+    .btn-voltar-produtos { 
+        background: #262626; color: #fff; border: 1px solid #444;
+    }
+    .btn-voltar-produtos:hover {
+        background: #333; color: #00ff00; border-color: #00ff00;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(0, 255, 0, 0.1);
+    }
+
+    /* Estilo do botão de Descarte Individual */
+    .btn-descartar-avaliacao {
+        background: #262626; color: #ff4444; border: 1px solid #444;
+        cursor: pointer;
+    }
+    .btn-descartar-avaliacao:hover {
+        background: #333; border-color: #ff4444;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(255, 68, 68, 0.1);
     }
 </style>
 {% endblock %}
