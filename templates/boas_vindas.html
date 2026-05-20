@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo ao MyGames</title>
+    <style>
+        :root { --primary: #007bff; --bg: #121212; --card: #1a1a1a; --text: #ffffff; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        
+        .box { width: 100%; max-width: 400px; padding: 40px; background: var(--card); border-radius: 12px; border: 1px solid #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h2 { text-align: center; margin-bottom: 10px; font-size: 24px; }
+        p { text-align: center; color: #aaa; margin-bottom: 30px; font-size: 14px; }
+        
+        .form-group { margin-bottom: 20px; position: relative; }
+        input { width: 100%; padding: 14px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; }
+        input:focus { outline: none; border-color: var(--primary); }
+        
+        /* Estilização da Lista de Cidades */
+        #lista-cidades { 
+            position: absolute; top: 100%; left: 0; right: 0; 
+            background: #222; border: 1px solid var(--primary); 
+            border-top: none; z-index: 1000; max-height: 250px; 
+            overflow-y: auto; display: none; border-radius: 0 0 6px 6px;
+        }
+        #lista-cidades div { padding: 12px 15px; cursor: pointer; color: #ddd; border-bottom: 1px solid #333; }
+        #lista-cidades div:hover { background: var(--primary); color: #fff; }
+        
+        button { width: 100%; padding: 14px; background: var(--primary); border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: background 0.3s; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h2>🎮 MyGames</h2>
+        <p>Informe sua localização para acessar o catálogo</p>
+        
+        <form action="{{ url_for('definir_regiao') }}" method="POST">
+            <div class="form-group">
+                <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
+                <div id="lista-cidades"></div>
+            </div>
+            <div class="form-group">
+                <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
+            </div>
+            <button type="submit" id="btn-entrar">Entrar no Catálogo</button>
+        </form>
+    </div>
+
+    <script>
+        const inputCidade = document.getElementById('campo-cidade');
+        const listaCidades = document.getElementById('lista-cidades');
+        const inputUf = document.getElementById('campo-uf');
+
+        inputCidade.addEventListener('input', async () => {
+            const termo = inputCidade.value;
+            if (termo.length < 3) { listaCidades.style.display = 'none'; return; }
+
+            const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
+            const dados = await response.json();
+
+            listaCidades.innerHTML = '';
+            if (dados.length > 0) {
+                dados.forEach(item => {
+                    const div = document.createElement('div');
+                    div.textContent = `${item.cidade} - ${item.uf}`;
+                    div.onmousedown = () => {
+                        inputCidade.value = item.cidade;
+                        inputUf.value = item.uf;
+                        listaCidades.style.display = 'none';
+                    };
+                    listaCidades.appendChild(div);
+                });
+                listaCidades.style.display = 'block';
+            } else {
+                listaCidades.style.display = 'none';
+            }
+        });
+
+        // Fecha a lista ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (e.target !== inputCidade) listaCidades.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

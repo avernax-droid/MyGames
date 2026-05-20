@@ -32,9 +32,16 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    if 'itens_avaliados' not in session:
-        session['itens_avaliados'] = []
-    return render_template('busca.html', fase_atual=1)
+    # Limpa a sessão para garantir que o fluxo comece do zero na página de boas-vindas
+    session.clear()
+    return render_template('boas_vindas.html')
+
+@app.route('/definir_regiao', methods=['POST'])
+def definir_regiao():
+    # Recebe os dados da página de boas vindas, salva na sessão e envia para a busca
+    session['cidade_usuario'] = request.form.get('cidade')
+    session['uf_usuario'] = request.form.get('estado_uf')
+    return redirect(url_for('busca'))
 
 @app.route('/busca')
 def busca():
@@ -290,6 +297,37 @@ def api_buscar_produtos():
     termo = request.args.get('q', '')
     produtos = engine.buscar_produtos_catalogo(termo)
     return jsonify(produtos)
+
+# --- NOVA ROTA DE API: BUSCA DE CIDADES NO IBGE ---
+@app.route('/api/buscar_cidades')
+def api_buscar_cidades():
+    termo = request.args.get('q', '')
+    
+    # Validação para evitar processamento inútil
+    if not termo or len(termo) < 3:
+        return jsonify([])
+
+    # Consulta a API oficial através do engine
+    dados = engine.consultar_municipios_ibge()
+    cidades_filtradas = []
+    
+    if dados:
+        for m in dados:
+            nome_cidade = m.get('nome', '')
+            if termo.lower() in nome_cidade.lower():
+                # Abertura segura nível a nível (Defensive Programming)
+                micro = m.get('microrregiao') or {}
+                meso = micro.get('mesorregiao') or {}
+                uf_obj = meso.get('UF') or {}
+                uf = uf_obj.get('sigla', '??')
+                
+                cidades_filtradas.append({'cidade': nome_cidade, 'uf': uf})
+                
+                # Controle de Payload: Limita a 8 resultados
+                if len(cidades_filtradas) >= 8:
+                    break
+
+    return jsonify(cidades_filtradas)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

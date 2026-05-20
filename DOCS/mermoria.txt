@@ -433,3 +433,48 @@ Ativar o comportamento no front-end do novo formulário para escutar o campo de 
 Testar o endpoint /api/obter_cliente_por_cpf que já deixamos pronto no seu server.py hoje. Quando um cliente antigo digitar seu CPF, o JavaScript preencherá instantaneamente todos os seus dados pessoais, endereço e PIX salvos no banco.
 
 Quando estiver pronto amanhã, basta me dizer: "Vamos continuar o MyGames de onde paramos ontem" e nós daremos o pontapé inicial criando o template de cadastro completo e testando o fluxo de ponta a ponta.
+
+========
+
+19/05
+
+O Problema Original
+O erro ocorria por dois motivos principais:
+
+Dados aninhados: A API do IBGE não retorna um objeto simples. A estrutura é cidade -> microrregião -> mesorregião -> UF -> sigla. Se tentássemos acessar esses dados diretamente (item['microrregiao']['mesorregiao']['UF']['sigla']), o código quebrava sempre que um desses níveis estivesse ausente ou mal formado.
+
+Performance e Filtro: Tentar filtrar cidades pelo lado do cliente (front-end) ou com muitas requisições fazia a tela parecer travada.
+
+A Solução Implementada (O "Pulo do Gato")
+Para que o boas_vindas.html funcionasse, implementamos o seguinte tratamento no server.py:
+
+1. Acesso Seguro aos Dados (Defensive Programming)
+Em vez de acessar as chaves diretamente, usamos o método .get() do dicionário encadeado com um dicionário vazio como fallback or {}. Isso impede o KeyError.
+
+# Trecho do tratamento que salvou a busca
+for m in dados:
+    nome_cidade = m.get('nome', '')
+    if termo in nome_cidade.lower():
+        # Abertura segura nível a nível
+        micro = m.get('microrregiao') or {}
+        meso = micro.get('mesorregiao') or {}
+        uf_obj = meso.get('UF') or {}
+        uf = uf_obj.get('sigla', '??')
+        
+        cidades_filtradas.append({'cidade': nome_cidade, 'uf': uf})
+
+2. Otimização da Busca no Back-End
+Em vez de carregar a lista de cidades a cada caractere digitado (o que causava latência), o server.py passou a:
+
+Receber o termo via request.args.get('q').
+
+Validar se o termo tem pelo menos 3 caracteres (if not termo or len(termo) < 3) antes de realizar qualquer processamento. Isso reduziu drasticamente o número de requisições inúteis ao IBGE.
+
+3. Limite de Resultados (Payload Control)
+A API do IBGE retorna milhares de registros. Para não "estourar" o seu front-end, adicionamos um contador de controle dentro do loop:
+
+if len(cidades_filtradas) >= 8:
+    break
+
+Isso garantiu que o navegador recebesse apenas uma lista curta e manuseável, evitando que o datalist ou o componente de busca ficasse lento ou travasse o navegador.
+    

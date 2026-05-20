@@ -4,6 +4,7 @@ from decimal import Decimal
 import datetime
 import smtplib
 import json
+import requests  # <-- ADICIONADO PARA A CONSULTA AO IBGE
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -260,16 +261,16 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         corpo += f"Número do Protocolo: {dados_email['protocolo']}\n"
         corpo += f"Quantidade de Itens: {dados_email['quantidade_itens']}\n\n"
         corpo += "========================================================\n"
-        corpo += "             DEMONSTRATIVO DOS ITENS AVALIADOS          \n"
+        corpo += "            DEMONSTRATIVO DOS ITENS AVALIADOS          \n"
         corpo += "========================================================\n\n"
         
         for i, item in enumerate(itens_avaliados, 1):
             nome_item = item.get('produto_nome') or item.get('produto_name') or 'Item'
             corpo += f"{i}. Produto: {nome_item}\n"
-            corpo += f"   Estado Periciado: {item.get('estado_descricao', 'Não especificado')}\n"
+            corpo += f"  Estado Periciado: {item.get('estado_descricao', 'Não especificado')}\n"
             if item.get('comentarios'):
-                corpo += f"   Notas do Perito: {item['comentarios']}\n"
-            corpo += f"   Valor de Compra: R$ {item['valor_pix_unitario']:.2f} (PIX)\n"
+                corpo += f"  Notas do Perito: {item['comentarios']}\n"
+            corpo += f"  Valor de Compra: R$ {item['valor_pix_unitario']:.2f} (PIX)\n"
             corpo += "--------------------------------------------------------\n"
             
         corpo += f"\nVALOR TOTAL CONSOLIDADO DO LOTE: R$ {dados_email['total_pix']:.2f}\n\n"
@@ -356,3 +357,20 @@ def buscar_opcoes_pericia(tipo_produto='Todos'):
         if db.is_connected():
             cursor.close()
             db.close()
+
+# --- MÓDULO DE INTEGRAÇÃO EXTERNA ---
+
+def consultar_municipios_ibge():
+    """
+    Acessa a API oficial do IBGE para trazer a lista de cidades brasileiras.
+    Retorna o JSON bruto para que a rota no server.py faça a filtragem otimizada.
+    """
+    url = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios"
+    try:
+        # Definindo um timeout para não travar a thread do Flask caso o IBGE caia
+        response = requests.get(url, timeout=5)
+        response.raise_for_status() 
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"ERRO ao consultar API do IBGE: {e}")
+        return []
