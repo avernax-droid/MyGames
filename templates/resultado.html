@@ -1,6 +1,12 @@
+<!-- 
+  MÓDULO: resultado.html
+  FUNÇÃO: Este módulo exibe ao usuário o orçamento final (cotação) calculado após a perícia do item.
+  Ele exibe os detalhes do item, valor, fotos enviadas e oferece ações para fechar o lote, 
+  adicionar mais produtos ou descartar a avaliação atual.
+-->
 {% extends 'base.html' %}
 
-{% block title %}Sua Oferta - MyGames{% endblock %}
+{% block title %}Sua Oferta{% endblock %}
 
 {% block content %}
 <div class="container-resultado">
@@ -63,7 +69,8 @@
                 FECHAR
             </a>
             
-            <a href="{{ url_for('busca') }}" class="btn-bloco-oferta btn-voltar-produtos">
+            <!-- Rota corrigida para 'produto' -->
+            <a href="{{ url_for('produto') }}" class="btn-bloco-oferta btn-voltar-produtos">
                 VOLTAR PARA MAIS PRODUTOS
             </a>
 

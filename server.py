@@ -38,16 +38,16 @@ def index():
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():
-    # Recebe os dados da página de boas vindas, salva na sessão e envia para a busca
+    # Recebe os dados da página de boas vindas, salva na sessão e envia para a página de produto
     session['cidade_usuario'] = request.form.get('cidade')
     session['uf_usuario'] = request.form.get('estado_uf')
-    return redirect(url_for('busca'))
+    return redirect(url_for('produto'))
 
-@app.route('/busca')
-def busca():
+@app.route('/produto')
+def produto():
     if 'itens_avaliados' not in session:
         session['itens_avaliados'] = []
-    return render_template('busca.html', fase_atual=1)
+    return render_template('produto.html', fase_atual=1)
 
 @app.route('/pericia/<int:produto_id>')
 def pericia(produto_id):
@@ -131,7 +131,7 @@ def cotar():
 def resumo():
     itens = session.get('itens_avaliados', [])
     if not itens:
-        return redirect(url_for('busca'))
+        return redirect(url_for('produto'))
     
     total_lote = sum(item['valor_pix_unitario'] for item in itens)
     return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
@@ -142,7 +142,7 @@ def descartar_lote():
     session.pop('itens_avaliados', None)
     session.pop('item_atual', None)
     session.pop('produto_selecionado_id', None)
-    return redirect(url_for('busca'))
+    return redirect(url_for('produto'))
 
 # Rota assíncrona para ejetar apenas a última avaliação sem redirecionar a página
 @app.route('/descartar-atual')
@@ -160,7 +160,7 @@ def descartar_atual():
 def identificacao():
     itens = session.get('itens_avaliados', [])
     if not itens:
-        return redirect(url_for('busca'))
+        return redirect(url_for('produto'))
     
     return render_template('cadastro_complementar.html', fase_atual=5, cliente={})
 
@@ -168,7 +168,7 @@ def identificacao():
 def finalizar_lote():
     itens = session.get('itens_avaliados', [])
     if not itens:
-        return redirect(url_for('busca'))
+        return redirect(url_for('produto'))
     
     # HIGIENIZAÇÃO DE STRINGS: Extrai apenas números puros eliminando qualquer tipo de máscara
     cpf_puro = ''.join(filter(str.isdigit, request.form.get('cpf', '')))
@@ -215,7 +215,7 @@ def finalizar():
     itens = session.get('itens_avaliados', [])
 
     if not itens:
-        return redirect(url_for('busca'))
+        return redirect(url_for('produto'))
 
     cliente = engine.obter_cliente(cliente_id)
     

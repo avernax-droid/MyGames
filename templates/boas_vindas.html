@@ -9,6 +9,10 @@
         body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         
         .box { width: 100%; max-width: 400px; padding: 40px; background: var(--card); border-radius: 12px; border: 1px solid #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        
+        /* Nova classe para o logo */
+        .logo { max-width: 150px; display: block; margin: 0 auto 15px auto; border-radius: 8px; }
+        
         h2 { text-align: center; margin-bottom: 10px; font-size: 24px; }
         p { text-align: center; color: #aaa; margin-bottom: 30px; font-size: 14px; }
         
@@ -33,7 +37,9 @@
 <body>
 
     <div class="box">
-        <h2>🎮 MyGames</h2>
+        <!-- Inserção da imagem do logo chamando da pasta static/img -->
+        <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo da Loja" class="logo">
+        
         <p>Informe sua localização para acessar o catálogo</p>
         
         <form action="{{ url_for('definir_regiao') }}" method="POST">

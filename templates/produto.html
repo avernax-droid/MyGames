@@ -1,15 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Seleção de Produto - MyGames{% endblock %}
+{% block title %}Seleção de Produto{% endblock %}
 
 {% block content %}
 <div class="container-busca">
     <header class="busca-header">
-        <!-- ALTERAÇÃO: Removida a saudação "Olá..." para permitir fluxo anônimo inicial -->
+        <!-- Logo removido para evitar duplicidade com o base.html -->
         <h2>Qual item você deseja vender hoje?</h2>
     </header>
 
-    <!-- Campo de Busca Autocomplete -->
     <div class="search-wrapper">
         <input type="text" id="inputBusca" class="search-box" 
                placeholder="Digite o modelo do console ou nome do jogo..." 
@@ -17,7 +16,6 @@
     </div>
 
     <div id="listaProdutos" class="grid-produtos">
-        <!-- Os produtos aparecerão aqui via JavaScript -->
     </div>
 </div>
 
@@ -62,7 +60,6 @@
 </script>
 
 <style>
-    /* Estilos específicos para a grade de busca no modo Black */
     .container-busca { max-width: 900px; margin: auto; padding: 20px; }
     .busca-header { margin-bottom: 30px; text-align: center; }
     .busca-header h2 { color: #fff; text-transform: uppercase; font-size: 24px; }
