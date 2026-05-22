@@ -5,79 +5,188 @@
 {% block content %}
 <div class="container-busca">
     <header class="busca-header">
-        <!-- Logo removido para evitar duplicidade com o base.html -->
-        <h2>Qual item você deseja vender hoje?</h2>
+        <h2 id="tituloEtapa">Qual é a categoria do item?</h2>
     </header>
 
-    <div class="search-wrapper">
-        <input type="text" id="inputBusca" class="search-box" 
-               placeholder="Digite o modelo do console ou nome do jogo..." 
-               onkeyup="buscar()" autocomplete="off">
+    <div id="stepCategorias" class="grid-categorias">
+        <div class="card-categoria" onclick="selecionarCategoria(1, 'Console')">
+            <h3>🎮 Console</h3>
+        </div>
+        <div class="card-categoria" onclick="selecionarCategoria(2, 'Controle')">
+            <h3>🕹️ Controle</h3>
+        </div>
+        <div class="card-categoria" onclick="selecionarCategoria(3, 'Jogo')">
+            <h3>💿 Jogo</h3>
+        </div>
+        <div class="card-categoria" onclick="selecionarCategoria(4, 'Acessório')">
+            <h3>🎧 Acessório</h3>
+        </div>
     </div>
 
-    <div id="listaProdutos" class="grid-produtos">
+    <div id="stepProdutos" style="display: none;">
+        <button class="btn-voltar" onclick="voltarCategorias()">← Voltar para Categorias</button>
+        
+        <!-- NOVO CAMPO DE BUSCA -->
+        <input type="text" id="inputBusca" class="input-busca" placeholder="Digite o nome do produto..." oninput="filtrarProdutos()">
+
+        <div id="listaProdutos" class="grid-produtos" style="margin-top: 20px;">
+            <!-- Os produtos filtrados aparecerão aqui -->
+        </div>
     </div>
 </div>
 
 <script>
-    async function buscar() {
-        const termo = document.getElementById('inputBusca').value;
-        if (termo.length < 2) {
-            document.getElementById('listaProdutos').innerHTML = '';
+    // ID da categoria que não possui lista de itens
+    const ID_JOGO = 3;
+    
+    // Variáveis globais para o filtro funcionar localmente
+    let produtosDaCategoria = [];
+    let categoriaAtualId = null;
+
+    async function selecionarCategoria(catId, catNome) {
+        // REGRA DE JOGOS: Se for Jogo, não há lista nem "outros". Vai direto.
+        if (catId === ID_JOGO) {
+            window.location.href = `/pericia/cat_${catId}`;
             return;
         }
 
+        // Esconde categorias, mostra produtos e altera título
+        document.getElementById('stepCategorias').style.display = 'none';
+        document.getElementById('stepProdutos').style.display = 'block';
+        document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;
+        
+        // Ajusta o placeholder do campo de busca com o nome da categoria
+        document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
+        
+        carregarProdutos(catId);
+    }
+
+    function voltarCategorias() {
+        // Restaura a tela inicial
+        document.getElementById('stepProdutos').style.display = 'none';
+        document.getElementById('stepCategorias').style.display = 'grid';
+        document.getElementById('tituloEtapa').innerText = 'Qual é a categoria do item?';
+        
+        // Limpa a busca e a tela ao voltar
+        document.getElementById('inputBusca').value = '';
+        document.getElementById('listaProdutos').innerHTML = '';
+    }
+
+    async function carregarProdutos(catId) {
+        categoriaAtualId = catId;
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = ''; // Inicia com a área de produtos limpa
+        document.getElementById('inputBusca').value = ''; // Limpa o input
+
         try {
-            const response = await fetch(`/api/buscar_produtos?q=${termo}`);
-            const produtos = await response.json();
+            const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
+            produtosDaCategoria = await response.json();
+            
+            // A chamada para filtrarProdutos() foi removida daqui. 
+            // Agora o sistema aguarda o usuário digitar.
 
-            const container = document.getElementById('listaProdutos');
-            container.innerHTML = '';
-
-            if (produtos.length === 0) {
-                container.innerHTML = '<p style="color: #666; grid-column: 1/-1; text-align: center;">Nenhum produto encontrado.</p>';
-                return;
-            }
-
-            produtos.forEach(p => {
-                const card = document.createElement('div');
-                card.className = 'card-produto';
-                card.onclick = () => window.location.href = `/pericia/${p.id}`;
-                
-                card.innerHTML = `
-                    <div class="card-img-wrapper">
-                        <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
-                    </div>
-                    <h4>${p.nome_produto}</h4>
-                    <span class="plataforma-badge">${p.plataforma}</span>
-                `;
-                container.appendChild(card);
-            });
         } catch (error) {
             console.error("Erro na busca:", error);
+            container.innerHTML = '<p style="color: red; text-align: center; grid-column: 1/-1;">Erro ao comunicar com o servidor.</p>';
         }
+    }
+
+    function filtrarProdutos() {
+        const termo = document.getElementById('inputBusca').value.toLowerCase().trim();
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = ''; // Limpa a tela para re-renderizar
+
+        // Se o campo estiver vazio, não mostra nada
+        if (termo === '') {
+            return;
+        }
+
+        // Filtra a lista baseada no texto digitado
+        const produtosFiltrados = produtosDaCategoria.filter(p => 
+            p.nome_produto.toLowerCase().includes(termo)
+        );
+
+        // Renderiza apenas os que passaram no filtro
+        produtosFiltrados.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'card-produto';
+            card.onclick = () => window.location.href = `/pericia/${p.id}`;
+            
+            card.innerHTML = `
+                <div class="card-img-wrapper">
+                    <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
+                </div>
+                <h4>${p.nome_produto}</h4>
+                <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+            `;
+            container.appendChild(card);
+        });
+
+        // Adiciona o botão "Outros" no final da lista
+        // Se a lista (produtosFiltrados) estiver vazia, ele será a única opção na tela
+        const cardOutro = document.createElement('div');
+        cardOutro.className = 'card-produto card-outro';
+        cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
+        cardOutro.innerHTML = `
+            <div class="card-img-wrapper" style="font-size: 40px; color: #00ff00;">
+                ➕
+            </div>
+            <h4>Outro produto não listado</h4>
+        `;
+        container.appendChild(cardOutro);
     }
 </script>
 
 <style>
     .container-busca { max-width: 900px; margin: auto; padding: 20px; }
     .busca-header { margin-bottom: 30px; text-align: center; }
-    .busca-header h2 { color: #fff; text-transform: uppercase; font-size: 24px; }
-    .search-wrapper { margin-bottom: 40px; }
-    .search-box { 
-        width: 100%; padding: 18px; border-radius: 12px; border: 2px solid #333; 
-        background: #1e1e1e; color: #fff; font-size: 18px; outline: none; transition: 0.3s;
-    }
-    .search-box:focus { border-color: #00ff00; box-shadow: 0 0 15px rgba(0, 255, 0, 0.1); }
+    .busca-header h2 { color: #fff; text-transform: uppercase; font-size: 24px; transition: 0.3s; }
     
+    /* Layout - Passo A (Categorias) */
+    .grid-categorias { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+    .card-categoria {
+        background: #1e1e1e; border: 2px solid #333; border-radius: 15px; padding: 30px 20px;
+        text-align: center; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; height: 120px;
+    }
+    .card-categoria:hover { border-color: #00ff00; transform: translateY(-5px); background: #252525; }
+    .card-categoria h3 { color: #fff; margin: 0; font-size: 20px; }
+
+    /* Layout - Passo B (Produtos) */
     .grid-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 25px; }
     .card-produto { 
         background: #1e1e1e; border: 1px solid #333; border-radius: 15px; padding: 20px; 
-        text-align: center; cursor: pointer; transition: 0.3s;
+        text-align: center; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; justify-content: space-between;
     }
     .card-produto:hover { transform: translateY(-5px); border-color: #00ff00; }
     .card-img-wrapper { height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
     .card-produto img { max-width: 100%; max-height: 100%; border-radius: 8px; }
-    .plataforma-badge { background: #333; color: #00ff00; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .plataforma-badge { background: #333; color: #00ff00; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 10px; display: inline-block;}
+    
+    /* Complementos de Interface */
+    .btn-voltar { background: transparent; border: none; color: #00ff00; cursor: pointer; font-size: 16px; margin-bottom: 10px; padding: 0; }
+    .btn-voltar:hover { text-decoration: underline; }
+    .card-outro { border-style: dashed; border-color: #666; justify-content: center; }
+    .card-outro:hover { border-color: #00ff00; }
+
+    /* NOVO: Estilo do Campo de Busca */
+    .input-busca {
+        width: 100%;
+        padding: 15px;
+        margin-bottom: 20px;
+        background: #1e1e1e;
+        border: 2px solid #333;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 16px;
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.3s;
+    }
+    .input-busca:focus {
+        border-color: #00ff00;
+    }
+    .input-busca::placeholder {
+        color: #888;
+    }
 </style>
 {% endblock %}

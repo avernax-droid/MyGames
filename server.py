@@ -1,9 +1,15 @@
 import os
+import json
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
-import engine  # Motor de lógica e banco de dados
-import json
+
+# 1. Carrega variáveis de ambiente ANTES de importar o engine
+load_dotenv()
+
+# 2. Agora o engine entra, já enxergando as credenciais do banco mygames_dev
+import engine  
 
 app = Flask(__name__)
 app.secret_key = 'mygames_key_2026'
@@ -32,13 +38,11 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    # Limpa a sessão para garantir que o fluxo comece do zero na página de boas-vindas
     session.clear()
     return render_template('boas_vindas.html')
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():
-    # Recebe os dados da página de boas vindas, salva na sessão e envia para a página de produto
     session['cidade_usuario'] = request.form.get('cidade')
     session['uf_usuario'] = request.form.get('estado_uf')
     return redirect(url_for('produto'))
@@ -49,20 +53,24 @@ def produto():
         session['itens_avaliados'] = []
     return render_template('produto.html', fase_atual=1)
 
-@app.route('/pericia/<int:produto_id>')
+@app.route('/pericia/<produto_id>')
 def pericia(produto_id):
-    produto = engine.obter_produto_por_id(produto_id)
+    # Intercepta os IDs especiais criados no passo anterior (Jogos e Outros)
+    if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
+        categoria_id = str(produto_id).split('_')[-1]
+        id_oficial = produto_id
+    else:
+        produto = engine.obter_produto_por_id(produto_id)
+        if not produto:
+            return redirect(url_for('produto'))
+        categoria_id = produto.get('categoria_id')
+        id_oficial = produto['id']
     
-    tipo_produto = 'Console'
-    if produto:
-        nome = produto.get('nome_produto', '').upper()
-        if any(x in nome for x in ['JOGO', 'CD', 'DVD', 'MIDIA']):
-            tipo_produto = 'Jogo'
+    opcoes = engine.buscar_opcoes_pericia(categoria_id)
     
-    opcoes = engine.buscar_opcoes_pericia(tipo_produto)
-    session['produto_selecionado_id'] = produto_id
+    session['produto_selecionado_id'] = id_oficial
     
-    return render_template('pericia.html', opcoes=opcoes, produto_id=produto_id, fase_atual=1)
+    return render_template('pericia.html', opcoes=opcoes, produto_id=id_oficial, fase_atual=1, categoria_id=categoria_id)
 
 # 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
 @app.route('/cotar', methods=['POST'])
@@ -82,20 +90,24 @@ def cotar():
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 fotos_salvas.append(filename)
 
-    resultado = engine.calcular_cotacao_final(produto_id, estado_id)
+    # Lida com o cálculo dependendo se é um produto real ou genérico
+    if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
+        resultado = {
+            "produto": "Lote de Jogos" if str(produto_id).startswith('cat_') else "Produto não listado",
+            "valor_final": 0.0
+        }
+        categoria_id = str(produto_id).split('_')[-1]
+        foto_url_final = None
+    else:
+        resultado = engine.calcular_cotacao_final(produto_id, estado_id)
+        produto_info = engine.obter_produto_por_id(produto_id)
+        categoria_id = produto_info.get('categoria_id') if produto_info else 1
+        foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
 
     if resultado:
-        produto_info = engine.obter_produto_por_id(produto_id)
-        foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
         resultado['foto_url'] = foto_url_final
-
-        tipo_produto = 'Console'
-        if produto_info:
-            nome = produto_info.get('nome_produto', '').upper()
-            if any(x in nome for x in ['JOGO', 'CD', 'DVD', 'MIDIA']):
-                tipo_produto = 'Jogo'
         
-        opcoes = engine.buscar_opcoes_pericia(tipo_produto)
+        opcoes = engine.buscar_opcoes_pericia(categoria_id)
         descricao_estado = "Estado Selecionado"
         if opcoes:
             for op in opcoes:
@@ -126,7 +138,7 @@ def cotar():
     
     return "Erro ao calcular cotação.", 500
 
-# 4ª TELA: NOVO RESUMO DO LOTE (Carrinho antes da identificação)
+# 4ª TELA: NOVO RESUMO DO LOTE
 @app.route('/resumo')
 def resumo():
     itens = session.get('itens_avaliados', [])
@@ -136,7 +148,6 @@ def resumo():
     total_lote = sum(item['valor_pix_unitario'] for item in itens)
     return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
 
-# Rota de descarte total das avaliações do lote limpando a Session
 @app.route('/descartar-lote')
 def descartar_lote():
     session.pop('itens_avaliados', None)
@@ -144,7 +155,6 @@ def descartar_lote():
     session.pop('produto_selecionado_id', None)
     return redirect(url_for('produto'))
 
-# Rota assíncrona para ejetar apenas a última avaliação sem redirecionar a página
 @app.route('/descartar-atual')
 def descartar_atual():
     lista_atual = session.get('itens_avaliados', [])
@@ -170,7 +180,6 @@ def finalizar_lote():
     if not itens:
         return redirect(url_for('produto'))
     
-    # HIGIENIZAÇÃO DE STRINGS: Extrai apenas números puros eliminando qualquer tipo de máscara
     cpf_puro = ''.join(filter(str.isdigit, request.form.get('cpf', '')))
     cep_puro = ''.join(filter(str.isdigit, request.form.get('cep', '')))
     whatsapp_puro = ''.join(filter(str.isdigit, request.form.get('whatsapp', '')))
@@ -240,15 +249,12 @@ def finalizar():
             'total_pix': total_pix
         }
         
-        # AJUSTE CRÍTICO: Passando a lista real de itens avaliados para detalhar no corpo do e-mail
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
-        # AJUSTE DE CORREÇÃO: Passando o valor total real do lote para exibição no HTML final
         return render_template('sucesso.html', protocolo=res_protocolo['numero'], total_lote=total_pix, fase_atual=6)
     
     return "Erro ao finalizar agendamento.", 500
 
-# ROTA DE API: Consulta cliente via CPF (Foco estrito em dado puro numérico)
 @app.route('/api/obter_cliente_por_cpf')
 def api_obter_cliente_por_cpf():
     cpf_raw = request.args.get('cpf', '')
@@ -258,8 +264,6 @@ def api_obter_cliente_por_cpf():
         return jsonify({'sucesso': False, 'existe': False})
         
     try:
-        # AJUSTE EXCLUSIVO DE SEGURANÇA CONTRA 'UNREAD RESULT FOUND':
-        # Forçamos a leitura e o consumo completo chamando a função do engine.
         cliente_dados = engine.obter_cliente_por_cpf(cpf_limpo)
         
         if cliente_dados:
@@ -294,20 +298,23 @@ def sair():
 
 @app.route('/api/buscar_produtos')
 def api_buscar_produtos():
-    termo = request.args.get('q', '')
-    produtos = engine.buscar_produtos_catalogo(termo)
+    # Passa a receber o ID da categoria do HTML, ignorando termo de texto
+    categoria_id = request.args.get('categoria_id', '')
+    
+    if not categoria_id:
+        return jsonify([])
+
+    produtos = engine.buscar_produtos_por_categoria(categoria_id)
+    
     return jsonify(produtos)
 
-# --- NOVA ROTA DE API: BUSCA DE CIDADES NO IBGE ---
 @app.route('/api/buscar_cidades')
 def api_buscar_cidades():
     termo = request.args.get('q', '')
     
-    # Validação para evitar processamento inútil
     if not termo or len(termo) < 3:
         return jsonify([])
 
-    # Consulta a API oficial através do engine
     dados = engine.consultar_municipios_ibge()
     cidades_filtradas = []
     
@@ -315,7 +322,6 @@ def api_buscar_cidades():
         for m in dados:
             nome_cidade = m.get('nome', '')
             if termo.lower() in nome_cidade.lower():
-                # Abertura segura nível a nível (Defensive Programming)
                 micro = m.get('microrregiao') or {}
                 meso = micro.get('mesorregiao') or {}
                 uf_obj = meso.get('UF') or {}
@@ -323,7 +329,6 @@ def api_buscar_cidades():
                 
                 cidades_filtradas.append({'cidade': nome_cidade, 'uf': uf})
                 
-                # Controle de Payload: Limita a 8 resultados
                 if len(cidades_filtradas) >= 8:
                     break
 

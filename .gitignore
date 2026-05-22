@@ -2,11 +2,12 @@ __pycache__/
 env/
 venv/
 .env
+.env.*
 *.pyc
 .vscode/
 
 # Arquivos de dados e scripts de carga
-Troca Game Avaliação - Geral.xlsx
+*.xlsx
 base
 popula_catalogo.py
 
@@ -14,5 +15,5 @@ popula_catalogo.py
 estrutura.txt
 
 # Arquivos temporários e uploads locais
-logo.jpeg:Zone.Identifier
+*:Zone.Identifier
 static/uploads/
