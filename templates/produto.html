@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container-busca">
     <header class="busca-header">
-        <h2 id="tituloEtapa">Qual é a categoria do item?</h2>
+        <h2 id="tituloEtapa">Selecione a categoria</h2>
     </header>
 
     <div id="stepCategorias" class="grid-categorias">
@@ -24,13 +24,13 @@
     </div>
 
     <div id="stepProdutos" style="display: none;">
-        <button class="btn-voltar" onclick="voltarCategorias()">← Voltar para Categorias</button>
+        <div class="container-botao-voltar">
+            <button class="btn-voltar" onclick="voltarCategorias()">Voltar</button>
+        </div>
         
-        <!-- NOVO CAMPO DE BUSCA -->
         <input type="text" id="inputBusca" class="input-busca" placeholder="Digite o nome do produto..." oninput="filtrarProdutos()">
 
         <div id="listaProdutos" class="grid-produtos" style="margin-top: 20px;">
-            <!-- Os produtos filtrados aparecerão aqui -->
         </div>
     </div>
 </div>
@@ -65,7 +65,7 @@
         // Restaura a tela inicial
         document.getElementById('stepProdutos').style.display = 'none';
         document.getElementById('stepCategorias').style.display = 'grid';
-        document.getElementById('tituloEtapa').innerText = 'Qual é a categoria do item?';
+        document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
         
         // Limpa a busca e a tela ao voltar
         document.getElementById('inputBusca').value = '';
@@ -162,13 +162,36 @@
     .card-produto img { max-width: 100%; max-height: 100%; border-radius: 8px; }
     .plataforma-badge { background: #333; color: #00ff00; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 10px; display: inline-block;}
     
-    /* Complementos de Interface */
-    .btn-voltar { background: transparent; border: none; color: #00ff00; cursor: pointer; font-size: 16px; margin-bottom: 10px; padding: 0; }
-    .btn-voltar:hover { text-decoration: underline; }
+    /* Complementos de Interface - BOTÃO VOLTAR REESTILIZADO E ALINHADO */
+    .container-botao-voltar {
+        display: flex;
+        justify-content: flex-end;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .btn-voltar { 
+        background: #00ff00; 
+        border: 2px solid #00ff00; 
+        color: #000; 
+        cursor: pointer; 
+        font-size: 14px; 
+        padding: 10px 25px; 
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        font-weight: bold;
+        display: inline-block;
+    }
+    .btn-voltar:hover { 
+        background: #00cc00;
+        border-color: #00cc00;
+        color: #000;
+        text-decoration: none;
+    }
     .card-outro { border-style: dashed; border-color: #666; justify-content: center; }
     .card-outro:hover { border-color: #00ff00; }
 
-    /* NOVO: Estilo do Campo de Busca */
+    /* Estilo do Campo de Busca */
     .input-busca {
         width: 100%;
         padding: 15px;

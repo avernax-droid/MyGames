@@ -6,8 +6,12 @@ venv/
 *.pyc
 .vscode/
 
+# Pasta de utilitários e scripts (Não enviar para o GitHub)
+utils/
+
 # Arquivos de dados e scripts de carga
 *.xlsx
+*.csv
 base
 popula_catalogo.py
 

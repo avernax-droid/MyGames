@@ -241,6 +241,10 @@ def finalizar():
 
     if res_protocolo:
         for item in itens:
+            # CORREÇÃO: Garante que o ID seja numérico para o banco de dados
+            produto_id_original = item.get('produto_id')
+            item['produto_id'] = int(produto_id_original) if str(produto_id_original).isdigit() else 0
+            
             engine.registrar_item_periciado(res_protocolo['id'], item)
         
         dados_email = {
@@ -298,7 +302,6 @@ def sair():
 
 @app.route('/api/buscar_produtos')
 def api_buscar_produtos():
-    # Passa a receber o ID da categoria do HTML, ignorando termo de texto
     categoria_id = request.args.get('categoria_id', '')
     
     if not categoria_id:
