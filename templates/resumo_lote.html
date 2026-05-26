@@ -3,44 +3,46 @@
 {% block title %}Resumo do Lote - MyGames{% endblock %}
 
 {% block content %}
-<div class="container-resumo">
-    <div class="card-resumo">
-        <header class="resumo-header">
-            <h2>Confira os itens do seu lote</h2>
+<div class="container" style="display: flex; justify-content: center; padding: 20px;">
+    <div class="card-padrao">
+        <header style="text-align: center; margin-bottom: 25px;">
+            <h2 style="color: #fff; margin-top: 0; font-size: 22px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px;">
+                Confira os itens do seu lote
+            </h2>
         </header>
         
-        <div class="tabela-lote-container">
-            <table class="tabela-lote">
+        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid #333; border-radius: 12px; padding: 10px; margin-bottom: 20px; max-height: 350px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
                     <tr>
-                        <th style="width: 60px;"></th>
-                        <th>Item</th>
-                        <th class="text-right">Valor PIX</th>
+                        <th style="color: #666; font-size: 11px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid #333; width: 60px;"></th>
+                        <th style="color: #666; font-size: 11px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid #333;">Item</th>
+                        <th style="color: #666; font-size: 11px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid #333; text-align: right;">Valor PIX</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in itens %}
                     <tr>
-                        <td>
-                            <div class="produto-thumb-mini">
+                        <td style="padding: 12px 10px; border-bottom: 1px solid #222;">
+                            <div style="width: 50px; height: 50px; background: #000; border: 1px solid #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                                 {% if item.foto_url and item.foto_url != 'None' and item.foto_url != '' %}
-                                    <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}">
+                                    <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                                 {% else %}
                                     <span style="font-size: 22px; line-height: 1;">🎮</span>
                                 {% endif %}
                             </div>
                         </td>
-                        <td>
-                            <div class="produto-nome">{{ item.produto_nome }}</div>
-                            <div class="produto-detalhes">
-                                <span class="estado-lote-texto">{{ item.estado_descricao or 'Estado Geral' }}</span> | 
+                        <td style="padding: 12px 10px; border-bottom: 1px solid #222;">
+                            <div style="color: #fff; font-weight: bold; font-size: 14px; text-transform: uppercase;">{{ item.produto_nome }}</div>
+                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
+                                <span style="color: var(--cor-destaque); font-weight: bold; text-transform: uppercase; font-size: 11px;">{{ item.estado_descricao or 'Estado Geral' }}</span> | 
                                 Qtd: {{ item.quantidade }} 
                                 {% if item.comentarios %}
-                                 | <span class="obs-tag">{{ item.comentarios }}</span>
+                                 | <span style="color: #aaa; font-style: italic;">{{ item.comentarios }}</span>
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="text-right valor-item">
+                        <td style="padding: 12px 10px; border-bottom: 1px solid #222; text-align: right; color: var(--cor-destaque); font-family: monospace; font-size: 15px; font-weight: bold;">
                             R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
                         </td>
                     </tr>
@@ -49,171 +51,31 @@
             </table>
         </div>
 
-        <div class="total-container">
-            <span class="total-label">TOTAL DO LOTE:</span>
-            <span class="total-valor">R$ {{ "%.2f"|format(total_lote) }}</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 15px; background: rgba(0, 255, 0, 0.05); border-radius: 12px; border: 1px dashed var(--cor-destaque); margin-bottom: 25px;">
+            <span style="color: #fff; font-weight: bold; font-size: 16px; text-transform: uppercase;">TOTAL DO LOTE:</span>
+            <span style="color: var(--cor-destaque); font-size: 26px; font-weight: bold; font-family: monospace;">R$ {{ "%.2f"|format(total_lote) }}</span>
         </div>
         
-        <div class="acoes-lote">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <a href="{{ url_for('produto') }}" class="btn-voltar" style="width: max-content;">
-                    VOLTAR
-                </a>
-
-                <a href="{{ url_for('identificacao') }}" class="btn-prosseguir" style="width: max-content;">
-                    CONTINUAR
-                </a>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <a href="{{ url_for('produto') }}" class="btn-secondary">VOLTAR</a>
+                <a href="{{ url_for('identificacao') }}" class="btn-primary">CONTINUAR</a>
             </div>
             
-            <button onclick="confirmarDescarte()" class="btn-descartar">
+            <button onclick="confirmarDescarte()" style="width: 100%; background: #262626; color: #ff4444; padding: 18px 0; border-radius: 12px; font-weight: bold; font-size: 16px; border: 1px solid #444; text-transform: uppercase; cursor: pointer;">
                 DESCARTAR
             </button>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    // CORREÇÃO: Chamando a URL estática diretamente para evitar erros de Build do Flask no Jinja
     function confirmarDescarte() {
-        const confirmar = confirm("Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?");
-        if (confirmar) {
+        if (confirm("Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?")) {
             window.location.href = "/descartar-lote";
         }
     }
 </script>
-
-<style>
-    .container-resumo { 
-        display: flex; justify-content: center; align-items: center; 
-        padding: 20px; min-height: 70vh; 
-    }
-    
-    .card-resumo { 
-        background: #1e1e1e; border: 2px solid #00ff00; border-radius: 24px; 
-        padding: 30px; max-width: 650px; width: 100%; 
-        box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
-    }
-
-    .resumo-header { text-align: center; margin-bottom: 25px; }
-    .resumo-header h2 { color: #fff; margin-top: 0; font-size: 22px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
-
-    .tabela-lote-container {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid #333;
-        border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 20px;
-        max-height: 350px;
-        overflow-y: auto;
-    }
-
-    .tabela-lote {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
-    }
-
-    .tabela-lote th {
-        color: #666;
-        font-size: 11px;
-        text-transform: uppercase;
-        padding: 10px;
-        border-bottom: 1px solid #333;
-    }
-
-    .tabela-lote td {
-        padding: 12px 10px;
-        border-bottom: 1px solid #222;
-        vertical-align: middle;
-    }
-
-    .tabela-lote tr:last-child td {
-        border-bottom: none;
-    }
-
-    .produto-thumb-mini {
-        width: 50px;
-        height: 50px;
-        background: #000;
-        border: 1px solid #333;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    }
-    .produto-thumb-mini img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-
-    .produto-nome { color: #fff; font-weight: bold; font-size: 14px; text-transform: uppercase; }
-    .produto-detalhes { color: #666; font-size: 12px; margin-top: 2px; }
-    
-    .estado-lote-texto { color: #00ff00; font-weight: bold; text-transform: uppercase; font-size: 11px; }
-    .obs-tag { color: #aaa; font-style: italic; }
-
-    .text-right { text-align: right; }
-    .valor-item { color: #00ff00; font-family: monospace; font-size: 15px; font-weight: bold; }
-
-    .total-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 18px 15px;
-        background: rgba(0, 255, 0, 0.05);
-        border-radius: 12px;
-        border: 1px dashed #00ff00;
-        margin-bottom: 25px;
-    }
-
-    .total-label { color: #fff; font-weight: bold; font-size: 16px; text-transform: uppercase; }
-    .total-valor { color: #00ff00; font-size: 26px; font-weight: bold; font-family: monospace; }
-
-    .acoes-lote {
-        display: flex;
-        flex-direction: column;
-        gap: 0px; /* Reduzido para controlar o espaço entre a linha nova e o botão descartar */
-    }
-
-    /* ESTILO ATUALIZADO: Botão Continuar */
-    .btn-prosseguir { 
-        display: inline-block; text-decoration: none; text-align: center;
-        background: #ffffff; color: #000; padding: 18px 40px; border-radius: 12px; 
-        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
-        box-sizing: border-box; text-transform: uppercase; letter-spacing: 1px;
-    }
-
-    .btn-prosseguir:hover { 
-        background: #00ff00; transform: translateY(-2px); 
-        box-shadow: 0 8px 20px rgba(0, 255, 0, 0.2);
-    }
-
-    /* NOVO ESTILO: Botão Voltar (Estilo Ghost) */
-    .btn-voltar {
-        display: inline-block; text-decoration: none; text-align: center;
-        background: transparent; color: #64748b; padding: 18px 40px; border-radius: 12px;
-        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
-        box-sizing: border-box; text-transform: uppercase; letter-spacing: 1px;
-        border: 1px solid #64748b;
-    }
-
-    .btn-voltar:hover {
-        color: #00ff00; border-color: #00ff00; transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(0, 255, 0, 0.1);
-    }
-
-    .btn-descartar {
-        display: block; width: 100%; text-align: center;
-        background: #262626; color: #ff4444; padding: 18px 0; border-radius: 12px;
-        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
-        box-sizing: border-box; border: 1px solid #444; text-transform: uppercase;
-        cursor: pointer; letter-spacing: 1px;
-    }
-    .btn-descartar:hover {
-        background: #333; border-color: #ff4444; transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(255, 68, 68, 0.1);
-    }
-</style>
 {% endblock %}
