@@ -164,8 +164,15 @@ def finalizar_proposta(dados_proposta):
         cursor = db.cursor()
         agora = datetime.datetime.now()
         protocolo = f"MG-{agora.year}-{dados_proposta['cliente_id']}-{agora.strftime('%H%M%S')}"
-        sql = "INSERT INTO protocolos_recompra (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao) VALUES (%s, %s, 'Aberto', %s, %s, NOW())"
-        cursor.execute(sql, (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred']))
+        
+        # NOVO: Extrai o canal de aquisição (usa None se não tiver sido passado)
+        canal_id = dados_proposta.get('canal_aquisicao_id')
+        
+        # ALTERADO: Adicionado canal_aquisicao_id no INSERT
+        sql = "INSERT INTO protocolos_recompra (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id) VALUES (%s, %s, 'Aberto', %s, %s, NOW(), %s)"
+        
+        cursor.execute(sql, (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred'], canal_id))
+        
         p_id = cursor.lastrowid
         db.commit()
         return {"id": p_id, "numero": protocolo}
@@ -198,3 +205,14 @@ def consultar_municipios_ibge():
     try:
         return requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", timeout=5).json()
     except: return []
+
+# NOVO: Função para buscar os canais ativos no banco de dados para a tela de boas-vindas
+def buscar_canais_aquisicao():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        cursor.execute("SELECT id, nome_exibicao FROM canais_aquisicao WHERE ativo = 1")
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()

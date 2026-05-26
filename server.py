@@ -39,12 +39,17 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     session.clear()
-    return render_template('boas_vindas.html')
+    # NOVO: Busca os canais no banco
+    canais_do_banco = engine.buscar_canais_aquisicao() 
+    # ALTERADO: Envia a lista 'canais' para o HTML renderizar os botões
+    return render_template('boas_vindas.html', canais=canais_do_banco)
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():
     session['cidade_usuario'] = request.form.get('cidade')
     session['uf_usuario'] = request.form.get('estado_uf')
+    # NOVO: Captura o canal escolhido no HTML e guarda na sessão para gravar depois
+    session['canal_aquisicao_id'] = request.form.get('canal_aquisicao_id') 
     return redirect(url_for('produto'))
 
 @app.route('/produto')
@@ -234,7 +239,9 @@ def finalizar():
     dados_protocolo = {
         'cliente_id': cliente_id,
         'total_pix': total_pix,
-        'total_cred': total_cred
+        'total_cred': total_cred,
+        # NOVO: Injeta o ID resgatado da sessão no dicionário
+        'canal_aquisicao_id': session.get('canal_aquisicao_id') 
     }
 
     res_protocolo = engine.finalizar_proposta(dados_protocolo)

@@ -22,7 +22,6 @@
                     {% for item in itens %}
                     <tr>
                         <td>
-                            <!-- CORREÇÃO: Estrutura estática sem onerror para eliminar o loop do pisca-pisca -->
                             <div class="produto-thumb-mini">
                                 {% if item.foto_url and item.foto_url != 'None' and item.foto_url != '' %}
                                     <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}">
@@ -32,13 +31,12 @@
                             </div>
                         </td>
                         <td>
-                            <!-- CORREÇÃO: Corrigido de item.produto_name para item.produto_nome -->
                             <div class="produto-nome">{{ item.produto_nome }}</div>
                             <div class="produto-detalhes">
                                 <span class="estado-lote-texto">{{ item.estado_descricao or 'Estado Geral' }}</span> | 
                                 Qtd: {{ item.quantidade }} 
                                 {% if item.comentarios %}
-                                 | <span class="obs-tag">Com observações</span>
+                                 | <span class="obs-tag">{{ item.comentarios }}</span>
                                 {% endif %}
                             </div>
                         </td>
@@ -57,9 +55,15 @@
         </div>
         
         <div class="acoes-lote">
-            <a href="{{ url_for('identificacao') }}" class="btn-prosseguir">
-                CONTINUAR
-            </a>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <a href="{{ url_for('produto') }}" class="btn-voltar" style="width: max-content;">
+                    VOLTAR
+                </a>
+
+                <a href="{{ url_for('identificacao') }}" class="btn-prosseguir" style="width: max-content;">
+                    CONTINUAR
+                </a>
+            </div>
             
             <button onclick="confirmarDescarte()" class="btn-descartar">
                 DESCARTAR
@@ -170,12 +174,13 @@
     .acoes-lote {
         display: flex;
         flex-direction: column;
-        gap: 15px;
+        gap: 0px; /* Reduzido para controlar o espaço entre a linha nova e o botão descartar */
     }
 
+    /* ESTILO ATUALIZADO: Botão Continuar */
     .btn-prosseguir { 
-        display: block; width: 100%; text-decoration: none; text-align: center;
-        background: #ffffff; color: #000; padding: 18px 0; border-radius: 12px; 
+        display: inline-block; text-decoration: none; text-align: center;
+        background: #ffffff; color: #000; padding: 18px 40px; border-radius: 12px; 
         font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
         box-sizing: border-box; text-transform: uppercase; letter-spacing: 1px;
     }
@@ -183,6 +188,20 @@
     .btn-prosseguir:hover { 
         background: #00ff00; transform: translateY(-2px); 
         box-shadow: 0 8px 20px rgba(0, 255, 0, 0.2);
+    }
+
+    /* NOVO ESTILO: Botão Voltar (Estilo Ghost) */
+    .btn-voltar {
+        display: inline-block; text-decoration: none; text-align: center;
+        background: transparent; color: #64748b; padding: 18px 40px; border-radius: 12px;
+        font-weight: bold; font-size: 16px; transition: 0.3s; font-family: inherit;
+        box-sizing: border-box; text-transform: uppercase; letter-spacing: 1px;
+        border: 1px solid #64748b;
+    }
+
+    .btn-voltar:hover {
+        color: #00ff00; border-color: #00ff00; transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 255, 0, 0.1);
     }
 
     .btn-descartar {

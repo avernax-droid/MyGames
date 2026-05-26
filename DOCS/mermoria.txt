@@ -477,4 +477,28 @@ if len(cidades_filtradas) >= 8:
     break
 
 Isso garantiu que o navegador recebesse apenas uma lista curta e manuseável, evitando que o datalist ou o componente de busca ficasse lento ou travasse o navegador.
-    
+
+======
+25/05
+
+Contexto e Próximos Passos — Projeto MyGames
+
+Assunto atual: Implementação do canal de aquisição ("Como nos conheceu") na jornada inicial do usuário.
+
+O que já foi definido (Abordagem Design First):
+
+Regra de Negócio: A pergunta será exibida de forma dinâmica na tela de boas-vindas, logo após o usuário selecionar a cidade (enquanto ele ainda navega de forma anônima).
+
+Modelagem de Dados: A informação pertence à transação/origem do contato, portanto será armazenada na tabela protocolos_recompra.
+
+Padrão de Armazenamento: Os dados serão salvos no banco em snake_case (google, mercado_livre, youtube, indicacao_amigo, redes_sociais, outros), mantendo os textos amigáveis e emojis apenas na camada visual (HTML).
+
+O que deve ser feito a seguir:
+
+Rodar a alteração no banco de dados MySQL:
+
+SQL
+ALTER TABLE protocolos_recompra ADD COLUMN canal_aquisicao VARCHAR(50) NULL;
+Analisar e modificar o arquivo templates/boas_vindas.html para incluir o novo fluxo de seleção assim que a cidade for definida.
+
+Bom descanso, Antonio! Nos vemos no próximo chat para dar andamento ao MyGames. Até lá!

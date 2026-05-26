@@ -9,18 +9,16 @@
         body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         
         .box { width: 100%; max-width: 400px; padding: 40px; background: var(--card); border-radius: 12px; border: 1px solid #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        
-        /* Nova classe para o logo */
         .logo { max-width: 150px; display: block; margin: 0 auto 15px auto; border-radius: 8px; }
         
         h2 { text-align: center; margin-bottom: 10px; font-size: 24px; }
         p { text-align: center; color: #aaa; margin-bottom: 30px; font-size: 14px; }
         
         .form-group { margin-bottom: 20px; position: relative; }
-        input { width: 100%; padding: 14px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; }
-        input:focus { outline: none; border-color: var(--primary); }
+        input, select { width: 100%; padding: 14px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
         
-        /* Estilização da Lista de Cidades */
+        /* Lista de Cidades */
         #lista-cidades { 
             position: absolute; top: 100%; left: 0; right: 0; 
             background: #222; border: 1px solid var(--primary); 
@@ -32,14 +30,17 @@
         
         button { width: 100%; padding: 14px; background: var(--primary); border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; transition: background 0.3s; }
         button:hover { background: #0056b3; }
+
+        /* Nova seção Select */
+        #secao-canal { display: none; margin-top: 25px; border-top: 1px solid #333; padding-top: 15px; }
+        #secao-canal h3 { text-align: center; font-size: 16px; margin-bottom: 15px; color: #ddd; }
+        #btn-entrar { display: none; }
     </style>
 </head>
 <body>
 
     <div class="box">
-        <!-- Inserção da imagem do logo chamando da pasta static/img -->
         <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo da Loja" class="logo">
-        
         <p>Informe sua localização para acessar o catálogo</p>
         
         <form action="{{ url_for('definir_regiao') }}" method="POST">
@@ -50,6 +51,19 @@
             <div class="form-group">
                 <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
             </div>
+
+            <div id="secao-canal">
+                <h3>Como você nos conheceu?</h3>
+                <div class="form-group">
+                    <select name="canal_aquisicao_id" id="canal_id_input" required onchange="liberarBotao()">
+                        <option value="" disabled selected>Selecione uma opção...</option>
+                        {% for canal in canais %}
+                        <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
             <button type="submit" id="btn-entrar">Entrar no Catálogo</button>
         </form>
     </div>
@@ -58,6 +72,8 @@
         const inputCidade = document.getElementById('campo-cidade');
         const listaCidades = document.getElementById('lista-cidades');
         const inputUf = document.getElementById('campo-uf');
+        const secaoCanal = document.getElementById('secao-canal');
+        const btnEntrar = document.getElementById('btn-entrar');
 
         inputCidade.addEventListener('input', async () => {
             const termo = inputCidade.value;
@@ -75,6 +91,7 @@
                         inputCidade.value = item.cidade;
                         inputUf.value = item.uf;
                         listaCidades.style.display = 'none';
+                        secaoCanal.style.display = 'block';
                     };
                     listaCidades.appendChild(div);
                 });
@@ -84,10 +101,16 @@
             }
         });
 
-        // Fecha a lista ao clicar fora
         document.addEventListener('click', (e) => {
             if (e.target !== inputCidade) listaCidades.style.display = 'none';
         });
+
+        function liberarBotao() {
+            const select = document.getElementById('canal_id_input');
+            if (select.value !== "") {
+                btnEntrar.style.display = 'block';
+            }
+        }
     </script>
 </body>
 </html>

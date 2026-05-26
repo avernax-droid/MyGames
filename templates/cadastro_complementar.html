@@ -15,7 +15,6 @@
 
     <form action="/finalizar-lote" method="POST">
         
-        <!-- BLOCO 1: DADOS PESSOAIS (UNIFICADO) -->
         <div class="row">
             <div class="input-group" style="flex: 0 0 40%;">
                 <label for="cpf">CPF *</label>
@@ -43,7 +42,6 @@
 
         <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
 
-        <!-- BLOCO 2: ENDEREÇO -->
         <div class="row">
             <div class="input-group" style="flex: 0 0 35%;">
                 <label for="cep">CEP *</label>
@@ -73,7 +71,6 @@
 
         <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
 
-        <!-- BLOCO 3: FINANCEIRO -->
         <div class="input-group">
             <label for="chave_pix">CHAVE PIX (PARA RECEBIMENTO DO PAGAMENTO) *</label>
             <input type="text" id="chave_pix" name="chave_pix" value="{{ cliente.chave_pix or '' }}" placeholder="CPF, CNPJ, E-mail, Telefone ou Chave Aleatória" required>
@@ -82,18 +79,38 @@
             </p>
         </div>
 
-        <!-- DADOS OCULTOS MANTIDOS PARA SINCRONIA -->
         <input type="hidden" name="cadastro_completado" value="1">
         <input type="hidden" id="cidade" name="cidade" value="{{ cliente.cidade or '' }}">
         <input type="hidden" id="estado_uf" name="estado_uf" value="{{ cliente.estado_uf or '' }}">
 
-        <button type="submit" class="btn-glow" style="width: 100%; margin-top: 25px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; font-size: 1.2rem;">
-            CONCLUIR E GERAR PROTOCOLO
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px;">
+            <button type="button" onclick="history.back()" class="btn-ghost" style="text-transform: uppercase; font-family: 'Rajdhani', sans-serif; font-size: 1rem;">
+                VOLTAR
+            </button>
+
+        <button type="submit" class="btn-glow" style="width: max-content; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; font-size: 1.2rem;">
+            GERAR PROTOCOLO
         </button>
+        </div>
     </form>
 </div>
 
 <script>
+// FUNÇÃO AUXILIAR INJETADA PARA A CORREÇÃO DE LIMPEZA
+function limparCamposPorAlteracaoCPF() {
+    document.getElementById('nome').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('numero').value = '';
+    document.getElementById('bairro').value = '';
+    document.getElementById('complemento').value = '';
+    document.getElementById('cidade').value = '';
+    document.getElementById('estado_uf').value = '';
+    document.getElementById('chave_pix').value = '';
+    document.getElementById('endereco').value = '';
+    document.getElementById('cep').value = '';
+    document.getElementById('whatsapp').value = '';
+}
+
 // FUNÇÕES AUXILIARES DE MÁSCARA (REAPROVEITÁVEIS)
 function aplicarMascaraCPF(valor) {
     let val = valor.replace(/\D/g, '');
@@ -118,10 +135,8 @@ function aplicarMascaraCEP(valor) {
 function aplicarMascaraWhatsApp(valor) {
     let val = valor.replace(/\D/g, '');
     if (val.length > 10) {
-        // Celulares com 9 dígitos: (11) 99999-9999
         return '(' + val.substring(0, 2) + ') ' + val.substring(2, 7) + '-' + val.substring(7, 11);
     } else if (val.length > 6) {
-        // Telefones fixos com 8 dígitos: (11) 3333-3333
         return '(' + val.substring(0, 2) + ') ' + val.substring(2, 6) + '-' + val.substring(6, 10);
     } else if (val.length > 2) {
         return '(' + val.substring(0, 2) + ') ' + val.substring(2);
@@ -148,7 +163,6 @@ document.getElementById('cpf').addEventListener('blur', function() {
                 if (dados.sucesso && dados.cliente) {
                     const c = dados.cliente;
                     
-                    // Preenche os inputs nativos com os dados brutos vindos do banco
                     document.getElementById('nome').value = c.nome || c.nome_completo || '';
                     document.getElementById('email').value = c.email || '';
                     document.getElementById('numero').value = c.numero || '';
@@ -159,18 +173,19 @@ document.getElementById('cpf').addEventListener('blur', function() {
                     document.getElementById('chave_pix').value = c.chave_pix || '';
                     document.getElementById('endereco').value = c.endereco || c.rua || '';
 
-                    // Tratamento Estético: Aplica a máscara visual nos dados puros que vieram do banco
                     if (c.cep) document.getElementById('cep').value = aplicarMascaraCEP(c.cep);
                     if (c.whatsapp) document.getElementById('whatsapp').value = aplicarMascaraWhatsApp(c.whatsapp);
 
-                    feedback.style.color = '#00ffcc'; // Verde/Ciano Neon
+                    feedback.style.color = '#00ffcc'; 
                     feedback.textContent = '✓ Perfil de jogador recuperado com sucesso!';
                 } else {
+                    limparCamposPorAlteracaoCPF();
                     feedback.style.color = '#64748b';
                     feedback.textContent = 'Novo perfil detectado. Preencha os campos para registrar-se.';
                 }
             })
             .catch(erro => {
+                limparCamposPorAlteracaoCPF();
                 feedback.style.color = '#64748b';
                 feedback.textContent = 'Novo perfil detectado. Preencha os campos para registrar-se.';
             });
@@ -180,6 +195,12 @@ document.getElementById('cpf').addEventListener('blur', function() {
 // Listener de Digitação: Máscara do CPF
 document.getElementById('cpf').addEventListener('input', function (e) {
     e.target.value = aplicarMascaraCPF(e.target.value);
+    
+    const cpfLimpo = e.target.value.replace(/\D/g, '');
+    if (cpfLimpo.length < 11) {
+        limparCamposPorAlteracaoCPF();
+        document.getElementById('feedbackCpf').style.display = 'none';
+    }
 });
 
 // Listener de Digitação: Máscara do WhatsApp
@@ -220,6 +241,27 @@ document.getElementById('cep').addEventListener('blur', function() {
             .catch(error => console.error('Erro na busca de CEP:', error));
     }
 });
+
+// CORREÇÃO: Simula o comportamento do TAB ao pressionar Enter
+document.querySelector('form').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault(); // Impede o envio do formulário sem clicar no botão
+        
+        // Se estiver no campo CPF, o blur dispara a sua inteligência original de busca
+        if (event.target.id === 'cpf') {
+            event.target.blur();
+        }
+
+        // Pega todos os inputs de texto visíveis no formulário
+        const inputs = Array.from(this.querySelectorAll('input:not([type="hidden"])'));
+        const indexAtual = inputs.indexOf(event.target);
+        
+        // Se o input atual for encontrado e não for o último, avança para o próximo
+        if (indexAtual > -1 && indexAtual < inputs.length - 1) {
+            inputs[indexAtual + 1].focus();
+        }
+    }
+});
 </script>
 
 <style>
@@ -227,7 +269,13 @@ document.getElementById('cep').addEventListener('blur', function() {
     .input-group { display: flex; flex-direction: column; flex: 1; text-align: left; }
     .input-group label { font-size: 0.75rem; color: #00d4ff; margin-bottom: 5px; text-transform: uppercase; }
     .input-group input { background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 4px; }
+    
+    /* Botão Principal */
     .btn-glow { background: var(--neon-orange, #ff8c00); color: #000; border: none; padding: 15px; font-weight: bold; cursor: pointer; border-radius: 8px; transition: 0.3s; }
     .btn-glow:hover { box-shadow: 0 0 15px rgba(255, 140, 0, 0.5); transform: translateY(-2px); }
+    
+    /* Botão Voltar (Ghost Button) */
+    .btn-ghost { background: transparent; color: #64748b; border: 1px solid #64748b; padding: 10px 25px; font-weight: bold; cursor: pointer; border-radius: 8px; transition: 0.3s; }
+    .btn-ghost:hover { color: #00d4ff; border-color: #00d4ff; transform: translateY(-2px); box-shadow: 0 0 10px rgba(0, 212, 255, 0.2); }
 </style>
 {% endblock %}
