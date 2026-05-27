@@ -48,6 +48,7 @@
             cursor: pointer;
             border: none;
             font-family: 'Rajdhani', sans-serif;
+            font-size: 16px; 
             transition: 0.3s;
         }
         .btn-primary:hover { background: #00cc00; transform: translateY(-2px); }
@@ -64,6 +65,7 @@
             display: inline-block;
             cursor: pointer;
             font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
             transition: 0.3s;
         }
         .btn-secondary:hover { background: rgba(0, 255, 0, 0.1); transform: translateY(-2px); }
@@ -86,11 +88,11 @@
 <body>
     <div class="container">
         <div class="fases-container">
-            <div class="fase-item {{ 'concluida' if fase_atual >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
-            <div class="fase-item {{ 'concluida' if fase_atual >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
-            <div class="fase-item {{ 'concluida' if fase_atual >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
-            <div class="fase-item {{ 'concluida' if fase_atual >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Identificação</span></div>
-            <div class="fase-item {{ 'concluida' if fase_atual >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Identificação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
         </div>
 
         <header>

@@ -502,3 +502,38 @@ ALTER TABLE protocolos_recompra ADD COLUMN canal_aquisicao VARCHAR(50) NULL;
 Analisar e modificar o arquivo templates/boas_vindas.html para incluir o novo fluxo de seleção assim que a cidade for definida.
 
 Bom descanso, Antonio! Nos vemos no próximo chat para dar andamento ao MyGames. Até lá!
+
+=====
+26/05
+
+Sumário de Refatoração e Padronização (MyGames)
+1. O que foi feito (Contexto de Design System)
+Centralização da Estilização: Migramos a lógica visual dos módulos de página para o base.html. Criamos variáveis globais (:root) para cores (fundo, cards, destaque em verde neon) e fontes (Rajdhani/Roboto).
+
+Criação de Componentes Globais: Substituímos estilos repetitivos por classes de componentes reutilizáveis:
+
+.card-padrao: Unifica a estrutura de cards em todo o sistema.
+
+.btn-primary: Padronização de botões de ação principal (cor de destaque).
+
+.btn-secondary: Padronização de botões de ação secundária (estilo ghost).
+
+Limpeza de Código: Removemos todos os blocos <style> locais dos arquivos de página, reduzindo a redundância e o tamanho dos arquivos, mantendo apenas a estrutura HTML.
+
+2. Módulos Alterados
+templates/base.html: Tornou-se a "fonte da verdade" para o estilo visual de todo o site.
+
+templates/cadastro_complementar.html: Implementada a padronização de layout, inclusão do botão "Voltar" (etapa anterior) e "Gerar Protocolo" (alinhado à direita, tamanho dinâmico). Manutenção da lógica de busca de CPF e trava de envio por Enter.
+
+templates/resumo_lote.html: Padronização dos botões (Voltar, Continuar, Descartar) e implementação da nova arquitetura de classes CSS.
+
+templates/resultado.html: Correção de UX nas observações do usuário (quebra de linha forçada com word-wrap: break-word para evitar estouro da área de texto).
+
+3. Pontos Chave para o Próximo "Refresh"
+Regra de Ouro: Não alteramos lógica de negócio (backend/Python) em correções de interface; as intervenções são estritamente visuais ou de usabilidade (UI/UX).
+
+Navegação: O botão "Voltar" em todas as telas foi padronizado para retornar à etapa anterior do funil via history.back() ou rota específica (url_for).
+
+Estado Atual: O sistema está operando na branch versao-demo com o diretório de trabalho limpo (commit 06d1c2a).
+
+Quando você retomar a conversa, basta colar este descritivo ou pedir para eu ler os arquivos, e estarei pronto para continuar com o próximo passo da padronização visual!

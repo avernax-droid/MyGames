@@ -3,8 +3,9 @@
 {% block title %}Sua Oferta{% endblock %}
 
 {% block content %}
-<div class="container-resultado">
-    <div class="card-oferta">
+<div class="container-resultado" style="display: flex; justify-content: center; align-items: center; padding: 20px; min-height: 70vh;">
+    
+    <div class="card-padrao" style="text-align: center;">
         
         <div id="dados-avaliacao-container">
             <header class="oferta-header">
@@ -52,16 +53,20 @@
             <p>Este item foi ejetado e não fará parte do lote.</p>
         </div>
 
-        <div class="acoes-finais">
-            <a href="{{ url_for('resumo') }}" class="btn-bloco-oferta btn-fechar-lote">
-                FECHAR
-            </a>
+        <div class="acoes-finais" style="margin-top: 25px;">
             
-            <a href="{{ url_for('produto') }}" class="btn-bloco-oferta btn-voltar-produtos">
-                VOLTAR PARA MAIS PRODUTOS
-            </a>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; gap: 15px;">
+                
+                <a href="{{ url_for('produto') }}" class="btn-secondary">
+                    MAIS PRODUTOS
+                </a>
 
-            <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-bloco-oferta btn-descartar-avaliacao">
+                <a href="{{ url_for('resumo') }}" class="btn-primary">
+                    FECHAR
+                </a>
+            </div>
+
+            <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
                 DESCARTAR AVALIAÇÃO
             </button>
         </div>
@@ -77,6 +82,10 @@
                     if (data.status === 'sucesso') {
                         document.getElementById('dados-avaliacao-container').style.display = 'none';
                         document.getElementById('btn-descarte-acao').style.display = 'none';
+                        
+                        // Oculta a linha dos botões Mais Produtos/Fechar
+                        document.querySelector('.acoes-finais > div').style.display = 'none';
+                        
                         document.getElementById('feedback-descarte').style.display = 'block';
                     }
                 })
@@ -86,56 +95,44 @@
 </script>
 
 <style>
-    .container-resultado { 
-        display: flex; justify-content: center; align-items: center; 
-        padding: 20px; min-height: 70vh; 
-    }
-    
-    .card-oferta { 
-        background: #1e1e1e; border: 2px solid #00ff00; border-radius: 24px; 
-        padding: 30px; text-align: center; max-width: 500px; width: 100%; 
-        box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
-    }
+    /* LIMPEZA DE CÓDIGO: 
+       Removemos .card-oferta, .container-resultado e TODAS as classes de botões! 
+       Eles agora herdam diretamente do base.html. 
+       Mantivemos apenas a formatação interna exclusiva desta página, utilizando as variáveis do :root. */
 
     .produto-thumb-wrapper {
         width: 100px; height: 100px; margin: 0 auto 15px;
         display: flex; align-items: center; justify-content: center;
-        background: rgba(0, 0, 0, 0.2); border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.2); border: var(--borda-fina);
         border-radius: 12px; padding: 5px;
     }
 
-    .produto-mini-foto {
-        max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain;
-    }
-
-    .produto-nome-display { color: #fff; text-transform: uppercase; font-size: 18px; font-weight: bold; }
-
+    .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 18px; font-weight: bold; }
+    
     .valor-container { margin: 20px 0; }
-    .simbolo-monetario { color: #00ff00; font-size: 24px; vertical-align: top; font-weight: bold; }
-    .valor-pix { color: #00ff00; font-size: 54px; font-weight: bold; line-height: 1; font-family: monospace; }
+    .simbolo-monetario { color: var(--cor-destaque); font-size: 24px; vertical-align: top; font-weight: bold; }
+    .valor-pix { color: var(--cor-destaque); font-size: 54px; font-weight: bold; line-height: 1; font-family: monospace; }
 
     .info-estado { margin-bottom: 25px; }
     .badge-estado-selecionado {
         display: inline-block; background: rgba(0, 255, 0, 0.08);
-        border: 1px solid #00ff00; color: #00ff00;
+        border: 1px solid var(--cor-destaque); color: var(--cor-destaque);
         padding: 8px 18px; border-radius: 6px;
         font-weight: bold; font-size: 14px; text-transform: uppercase;
     }
 
     .revisao-pericia { 
         background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; 
-        margin-bottom: 20px; text-align: left; border: 1px solid #333;
+        margin-bottom: 20px; text-align: left; border: var(--borda-fina);
     }
-    .label-mini { color: #666; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; }
+    .label-mini { color: var(--texto-dim); font-size: 11px; text-transform: uppercase; margin-bottom: 8px; }
     .fotos-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
-    .thumb-revisao { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #444; }
+    .thumb-revisao { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: var(--borda-fina); }
     
-    /* CORREÇÃO APLICADA AQUI */
     .texto-comentario { 
-        color: #aaa; font-size: 13px; font-style: italic; margin: 0;
-        word-wrap: break-word; 
-        white-space: pre-wrap; 
-        overflow-wrap: break-word;
+        color: var(--texto-dim); font-size: 13px; font-style: italic; margin: 0;
+        word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;
     }
 
     .msg-feedback-descarte {
@@ -145,26 +142,6 @@
     }
     .icone-lixeira { font-size: 36px; margin-bottom: 8px; }
     .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 6px 0; font-size: 16px; text-transform: uppercase; }
-    .msg-feedback-descarte p { color: #777; margin: 0; font-size: 13px; }
-
-    .acoes-finais { display: flex; flex-direction: column; gap: 15px; margin-top: 25px; }
-
-    .btn-bloco-oferta { 
-        display: block; width: 100%; text-decoration: none; text-align: center;
-        padding: 16px 0; border-radius: 12px; font-weight: bold; font-size: 16px; 
-        transition: 0.3s; font-family: inherit; box-sizing: border-box; 
-        text-transform: uppercase; letter-spacing: 1px;
-    }
-
-    .btn-fechar-lote { background: #ffffff; color: #000; }
-    .btn-fechar-lote:hover { background: #00ff00; transform: translateY(-2px); }
-
-    .btn-voltar-produtos { background: #262626; color: #fff; border: 1px solid #444; }
-    .btn-voltar-produtos:hover { background: #333; color: #00ff00; border-color: #00ff00; }
-
-    .btn-descartar-avaliacao {
-        background: #262626; color: #ff4444; border: 1px solid #444; cursor: pointer;
-    }
-    .btn-descartar-avaliacao:hover { background: #333; border-color: #ff4444; }
+    .msg-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 13px; }
 </style>
 {% endblock %}
