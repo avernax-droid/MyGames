@@ -1,3 +1,17 @@
+# ==============================================================================
+# PROJETO: MyGames
+# MÓDULO: engine.py
+# DATA DE CRIAÇÃO: 28/05/2026
+# TÍTULO: Motor de Regras e Integração de Banco de Dados
+# FUNÇÃO: Módulo core do sistema responsável por toda a camada de persistência 
+# de dados (MySQL), cálculos de perícia (depreciação de valores), integração com 
+# APIs externas (IBGE) e envio de comunicações automatizadas (e-mail). Orquestra 
+# a lógica entre o front-end e o banco de dados.
+#
+# HISTÓRICO DE ALTERAÇÕES:
+# - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+# ==============================================================================
+
 import mysql.connector
 from mysql.connector import Error
 from decimal import Decimal
@@ -118,7 +132,6 @@ def calcular_cotacao_final(produto_id, estado_id):
         cursor.execute("SELECT fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
         
-        # Correção: Blindagem contra valores nulos/vazios e troca de vírgula por ponto
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
         
@@ -148,14 +161,35 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         remetente, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
         msg = MIMEMultipart()
         msg['From'], msg['To'], msg['Subject'] = remetente, cliente['email'], f"Confirmação MyGames - Protocolo {dados_email['protocolo']}"
+        
         corpo = f"Olá {cliente['nome_completo']},\n\nProtocolo: {dados_email['protocolo']}\n\n"
+        
+        tem_analise_manual = False
+        
         for item in itens_avaliados:
-            corpo += f"Produto: {item.get('produto_nome')}\n Valor: R$ {item['valor_pix_unitario']:.2f}\n"
-        msg.attach(MIMEText(corpo, 'plain'))
+            corpo += f"Produto: {item.get('produto_nome')}\n"
+            if item.get('is_outros'):
+                corpo += " Valor: Sob Consulta\n\n"
+                tem_analise_manual = True
+            else:
+                corpo += f" Valor: R$ {item['valor_pix_unitario']:.2f}\n\n"
+        
+        if tem_analise_manual:
+            corpo += "--------------------------------------------------------\n"
+            corpo += "AVISO SOBRE ITENS SOB CONSULTA:\n"
+            corpo += "Notamos que o seu lote contém itens que não estão cadastrados em nosso sistema padrão.\n"
+            corpo += "Nossa equipe técnica avaliará as informações e fotos enviadas, e entrará em contato "
+            corpo += "com você em até 24 horas úteis para apresentar a oferta final destes itens.\n"
+            corpo += "--------------------------------------------------------\n"
+            
+        msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
+        
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls(); server.login(remetente, senha); server.send_message(msg); server.quit()
         return True
-    except: return False
+    except Exception as e: 
+        print(f"Erro ao enviar email: {e}")
+        return False
 
 def finalizar_proposta(dados_proposta):
     db = conectar_bd()
@@ -165,10 +199,8 @@ def finalizar_proposta(dados_proposta):
         agora = datetime.datetime.now()
         protocolo = f"MG-{agora.year}-{dados_proposta['cliente_id']}-{agora.strftime('%H%M%S')}"
         
-        # NOVO: Extrai o canal de aquisição (usa None se não tiver sido passado)
         canal_id = dados_proposta.get('canal_aquisicao_id')
         
-        # ALTERADO: Adicionado canal_aquisicao_id no INSERT
         sql = "INSERT INTO protocolos_recompra (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id) VALUES (%s, %s, 'Aberto', %s, %s, NOW(), %s)"
         
         cursor.execute(sql, (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred'], canal_id))
@@ -206,7 +238,6 @@ def consultar_municipios_ibge():
         return requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", timeout=5).json()
     except: return []
 
-# NOVO: Função para buscar os canais ativos no banco de dados para a tela de boas-vindas
 def buscar_canais_aquisicao():
     db = conectar_bd()
     if not db: return []

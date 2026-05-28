@@ -1,16 +1,42 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: pericia.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Avaliação Técnica e Conservação do Produto
+  FUNÇÃO: Tela responsável por coletar informações detalhadas sobre o estado de 
+  conservação do item selecionado. Exibe perguntas dinâmicas extras dependendo da 
+  categoria (ex: se console é bloqueado, se mídia é física/digital), permite o 
+  upload opcional de fotos para perícia e valida obrigatoriedade de comentários 
+  para estados específicos. Também exibe alertas customizados para itens não listados.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 28/05/2026: Remoção da lógica de upload local, agora centralizada no main.js.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Avaliação Técnica - MyGames{% endblock %}
 
 {% block content %}
-<div class="container-pericia">
-    <header class="pericia-header">
-        <h2>Estado de Conservação</h2>
-        <p class="instrucao">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+<div class="card-padrao">
+    <header style="text-align: center; margin-bottom: 35px;">
+        <h2 style="color: var(--cor-destaque); font-size: 28px; margin-bottom: 10px;">Estado de Conservação</h2>
+        <p style="color: var(--texto-dim); font-size: 15px;">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
     </header>
 
-    <form action="/cotar" method="POST" enctype="multipart/form-data" class="form-pericia">
+    <form action="/cotar" method="POST" enctype="multipart/form-data">
         
+        {% if session.get('is_outros') %}
+        <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+            <p style="color: var(--cor-destaque); margin: 0; font-weight: bold; font-size: 14px;">ℹ️ AVALIAÇÃO PERSONALIZADA</p>
+            <p style="color: var(--texto-dim); font-size: 12px; margin: 5px 0 0 0;">
+                Preencha os dados abaixo com o máximo de detalhes possível para nossa equipe formular a sua oferta.
+            </p>
+        </div>
+        {% endif %}
+
         <div class="opcoes-wrapper">
             <p class="label-secao">Selecione o estado do item:</p>
             {% if opcoes %}
@@ -89,55 +115,18 @@
             <textarea name="comentarios" id="campo-comentarios" class="text-obs" placeholder="Ex: Acompanha caixa original, detalhe no analógico, etc."></textarea>
         </div>
 
-        <button type="submit" class="btn-cotar-glow">AVALIAR</button>
+        <button type="submit" class="btn-primary" style="width: 100%;">AVALIAR</button>
     </form>
 </div>
 
 <script>
-    // 1. Gerenciador de feedback de upload de arquivos
-    const fileInput = document.getElementById('file-input');
-    const fileMsg = document.getElementById('file-msg');
-    
-    fileInput.addEventListener('change', function() {
-        const count = this.files.length;
-        if (count > 0) {
-            fileMsg.innerText = count + (count > 1 ? " arquivos selecionados" : " arquivo selecionado");
-            fileMsg.style.color = "#00ff00";
-            fileMsg.style.fontWeight = "bold";
-        } else {
-            fileMsg.innerText = "ou arraste as imagens aqui";
-            fileMsg.style.color = "#888";
-        }
-    });
-
-    // 2. Efeito visual ao arrastar arquivos sobre a área
-    const dropArea = document.getElementById('drop-area');
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            dropArea.style.borderColor = "#00ff00";
-            dropArea.style.background = "rgba(0, 255, 0, 0.05)";
-        });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            dropArea.style.borderColor = "#444";
-            dropArea.style.background = "rgba(26, 26, 26, 1)";
-        });
-    });
-
-    // 3. NOVO: Validador Inteligente de Comentários
     const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
     const campoComentarios = document.getElementById('campo-comentarios');
 
     radiosOpcoes.forEach(radio => {
         radio.addEventListener('change', function() {
-            // Pega o texto correspondente à opção selecionada e converte para minúsculas
             const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
             
-            // Se a opção exigir especificação, torna o textarea obrigatório
             if (textoOpcao.includes('especifique nos comentários')) {
                 campoComentarios.setAttribute('required', 'required');
                 campoComentarios.placeholder = "OBRIGATÓRIO: Por favor, especifique os detalhes aqui...";
@@ -152,83 +141,31 @@
 </script>
 
 <style>
-    .container-pericia { max-width: 650px; margin: auto; padding: 20px; }
-    .pericia-header { text-align: center; margin-bottom: 35px; }
-    .pericia-header h2 { color: #00ff00; font-size: 28px; margin-bottom: 10px; }
-    .instrucao { color: #888; font-size: 15px; }
-
-    .label-secao { color: #aaa; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-
+    .label-secao { color: var(--texto-dim); font-size: 14px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
     .opcoes-wrapper { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
-    .alert-error { 
-        color: #ff4444; text-align: center; padding: 20px; 
-        border: 1px dashed #ff4444; border-radius: 12px; background: rgba(255, 68, 68, 0.05);
-    }
-    
+    .alert-error { color: #ff4444; text-align: center; padding: 20px; border: 1px dashed #ff4444; border-radius: 12px; background: rgba(255, 68, 68, 0.05); }
     .radio-label input[type="radio"] { display: none; }
-
-    .opcao-card {
-        display: flex; align-items: center; background: #1e1e1e; border: 2px solid #333;
-        border-radius: 12px; padding: 15px 20px; cursor: pointer; transition: 0.3s;
-    }
+    .opcao-card { display: flex; align-items: center; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px 20px; cursor: pointer; transition: 0.3s; }
     .opcao-card:hover { border-color: #555; background: #252525; }
-
-    .check-indicator {
-        width: 20px; height: 20px; border: 2px solid #555; border-radius: 50%;
-        margin-right: 20px; position: relative; transition: 0.3s;
-    }
-
-    .radio-label input[type="radio"]:checked + .opcao-card {
-        border-color: #00ff00; background: rgba(0, 255, 0, 0.05);
-    }
-    .radio-label input[type="radio"]:checked + .opcao-card .check-indicator {
-        border-color: #00ff00; background: #00ff00; box-shadow: 0 0 10px #00ff00;
-    }
-
-    /* ESTILOS NOVOS: Perguntas Dinâmicas */
-    .pergunta-extra-wrapper {
-        background: #151515; padding: 20px; border-radius: 12px; border: 1px solid #333;
-    }
+    .check-indicator { width: 20px; height: 20px; border: 2px solid #555; border-radius: 50%; margin-right: 20px; position: relative; transition: 0.3s; }
+    .radio-label input[type="radio"]:checked + .opcao-card { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); }
+    .radio-label input[type="radio"]:checked + .opcao-card .check-indicator { border-color: var(--cor-destaque); background: var(--cor-destaque); box-shadow: 0 0 10px var(--cor-destaque); }
+    .pergunta-extra-wrapper { background: #151515; padding: 20px; border-radius: 12px; border: var(--borda-fina); }
     .radio-group-inline { display: flex; flex-direction: column; gap: 15px; }
-    .radio-inline { 
-        display: flex; align-items: center; gap: 10px; color: #fff; cursor: pointer; font-size: 15px; 
-    }
-    .radio-inline input[type="radio"] { 
-        accent-color: #00ff00; width: 18px; height: 18px; cursor: pointer; 
-    }
-    
+    .radio-inline { display: flex; align-items: center; gap: 10px; color: var(--texto-br); cursor: pointer; font-size: 15px; }
+    .radio-inline input[type="radio"] { accent-color: var(--cor-destaque); width: 18px; height: 18px; cursor: pointer; }
     .inputs-qtd-group { display: flex; flex-direction: column; gap: 15px; }
     .inputs-qtd-group label { display: flex; justify-content: space-between; align-items: center; color: #ddd; font-size: 15px; }
-    .input-qtd { 
-        width: 80px; padding: 10px; background: #1e1e1e; border: 1px solid #555; 
-        border-radius: 8px; color: #fff; font-size: 16px; text-align: center; outline: none; transition: 0.3s;
-    }
-    .input-qtd:focus { border-color: #00ff00; box-shadow: 0 0 10px rgba(0,255,0,0.1); }
-
+    .input-qtd { width: 80px; padding: 10px; background: var(--bg-fundo); border: 1px solid #555; border-radius: 8px; color: var(--texto-br); font-size: 16px; text-align: center; outline: none; transition: 0.3s; }
+    .input-qtd:focus { border-color: var(--cor-destaque); box-shadow: 0 0 10px rgba(0,255,0,0.1); }
     .upload-section { margin-bottom: 30px; }
-    .file-drop-area {
-        position: relative; display: flex; align-items: center; padding: 25px;
-        background: #1a1a1a; border: 2px dashed #444; border-radius: 12px;
-        transition: 0.3s; text-align: center; justify-content: center;
-    }
+    .file-drop-area { position: relative; display: flex; align-items: center; padding: 25px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; transition: 0.3s; text-align: center; justify-content: center; }
     .file-input { position: absolute; left: 0; top: 0; height: 100%; width: 100%; opacity: 0; cursor: pointer; }
-    .fake-btn { background: #333; color: #fff; padding: 8px 15px; border-radius: 5px; font-size: 13px; margin-right: 10px; }
+    .fake-btn { background: #333; color: var(--texto-br); padding: 8px 15px; border-radius: 5px; font-size: 13px; margin-right: 10px; }
     .file-msg { color: #888; font-size: 14px; }
     .file-hint { color: #555; font-size: 12px; margin-top: 8px; }
-
     .obs-section { margin-bottom: 30px; }
-    .text-obs {
-        width: 100%; height: 100px; background: #1e1e1e; border: 2px solid #333;
-        border-radius: 12px; padding: 15px; color: #fff; font-family: inherit;
-        resize: none; transition: 0.3s;
-    }
-    .text-obs:focus { border-color: #00ff00; outline: none; background: #252525; }
-
-    .btn-cotar-glow {
-        width: 100%; background: #00ff00; color: #000; border: none; padding: 20px;
-        font-size: 18px; font-weight: bold; border-radius: 12px; cursor: pointer;
-        transition: 0.3s; text-transform: uppercase; letter-spacing: 1px;
-    }
-    .btn-cotar-glow:hover { background: #00cc00; box-shadow: 0 0 20px rgba(0, 255, 0, 0.3); transform: translateY(-2px); }
+    .text-obs { width: 100%; height: 100px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px; color: var(--texto-br); font-family: inherit; resize: none; transition: 0.3s; }
+    .text-obs:focus { border-color: var(--cor-destaque); outline: none; background: #252525; }
 </style>
 {% endblock %}

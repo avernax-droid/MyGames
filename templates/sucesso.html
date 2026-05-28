@@ -1,52 +1,70 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: sucesso.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Tela de Conclusão e Protocolo
+  FUNÇÃO: Exibe o número do protocolo gerado, confirma o envio do e-mail de 
+  resumo e apresenta o valor final (ou parcial) do lote. Também emite um alerta 
+  ao usuário caso existam itens sob consulta que dependam de análise manual 
+  da equipe técnica.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  ==============================================================================
+#}
 {% extends "base.html" %}
 
 {% block title %}Agendamento Concluído{% endblock %}
 
 {% block content %}
-<div class="card-lead" style="text-align: center; max-width: 550px; margin: auto;">
-    <div class="xp-bar-container">
-        <div class="xp-bar-fill" style="width: 100%;"></div>
-        <span class="xp-text">MISSION ACCOMPLISHED</span>
-    </div>
+{% set tem_pendentes = false %}
+{% for item in session.get('itens_avaliados', []) %}
+    {% if item.is_outros %}
+        {% set tem_pendentes = true %}
+    {% endif %}
+{% endfor %}
 
-    <header style="margin-bottom: 30px;">
-        <div style="font-size: 60px; color: #00ffcc; margin-bottom: 10px;">✓</div>
-        <h2 style="font-family: 'Rajdhani', sans-serif; color: #ff8c00; text-transform: uppercase; margin: 0;">
+<div class="card-padrao" style="text-align: center;">
+    <header style="margin-bottom: 15px;">
+        <div style="font-size: 40px; color: var(--cor-destaque); margin-bottom: 5px;">✓</div>
+        <h2 style="font-family: 'Rajdhani', sans-serif; color: var(--texto-br); text-transform: uppercase; margin: 0;">
             Protocolo Gerado!
         </h2>
-        <p style="color: #888; margin-top: 5px;">
+        <p style="color: var(--texto-dim); margin-top: 5px;">
             Um resumo detalhado com o demonstrativo dos itens foi enviado para <strong>{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
         </p>
     </header>
 
-    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px dashed #00d4ff; margin-bottom: 25px;">
-        <span style="display: block; font-size: 0.75rem; color: #00d4ff; margin-bottom: 5px; text-transform: uppercase;">Código de Protocolo</span>
-        <strong style="font-size: 1.5rem; letter-spacing: 2px; color: #fff; font-family: 'Courier New', monospace;">
+    <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; border: 1px dashed var(--cor-destaque); margin-bottom: 15px;">
+        <span style="display: block; font-size: 0.75rem; color: var(--cor-destaque); margin-bottom: 5px; text-transform: uppercase;">Código de Protocolo</span>
+        <strong style="font-size: 1.5rem; letter-spacing: 2px; color: var(--texto-br); font-family: 'Courier New', monospace;">
             {{ protocolo if protocolo else session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
         </strong>
     </div>
 
-    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; margin-bottom: 30px; font-size: 0.95rem; border-left: 4px solid #00ffcc;">
-        <p style="margin: 8px 0; color: #aaa;"><strong>Total de Itens do Lote:</strong> <span style="color: #fff;">{{ session.get('itens_avaliados', [])|length }}</span></p>
-        <p style="margin: 8px 0; color: #aaa;"><strong>Valor Total da Proposta:</strong> <span style="color: #00ffcc; font-weight: bold; font-size: 1.2rem;">R$ {{ "%.2f"|format(total_lote) }}</span></p>
+    {% if tem_pendentes %}
+    <div style="background: rgba(255, 170, 0, 0.1); border: 1px dashed #ffaa00; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: left;">
+        <p style="color: #ffaa00; margin: 0 0 5px 0; font-weight: bold; font-size: 14px;">⚠️ ANÁLISE PENDENTE</p>
+        <p style="color: var(--texto-br); font-size: 13px; margin: 0;">Notamos que seu lote contém itens que requerem avaliação manual. Nossa equipe analisará as fotos e informações e enviará a oferta final atualizada em até 24 horas úteis.</p>
+    </div>
+    {% endif %}
+
+    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border-left: 4px solid var(--cor-destaque);">
+        <p style="margin: 8px 0; color: var(--texto-dim);"><strong>Total de Itens do Lote:</strong> <span style="color: var(--texto-br);">{{ session.get('itens_avaliados', [])|length }}</span></p>
+        
+        <p style="margin: 8px 0; color: var(--texto-dim);">
+            <strong>{{ 'Valor Parcial da Proposta:' if tem_pendentes else 'Valor Total da Proposta:' }}</strong> 
+            <span style="color: var(--cor-destaque); font-weight: bold; font-size: 1.2rem;">
+                R$ {{ "%.2f"|format(total_lote) }}{{ '*' if tem_pendentes else '' }}
+            </span>
+        </p>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 15px;">
-        <!-- Botão 'Avaliar Outro Item' removido para forçar o encerramento seguro da sessão do lote -->
-        <a href="{{ url_for('sair') }}" 
-           class="btn-glow-exit"
-           style="text-decoration: none; display: block; padding: 18px; text-transform: uppercase; background: #ff8c00; color: #000; font-weight: bold; border-radius: 8px; font-family: 'Rajdhani', sans-serif; font-size: 1.1rem;">
+        <a href="{{ url_for('sair') }}" class="btn-primary" style="width: 100%; box-sizing: border-box;">
             Encerrar Sessão de {{ session.get('player_nome', 'Jogador') }}
         </a>
     </div>
 </div>
-
-<style>
-    .card-lead { background: #1e1e1e; padding: 40px; border-radius: 20px; border: 1px solid #333; }
-    .xp-bar-container { background: #000; height: 25px; position: relative; border-radius: 50px; margin-bottom: 30px; overflow: hidden; border: 1px solid #333; }
-    .xp-bar-fill { background: linear-gradient(90deg, #00ffcc, #00aa88); height: 100%; transition: 1s ease-out; }
-    .xp-text { position: absolute; width: 100%; text-align: center; top: 3px; font-size: 12px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
-    .btn-glow-exit { transition: 0.3s; }
-    .btn-glow-exit:hover { box-shadow: 0 0 20px rgba(255, 140, 0, 0.4); transform: translateY(-2px); filter: brightness(1.1); }
-</style>
 {% endblock %}

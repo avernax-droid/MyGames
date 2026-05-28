@@ -1,3 +1,17 @@
+# ==============================================================================
+# PROJETO: MyGames
+# MÓDULO: server.py
+# DATA DE CRIAÇÃO: 28/05/2026
+# TÍTULO: Servidor Web e Roteamento Flask
+# FUNÇÃO: Controladora principal da aplicação web. Gerencia todas as rotas (endpoints)
+# do sistema, controla o fluxo de sessão do usuário (stepper), processa formulários, 
+# gerencia uploads de arquivos e integra as chamadas ao módulo 'engine.py'. 
+# Atua como a camada de interface entre o usuário e a lógica de negócio.
+#
+# HISTÓRICO DE ALTERAÇÕES:
+# - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+# ==============================================================================
+
 import os
 import json
 from dotenv import load_dotenv
@@ -64,7 +78,12 @@ def pericia(produto_id):
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
         categoria_id = str(produto_id).split('_')[-1]
         id_oficial = produto_id
+        
+        # FOCO DA ALTERAÇÃO: Define a flag com base no prefixo 'outro_cat_'
+        session['is_outros'] = str(produto_id).startswith('outro_cat_')
     else:
+        # FOCO DA ALTERAÇÃO: Garante que se for um produto normal, a flag permaneça falsa
+        session['is_outros'] = False
         produto = engine.obter_produto_por_id(produto_id)
         if not produto:
             return redirect(url_for('produto'))
@@ -97,6 +116,8 @@ def cotar():
 
     # Lida com o cálculo dependendo se é um produto real ou genérico
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
+        # FOCO DA ALTERAÇÃO: Mantém ou atualiza a flag de controle da sessão ativa
+        session['is_outros'] = str(produto_id).startswith('outro_cat_')
         resultado = {
             "produto": "Lote de Jogos" if str(produto_id).startswith('cat_') else "Produto não listado",
             "valor_final": 0.0
@@ -104,6 +125,8 @@ def cotar():
         categoria_id = str(produto_id).split('_')[-1]
         foto_url_final = None
     else:
+        # FOCO DA ALTERAÇÃO: Força falso se for um fluxo padrão de produto catalogado
+        session['is_outros'] = False
         resultado = engine.calcular_cotacao_final(produto_id, estado_id)
         produto_info = engine.obter_produto_por_id(produto_id)
         categoria_id = produto_info.get('categoria_id') if produto_info else 1
@@ -131,7 +154,9 @@ def cotar():
             'comentarios': comentarios,
             'quantidade': 1,
             'estado_descricao': descricao_estado,
-            'foto_url': foto_url_final
+            'foto_url': foto_url_final,
+            # FOCO DA ALTERAÇÃO: Registra no próprio dicionário do item se ele veio do fluxo de "Outros"
+            'is_outros': session.get('is_outros', False)
         }
         
         lista_atual = session.get('itens_avaliados', [])

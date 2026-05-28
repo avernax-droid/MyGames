@@ -1,3 +1,18 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: boas_vindas.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Landing Page e Captura de Localização
+  FUNÇÃO: Ponto de entrada do sistema MyGames. Sua principal responsabilidade 
+  é recepcionar o usuário, capturar sua localização geográfica (Cidade e UF) 
+  através de busca em tempo real (API do IBGE) e registrar o canal de aquisição 
+  (como ele conheceu a empresa) antes de liberar o acesso ao catálogo.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Bem-vindo ao MyGames{% endblock %}
@@ -5,7 +20,7 @@
 {% block content %}
 <div class="card-padrao">
     <p style="text-align: center; color: var(--texto-dim); margin-bottom: 30px; font-size: 14px;">
-        Informe sua localização para acessar o catálogo
+        Informe sua localização
     </p>
     
     <form action="{{ url_for('definir_regiao') }}" method="POST">

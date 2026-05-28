@@ -1,3 +1,19 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: resultado.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Exibição de Oferta e Revisão de Perícia
+  FUNÇÃO: Apresenta o resultado da avaliação técnica de um produto individual. 
+  Exibe o valor da oferta gerada (ou o aviso de avaliação sob consulta para itens 
+  personalizados), o estado de conservação selecionado e uma galeria de revisão 
+  com fotos e comentários enviados pelo usuário. Inclui funcionalidade para 
+  descartar a avaliação atual do item.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Sua Oferta{% endblock %}
@@ -15,10 +31,18 @@
                 <div class="produto-nome-display">{{ cotacao.produto }}</div>
             </header>
             
+            {% if session.get('is_outros') %}
+            <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: left;">
+                <h3 style="color: var(--cor-destaque); margin-top: 0; font-size: 16px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">ℹ️ Avaliação Sob Consulta</h3>
+                <p style="color: var(--texto-br); font-size: 14px; margin-bottom: 8px;">Este item será avaliado manualmente por nossa equipe técnica.</p>
+                <p style="color: var(--texto-dim); font-size: 13px; margin: 0;">Entraremos em contato em até <strong>24 horas úteis</strong> através do WhatsApp ou E-mail informados no seu cadastro para concluir a oferta.</p>
+            </div>
+            {% else %}
             <div class="valor-container">
                 <span class="simbolo-monetario">R$</span>
                 <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
             </div>
+            {% endif %}
             
             <div class="info-estado">
                 <span class="badge-estado-selecionado">
@@ -82,10 +106,7 @@
                     if (data.status === 'sucesso') {
                         document.getElementById('dados-avaliacao-container').style.display = 'none';
                         document.getElementById('btn-descarte-acao').style.display = 'none';
-                        
-                        // Oculta a linha dos botões Mais Produtos/Fechar
                         document.querySelector('.acoes-finais > div').style.display = 'none';
-                        
                         document.getElementById('feedback-descarte').style.display = 'block';
                     }
                 })
@@ -95,11 +116,6 @@
 </script>
 
 <style>
-    /* LIMPEZA DE CÓDIGO: 
-       Removemos .card-oferta, .container-resultado e TODAS as classes de botões! 
-       Eles agora herdam diretamente do base.html. 
-       Mantivemos apenas a formatação interna exclusiva desta página, utilizando as variáveis do :root. */
-
     .produto-thumb-wrapper {
         width: 100px; height: 100px; margin: 0 auto 15px;
         display: flex; align-items: center; justify-content: center;

@@ -1,3 +1,19 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: resumo_lote.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Resumo e Revisão do Lote de Produtos
+  FUNÇÃO: Exibe uma lista detalhada de todos os itens avaliados pelo usuário até 
+  o momento, com seus respectivos estados de conservação, fotos (se houver), 
+  observações e valores calculados (ou indicação de análise manual). Oferece 
+  opções para retornar à seleção de produtos, prosseguir para a identificação 
+  do player ou descartar todo o lote atual.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Resumo do Lote - MyGames{% endblock %}
@@ -39,7 +55,11 @@
                             </div>
                         </td>
                         <td class="valor-unitario">
-                            R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
+                            {% if item.is_outros %}
+                                <span style="color: #ffaa00; font-size: 11px; text-transform: uppercase; font-weight: bold; border: 1px dashed #ffaa00; padding: 3px 6px; border-radius: 4px; font-family: sans-serif; display: inline-block;">Sob Consulta</span>
+                            {% else %}
+                                R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

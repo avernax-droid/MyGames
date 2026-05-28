@@ -1,6 +1,16 @@
-/* ============================================================
-   MYGAMES - IDENTIDADE VISUAL V1.8 (CONSOLIDADA)
-   ============================================================ */
+/* ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: static/css/style.css
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Design System e Identidade Visual (v1.8 Consolidada)
+  FUNÇÃO: Arquivo central de estilos responsável por toda a identidade visual 
+  da aplicação. Define variáveis de cores (Tokens), tipografia, estilização de 
+  componentes, layout responsivo e elementos de gamificação.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão e consolidação da Identidade Visual.
+  ==============================================================================
+*/
 
 :root {
     --bg-dark: #0f172a;

@@ -1,3 +1,18 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: cadastro_complementar.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Finalização de Cadastro (Identificação)
+  FUNÇÃO: Tela responsável por coletar e validar os dados pessoais, de endereço 
+  e de pagamento (chave PIX) do usuário. Possui lógica integrada para buscar e 
+  preencher automaticamente os dados de clientes recorrentes a partir do CPF, 
+  preparando a sessão para a geração do protocolo final do lote.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  ==============================================================================
+#}
 {% extends "base.html" %}
 
 {% block title %}Finalizar Cadastro{% endblock %}
@@ -94,7 +109,6 @@
 
 {% block scripts %}
 <script>
-    // [Script mantido igual ao original, apenas com o layout CSS removido acima]
     function limparCamposPorAlteracaoCPF() {
         document.getElementById('nome').value = '';
         document.getElementById('email').value = '';

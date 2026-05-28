@@ -1,3 +1,20 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: produto.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Seleção de Categoria e Busca de Produtos
+  FUNÇÃO: Tela responsável por permitir que o usuário escolha uma categoria 
+  (Console, Controle, Jogo, Acessório) e pesquise dinamicamente itens do catálogo. 
+  O módulo filtra os resultados em tempo real via JavaScript, priorizando produtos 
+  que começam com o termo digitado, e também fornece a opção de "Outro produto 
+  não listado" como rota de fuga para itens ausentes no banco.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 28/05/2026: Refatoração da função filtrarProdutos() para priorizar resultados que iniciam com o caractere digitado.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Seleção de Produto{% endblock %}
@@ -25,7 +42,7 @@
 
     <div id="stepProdutos" style="display: none;">
         <div class="container-botao-voltar">
-            <button class="btn-voltar" onclick="voltarCategorias()">Voltar</button>
+            <button class="btn-secondary" style="padding: 10px 25px; width: auto;" onclick="voltarCategorias()">Voltar</button>
         </div>
         
         <input type="text" id="inputBusca" class="input-busca" placeholder="Digite o nome do produto..." oninput="filtrarProdutos()">
@@ -36,38 +53,28 @@
 </div>
 
 <script>
-    // ID da categoria que não possui lista de itens
     const ID_JOGO = 3;
-    
-    // Variáveis globais para o filtro funcionar localmente
     let produtosDaCategoria = [];
     let categoriaAtualId = null;
 
     async function selecionarCategoria(catId, catNome) {
-        // REGRA DE JOGOS: Se for Jogo, não há lista nem "outros". Vai direto.
         if (catId === ID_JOGO) {
             window.location.href = `/pericia/cat_${catId}`;
             return;
         }
 
-        // Esconde categorias, mostra produtos e altera título
         document.getElementById('stepCategorias').style.display = 'none';
         document.getElementById('stepProdutos').style.display = 'block';
         document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;
-        
-        // Ajusta o placeholder do campo de busca com o nome da categoria
         document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
         
         carregarProdutos(catId);
     }
 
     function voltarCategorias() {
-        // Restaura a tela inicial
         document.getElementById('stepProdutos').style.display = 'none';
         document.getElementById('stepCategorias').style.display = 'grid';
         document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
-        
-        // Limpa a busca e a tela ao voltar
         document.getElementById('inputBusca').value = '';
         document.getElementById('listaProdutos').innerHTML = '';
     }
@@ -75,38 +82,44 @@
     async function carregarProdutos(catId) {
         categoriaAtualId = catId;
         const container = document.getElementById('listaProdutos');
-        container.innerHTML = ''; // Inicia com a área de produtos limpa
-        document.getElementById('inputBusca').value = ''; // Limpa o input
+        container.innerHTML = ''; 
+        document.getElementById('inputBusca').value = ''; 
 
         try {
             const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
             produtosDaCategoria = await response.json();
-            
-            // A chamada para filtrarProdutos() foi removida daqui. 
-            // Agora o sistema aguarda o usuário digitar.
-
         } catch (error) {
             console.error("Erro na busca:", error);
-            container.innerHTML = '<p style="color: red; text-align: center; grid-column: 1/-1;">Erro ao comunicar com o servidor.</p>';
+            container.innerHTML = '<p style="color: #ff4444; text-align: center; grid-column: 1/-1;">Erro ao comunicar com o servidor.</p>';
         }
     }
 
     function filtrarProdutos() {
         const termo = document.getElementById('inputBusca').value.toLowerCase().trim();
         const container = document.getElementById('listaProdutos');
-        container.innerHTML = ''; // Limpa a tela para re-renderizar
+        container.innerHTML = ''; 
 
-        // Se o campo estiver vazio, não mostra nada
-        if (termo === '') {
-            return;
-        }
+        if (termo === '') return;
 
-        // Filtra a lista baseada no texto digitado
+        // 1. Filtra quem tem a letra/termo em qualquer lugar do nome
         const produtosFiltrados = produtosDaCategoria.filter(p => 
             p.nome_produto.toLowerCase().includes(termo)
         );
 
-        // Renderiza apenas os que passaram no filtro
+        // 2. Ordenação inteligente: Quem COMEÇA com a letra digitada vai pro topo
+        produtosFiltrados.sort((a, b) => {
+            const nomeA = a.nome_produto.toLowerCase();
+            const nomeB = b.nome_produto.toLowerCase();
+            const aComecaComTermo = nomeA.startsWith(termo);
+            const bComecaComTermo = nomeB.startsWith(termo);
+
+            if (aComecaComTermo && !bComecaComTermo) return -1;
+            if (!aComecaComTermo && bComecaComTermo) return 1;
+            
+            return nomeA.localeCompare(nomeB);
+        });
+
+        // 3. Renderiza os cards atualizados
         produtosFiltrados.forEach(p => {
             const card = document.createElement('div');
             card.className = 'card-produto';
@@ -122,13 +135,11 @@
             container.appendChild(card);
         });
 
-        // Adiciona o botão "Outros" no final da lista
-        // Se a lista (produtosFiltrados) estiver vazia, ele será a única opção na tela
         const cardOutro = document.createElement('div');
         cardOutro.className = 'card-produto card-outro';
         cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
         cardOutro.innerHTML = `
-            <div class="card-img-wrapper" style="font-size: 40px; color: #00ff00;">
+            <div class="card-img-wrapper" style="font-size: 40px; color: var(--cor-destaque);">
                 ➕
             </div>
             <h4>Outro produto não listado</h4>
@@ -140,81 +151,41 @@
 <style>
     .container-busca { max-width: 900px; margin: auto; padding: 20px; }
     .busca-header { margin-bottom: 30px; text-align: center; }
-    .busca-header h2 { color: #fff; text-transform: uppercase; font-size: 24px; transition: 0.3s; }
+    .busca-header h2 { color: var(--texto-br); text-transform: uppercase; font-size: 24px; transition: 0.3s; }
     
-    /* Layout - Passo A (Categorias) */
     .grid-categorias { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
     .card-categoria {
-        background: #1e1e1e; border: 2px solid #333; border-radius: 15px; padding: 30px 20px;
+        background: var(--bg-fundo); border: 2px solid #333; border-radius: 15px; padding: 30px 20px;
         text-align: center; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; height: 120px;
     }
-    .card-categoria:hover { border-color: #00ff00; transform: translateY(-5px); background: #252525; }
-    .card-categoria h3 { color: #fff; margin: 0; font-size: 20px; }
+    .card-categoria:hover { border-color: var(--cor-destaque); transform: translateY(-5px); background: #252525; }
+    .card-categoria h3 { color: var(--texto-br); margin: 0; font-size: 20px; }
 
-    /* Layout - Passo B (Produtos) - VERSÃO COMPACTA */
     .grid-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
     .card-produto { 
-        background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 10px; 
+        background: var(--bg-fundo); border: var(--borda-fina); border-radius: 10px; padding: 10px; 
         text-align: center; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; justify-content: space-between;
     }
-    .card-produto:hover { transform: translateY(-3px); border-color: #00ff00; }
+    .card-produto:hover { transform: translateY(-3px); border-color: var(--cor-destaque); }
     
-    /* Mágica da proporção: reduzimos a altura de 160px para 70px */
     .card-img-wrapper { height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
     .card-produto img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
     
-    /* Reduzindo as fontes para harmonizar com o card menor */
-    .card-produto h4 { font-size: 11px; margin: 0 0 5px 0; line-height: 1.1; }
-    .plataforma-badge { background: #333; color: #00ff00; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: bold; text-transform: uppercase; margin-top: auto; display: inline-block;}
+    .card-produto h4 { font-size: 11px; margin: 0 0 5px 0; line-height: 1.1; color: var(--texto-br); }
+    .plataforma-badge { background: #333; color: var(--cor-destaque); padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: bold; text-transform: uppercase; margin-top: auto; display: inline-block;}
     
-    /* Complementos de Interface - BOTÃO VOLTAR REESTILIZADO E ALINHADO */
-    .container-botao-voltar {
-        display: flex;
-        justify-content: flex-end;
-        width: 100%;
-        margin-bottom: 20px;
-    }
-    .btn-voltar { 
-        background: #00ff00; 
-        border: 2px solid #00ff00; 
-        color: #000; 
-        cursor: pointer; 
-        font-size: 14px; 
-        padding: 10px 25px; 
-        border-radius: 8px;
-        transition: all 0.3s ease;
-        text-transform: uppercase;
-        font-weight: bold;
-        display: inline-block;
-    }
-    .btn-voltar:hover { 
-        background: #00cc00;
-        border-color: #00cc00;
-        color: #000;
-        text-decoration: none;
-    }
+    .container-botao-voltar { display: flex; justify-content: flex-end; width: 100%; margin-bottom: 20px; }
+    
     .card-outro { border-style: dashed; border-color: #666; justify-content: center; }
-    .card-outro:hover { border-color: #00ff00; }
+    .card-outro:hover { border-color: var(--cor-destaque); }
 
-    /* Estilo do Campo de Busca */
     .input-busca {
-        width: 100%;
-        padding: 15px;
-        margin-bottom: 20px;
-        background: #1e1e1e;
-        border: 2px solid #333;
-        border-radius: 10px;
-        color: #fff;
-        font-size: 16px;
-        outline: none;
-        box-sizing: border-box;
+        width: 100%; padding: 15px; margin-bottom: 20px;
+        background: var(--bg-fundo); border: 2px solid #333; border-radius: 10px;
+        color: var(--texto-br); font-size: 16px; outline: none; box-sizing: border-box;
         transition: border-color 0.3s;
     }
-    .input-busca:focus {
-        border-color: #00ff00;
-    }
-    .input-busca::placeholder {
-        color: #888;
-    }
+    .input-busca:focus { border-color: var(--cor-destaque); }
+    .input-busca::placeholder { color: var(--texto-dim); }
 </style>
 {% endblock %}
