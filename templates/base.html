@@ -11,6 +11,7 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Inclusão de Modal Global de Confirmação para reuso em todas as telas.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -98,6 +99,17 @@
         .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
 
         .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        /* ============================================================================== */
+        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS */
+        /* ============================================================================== */
+        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 30px 20px; max-width: 350px; width: 90%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-icone-global { font-size: 45px; margin-bottom: 15px; line-height: 1; }
+        .modal-titulo-global { color: #ff4444; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 25px; line-height: 1.4; }
+        .modal-botoes-global { display: flex; gap: 10px; justify-content: center; }
+        .modal-botoes-global button { flex: 1; padding: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; }
     </style>
 </head>
 <body>
@@ -121,7 +133,57 @@
         </main>
     </div>
 
+    <div id="modal-confirmacao-global" class="modal-overlay-global" style="display: none;">
+        <div class="modal-box-global">
+            <div class="modal-icone-global">⚠️</div>
+            <h3 id="modal-titulo-global" class="modal-titulo-global">Atenção</h3>
+            <p id="modal-texto-global" class="modal-texto-global">Deseja realmente continuar?</p>
+            
+            <div class="modal-botoes-global">
+                <button onclick="fecharModalConfirmacao()" class="btn-primary" style="background: #333; border-color: #555; color: var(--texto-br);">
+                    CANCELAR
+                </button>
+                <button id="modal-btn-confirmar-global" onclick="executarAcaoModal()" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                    CONFIRMAR
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/ux-helper.js') }}"></script>
+    
+    <script>
+        let modalConfirmacaoAcao = null;
+
+        function abrirModalConfirmacao(titulo, mensagem, textoBotao, acao) {
+            document.getElementById('modal-titulo-global').innerText = titulo;
+            document.getElementById('modal-texto-global').innerText = mensagem;
+            document.getElementById('modal-btn-confirmar-global').innerText = textoBotao;
+            
+            modalConfirmacaoAcao = acao;
+            
+            const modal = document.getElementById('modal-confirmacao-global');
+            modal.style.display = 'flex';
+        }
+
+        function fecharModalConfirmacao() {
+            document.getElementById('modal-confirmacao-global').style.display = 'none';
+            modalConfirmacaoAcao = null;
+        }
+
+        function executarAcaoModal() {
+            if (typeof modalConfirmacaoAcao === 'function') {
+                modalConfirmacaoAcao();
+            } else if (typeof modalConfirmacaoAcao === 'string') {
+                const btn = document.getElementById('modal-btn-confirmar-global');
+                btn.innerText = "PROCESSANDO...";
+                btn.style.opacity = "0.7";
+                window.location.href = modalConfirmacaoAcao;
+            }
+            fecharModalConfirmacao();
+        }
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>

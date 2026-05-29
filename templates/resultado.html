@@ -14,6 +14,7 @@
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Redução proporcional do tamanho da fonte no valor da cotação.
   - 29/05/2026: Alinhamento dos três botões de ação na mesma linha.
+  - 29/05/2026: Integração com Modal Global e correção da navegação pós-descarte.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -80,42 +81,38 @@
         </div>
 
         <div class="acoes-finais" style="margin-top: 25px;">
-            
             <div style="display: flex; justify-content: space-between; gap: 15px;">
-                
                 <a href="{{ url_for('produto') }}" class="btn-secondary">
                     MAIS PRODUTOS
                 </a>
 
-                <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
                     DESCARTAR AVALIAÇÃO
                 </button>
 
                 <a href="{{ url_for('resumo') }}" class="btn-primary">
                     FECHAR
                 </a>
-                
             </div>
-            
         </div>
     </div>
 </div>
 
 <script>
-    function executarDescarteIndividual() {
-        if (confirm("Deseja realmente descartar a avaliação deste produto?")) {
-            fetch('/descartar-atual')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'sucesso') {
-                        document.getElementById('dados-avaliacao-container').style.display = 'none';
-                        document.getElementById('btn-descarte-acao').style.display = 'none';
-                        document.querySelector('.acoes-finais > div').style.display = 'none';
-                        document.getElementById('feedback-descarte').style.display = 'block';
-                    }
-                })
-                .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
-        }
+    // ALTERAÇÃO: Nome da função atualizado para ser chamada pelo Modal Global
+    function executarDescarteIndividualAjax() {
+        fetch('/descartar-atual')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'sucesso') {
+                    // Esconde os dados do produto e apenas o botão de descarte.
+                    // Mantém os botões "MAIS PRODUTOS" e "FECHAR" ativos na tela.
+                    document.getElementById('dados-avaliacao-container').style.display = 'none';
+                    document.getElementById('btn-descarte-acao').style.display = 'none'; 
+                    document.getElementById('feedback-descarte').style.display = 'block';
+                }
+            })
+            .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
     }
 </script>
 

@@ -13,6 +13,7 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Alinhamento horizontal dos três botões de ação final.
+  - 29/05/2026: Substituição do confirm() nativo pelo Modal Global de confirmação.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -77,7 +78,7 @@
             <div class="botoes-nav" style="gap: 15px;">
                 <a href="{{ url_for('produto') }}" class="btn-secondary">VOLTAR</a>
                 
-                <button onclick="confirmarDescarte()" class="btn-secondary btn-descartar">
+                <button onclick="abrirModalConfirmacao('Descartar Lote Inteiro', 'Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?', 'SIM, DESCARTAR LOTE', executarDescarteLote)" class="btn-secondary btn-descartar">
                     DESCARTAR LOTE
                 </button>
 
@@ -113,10 +114,9 @@
 
 {% block scripts %}
 <script>
-    function confirmarDescarte() {
-        if (confirm("Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?")) {
-            window.location.href = "/descartar-lote";
-        }
+    // ALTERAÇÃO: Nova função de callback para o Modal Global executar a navegação
+    function executarDescarteLote() {
+        window.location.href = "/descartar-lote";
     }
 </script>
 {% endblock %}

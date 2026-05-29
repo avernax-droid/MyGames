@@ -580,3 +580,32 @@ Objetivo: Implementar um script (sem alterar a estrutura do formulário) que, ao
 Toda a estrutura funcional atual do sistema está salva e protegida no repositório GitHub (https://github.com/avernax-droid/MyGames.git), branch versao-demo.
 
 O seu git status está limpo ("working tree clean"), servindo como ponto de restauração imediato.
+
+=======
+29/05
+
+REFRESH DE MEMÓRIA - PROJETO MYGAMES
+
+1. Status Atual e Ambiente:
+
+Projeto: MyGames (Python, Flask, MySQL, VS Code).
+
+Branch atual: versao-demo (O último commit feito salvou as melhorias de loading no cadastro, ViaCEP e CSS de valores).
+
+REGRA PRINCIPAL ATIVA: NUNCA alterar estrutura funcional ou Jinja2 se não for estritamente o foco do problema.
+
+2. Onde Paramos (O Problema Atual):
+
+Decidimos substituir os alertas nativos do navegador (confirm()) por um Modal Global de Confirmação estilizado com o Design System do MyGames.
+
+Percebemos também um problema de UX na página de avaliação (resultado.html): ao descartar um item com sucesso, a navegação inteira sumia, deixando o usuário preso numa tela sem botões.
+
+3. Próximo Passo Exato (Ação Pendente):
+
+Aplicar a estrutura do Modal Global dentro do módulo templates/base.html.
+
+Aplicar as atualizações nos botões do templates/resumo_lote.html para chamarem o novo modal global.
+
+Aplicar a correção de navegação e a chamada do modal no templates/resultado.html (para que os botões "MAIS PRODUTOS" e "FECHAR" continuem visíveis após o descarte).
+
+Nota para a IA: O código destas 3 páginas já foi gerado na conversa anterior e está pronto para ser testado e validado pelo usuário.
