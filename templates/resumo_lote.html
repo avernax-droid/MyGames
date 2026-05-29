@@ -12,6 +12,7 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Alinhamento horizontal dos três botões de ação final.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -73,14 +74,15 @@
         </div>
         
         <div class="acoes-finais">
-            <div class="botoes-nav">
+            <div class="botoes-nav" style="gap: 15px;">
                 <a href="{{ url_for('produto') }}" class="btn-secondary">VOLTAR</a>
+                
+                <button onclick="confirmarDescarte()" class="btn-secondary btn-descartar">
+                    DESCARTAR LOTE
+                </button>
+
                 <a href="{{ url_for('identificacao') }}" class="btn-primary">CONTINUAR</a>
             </div>
-            
-            <button onclick="confirmarDescarte()" class="btn-secondary btn-descartar">
-                DESCARTAR LOTE
-            </button>
         </div>
     </div>
 </div>
@@ -102,9 +104,10 @@
     .total-lote-box { display: flex; justify-content: space-between; align-items: center; padding: 18px 15px; background: rgba(0, 255, 0, 0.05); border-radius: 12px; border: 1px dashed var(--cor-destaque); margin-bottom: 25px; font-weight: bold; color: var(--texto-br); }
     .total-lote-box strong { color: var(--cor-destaque); font-size: 26px; font-family: monospace; }
     
+    /* REMOVIDO width: 100% DA CLASSE btn-descartar E ADICIONADO flex-direction: row NA acoes-finais */
     .acoes-finais { display: flex; flex-direction: column; gap: 15px; }
     .botoes-nav { display: flex; justify-content: space-between; align-items: center; }
-    .btn-descartar { width: 100%; border-color: #ff4444 !important; color: #ff4444 !important; }
+    .btn-descartar { border-color: #ff4444 !important; color: #ff4444 !important; }
 </style>
 {% endblock %}
 
