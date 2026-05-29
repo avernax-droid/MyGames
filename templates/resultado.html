@@ -12,6 +12,8 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Redução proporcional do tamanho da fonte no valor da cotação.
+  - 29/05/2026: Alinhamento dos três botões de ação na mesma linha.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -79,20 +81,22 @@
 
         <div class="acoes-finais" style="margin-top: 25px;">
             
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; gap: 15px;">
+            <div style="display: flex; justify-content: space-between; gap: 15px;">
                 
                 <a href="{{ url_for('produto') }}" class="btn-secondary">
                     MAIS PRODUTOS
                 </a>
 
+                <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                    DESCARTAR AVALIAÇÃO
+                </button>
+
                 <a href="{{ url_for('resumo') }}" class="btn-primary">
                     FECHAR
                 </a>
+                
             </div>
-
-            <button onclick="executarDescarteIndividual()" id="btn-descarte-acao" class="btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
-                DESCARTAR AVALIAÇÃO
-            </button>
+            
         </div>
     </div>
 </div>
@@ -126,9 +130,9 @@
     .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
     .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 18px; font-weight: bold; }
     
-    .valor-container { margin: 20px 0; }
-    .simbolo-monetario { color: var(--cor-destaque); font-size: 24px; vertical-align: top; font-weight: bold; }
-    .valor-pix { color: var(--cor-destaque); font-size: 54px; font-weight: bold; line-height: 1; font-family: monospace; }
+    .valor-container { margin: 10px 0; }
+    .simbolo-monetario { color: var(--cor-destaque); font-size: 18px; vertical-align: top; font-weight: bold; margin-top: 5px; display: inline-block; }
+    .valor-pix { color: var(--cor-destaque); font-size: 36px; font-weight: bold; line-height: 1; font-family: monospace; }
 
     .info-estado { margin-bottom: 25px; }
     .badge-estado-selecionado {

@@ -11,6 +11,8 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Inclusão de feedback visual dinâmico no botão de submit.
+  - 29/05/2026: Restauração da máscara e busca automática de endereço pelo CEP (ViaCEP).
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -194,6 +196,71 @@
             const inputs = Array.from(this.querySelectorAll('input:not([type="hidden"])'));
             const index = inputs.indexOf(event.target);
             if (index > -1 && index < inputs.length - 1) inputs[index + 1].focus();
+        }
+    });
+
+    document.querySelector('form').addEventListener('submit', function() {
+        const btnSubmit = this.querySelector('button[type="submit"]');
+        if (btnSubmit) {
+            const spinnerSVG = `
+                <svg style="width: 18px; height: 18px; margin-right: 8px; animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+            `;
+            
+            btnSubmit.innerHTML = `<div style="display: flex; align-items: center; justify-content: center;">${spinnerSVG} PROCESSANDO...</div>`;
+            
+            setTimeout(() => {
+                btnSubmit.disabled = true;
+                btnSubmit.style.cursor = "not-allowed";
+                btnSubmit.style.opacity = "0.8";
+            }, 0);
+        }
+    });
+
+    // ==============================================================================
+    // ALTERAÇÃO AQUI: Eventos para o campo CEP (Máscara e Fetch no ViaCEP)
+    // ==============================================================================
+    const campoCep = document.getElementById('cep');
+    
+    // Aplica a máscara enquanto digita
+    campoCep.addEventListener('input', function(e) {
+        e.target.value = aplicarMascaraCEP(e.target.value);
+    });
+
+    // Busca o endereço na API ao sair do campo
+    campoCep.addEventListener('blur', function() {
+        const cepLimpo = this.value.replace(/\D/g, '');
+        
+        if (cepLimpo.length === 8) {
+            // Muda o placeholder para dar feedback visual de busca
+            document.getElementById('endereco').placeholder = "Buscando...";
+            
+            fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+                .then(resposta => resposta.json())
+                .then(dados => {
+                    if (!dados.erro) {
+                        document.getElementById('endereco').value = dados.logradouro || '';
+                        document.getElementById('bairro').value = dados.bairro || '';
+                        document.getElementById('cidade').value = dados.localidade || '';
+                        document.getElementById('estado_uf').value = dados.uf || '';
+                        
+                        // Restaura o placeholder
+                        document.getElementById('endereco').placeholder = "Rua, Av...";
+                        
+                        // Foca no campo número para agilizar a vida do usuário
+                        document.getElementById('numero').focus();
+                    } else {
+                        alert("CEP não encontrado.");
+                        document.getElementById('endereco').placeholder = "Rua, Av...";
+                    }
+                })
+                .catch(erro => {
+                    console.error("Erro ao buscar CEP:", erro);
+                    document.getElementById('endereco').placeholder = "Rua, Av...";
+                });
         }
     });
 </script>

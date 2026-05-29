@@ -537,3 +537,46 @@ Navegação: O botão "Voltar" em todas as telas foi padronizado para retornar �
 Estado Atual: O sistema está operando na branch versao-demo com o diretório de trabalho limpo (commit 06d1c2a).
 
 Quando você retomar a conversa, basta colar este descritivo ou pedir para eu ler os arquivos, e estarei pronto para continuar com o próximo passo da padronização visual!
+
+======
+28/05
+
+REGRA PRINCIPAL: NUNCA, NUNCA, NUNCA, NUNCA alterar, modificar ou melhorar nada que não seja o foco direto do problema solicitado.
+1. Ambiente do Projeto (Tecnologias e Estrutura)
+O projeto MyGames é uma aplicação web em Python, operando nas seguintes condições:
+
+Linguagem: Python.
+
+Framework Web: Flask.
+
+Banco de Dados: MySQL.
+
+Ambiente de Desenvolvimento: Linux - Ubuntu (via VS Code), usando ambiente virtual Python (venv).
+
+Frontend/Assets: HTML/Jinja2, CSS (estilos globais em static/css/style.css), JavaScript (lógica centralizada em static/js/main.js e suporte de UX em static/js/ux-helper.js).
+
+Controle de Versão: Git (Branch atual: versao-demo).
+
+Conectividade: Integração com APIs externas (ViaCEP, IBGE, Aviationstack) e uso de Engine própria (engine.py).
+
+2. Descritivo das Pendências (O que falta corrigir)
+O sistema está funcional e versionado (Commit 877f63d), mas restam dois pontos de ajuste de usabilidade:
+
+A. Pendência: Ajuste Visual na Página de Avaliação
+Módulo: templates/pericia.html
+
+Problema: A tela de "Estado de Conservação" possui campos que forçam o uso de scroll (rolagem) em dispositivos menores.
+
+Objetivo: Compactar o layout (margens, paddings ou altura de campos) para que o usuário veja todas as opções, as perguntas extras da categoria e o campo de observações sem precisar rolar a tela, sem remover ou modificar a lógica funcional de renderização.
+
+B. Pendência: Feedback de Processamento (Loading)
+Módulo: templates/cadastro_complementar.html
+
+Problema: Ao clicar no botão "GERAR PROTOCOLO", não há feedback visual para o usuário. O sistema parece "parado" enquanto processa em background.
+
+Objetivo: Implementar um script (sem alterar a estrutura do formulário) que, ao clicar no botão de submit, altere o texto para "PROCESSANDO..." e desabilite o clique (para evitar envios duplicados), fornecendo uma confirmação visual de que o background está trabalhando.
+
+3. Histórico de Segurança
+Toda a estrutura funcional atual do sistema está salva e protegida no repositório GitHub (https://github.com/avernax-droid/MyGames.git), branch versao-demo.
+
+O seu git status está limpo ("working tree clean"), servindo como ponto de restauração imediato.
