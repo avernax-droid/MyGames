@@ -10,10 +10,13 @@
 #
 # HISTÓRICO DE ALTERAÇÕES:
 # - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+# - 29/05/2026: Integração do multiplicador de preço por região nas rotas definir_regiao e cotar.
+# - 30/05/2026: Implementação do fluxo de handoff remoto (QR Code) para envio de mídias via mobile.
 # ==============================================================================
 
 import os
 import json
+import uuid
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
@@ -60,10 +63,17 @@ def index():
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():
-    session['cidade_usuario'] = request.form.get('cidade')
-    session['uf_usuario'] = request.form.get('estado_uf')
+    cidade = request.form.get('cidade')
+    estado_uf = request.form.get('estado_uf')
+    
+    session['cidade_usuario'] = cidade
+    session['uf_usuario'] = estado_uf
     # NOVO: Captura o canal escolhido no HTML e guarda na sessão para gravar depois
     session['canal_aquisicao_id'] = request.form.get('canal_aquisicao_id') 
+    
+    # NOVO: Busca e salva o multiplicador de preço da região na sessão
+    session['multiplicador_regiao'] = engine.obter_multiplicador_regiao(cidade, estado_uf)
+    
     return redirect(url_for('produto'))
 
 @app.route('/produto')
@@ -94,7 +104,10 @@ def pericia(produto_id):
     
     session['produto_selecionado_id'] = id_oficial
     
-    return render_template('pericia.html', opcoes=opcoes, produto_id=id_oficial, fase_atual=1, categoria_id=categoria_id)
+    # Geração do token de handoff único para esta sessão de upload remoto
+    token_sessao = str(uuid.uuid4())
+    
+    return render_template('pericia.html', opcoes=opcoes, produto_id=id_oficial, fase_atual=1, categoria_id=categoria_id, token_sessao=token_sessao)
 
 # 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
 @app.route('/cotar', methods=['POST'])
@@ -104,6 +117,8 @@ def cotar():
     comentarios = request.form.get('comentarios', '')
     
     fotos_salvas = []
+    
+    # 1. Processa fotos enviadas diretamente via upload local do Desktop
     if 'fotos' in request.files:
         files = request.files.getlist('fotos')
         for file in files:
@@ -114,20 +129,48 @@ def cotar():
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 fotos_salvas.append(filename)
 
+    # 2. Processa fotos recebidas de forma remota via celular (Mobile Handoff)
+    token_sessao = request.form.get('token_sessao')
+    if token_sessao:
+        pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token_sessao)
+        if os.path.exists(pasta_token):
+            for file_name in os.listdir(pasta_token):
+                if allowed_file(file_name):
+                    ts = datetime.now().strftime("%H%M%S")
+                    cli_prefix = session.get('cliente_id', 'anon')
+                    novo_nome = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_mobile_{file_name}")
+                    
+                    caminho_antigo = os.path.join(pasta_token, file_name)
+                    caminho_novo = os.path.join(app.config['UPLOAD_FOLDER'], novo_nome)
+                    
+                    os.rename(caminho_antigo, caminho_novo)
+                    fotos_salvas.append(novo_nome)
+            
+            # Remove o diretório temporário do token após mover os arquivos
+            try:
+                os.rmdir(pasta_token)
+            except Exception:
+                pass
+
     # Lida com o cálculo dependendo se é um produto real ou genérico
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
         # FOCO DA ALTERAÇÃO: Mantém ou atualiza a flag de controle da sessão ativa
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
         resultado = {
             "produto": "Lote de Jogos" if str(produto_id).startswith('cat_') else "Produto não listado",
-            "valor_final": 0.0
+            "valor_final": 0.0,
+            "multiplicador_aplicado": 1.00
         }
         categoria_id = str(produto_id).split('_')[-1]
         foto_url_final = None
     else:
         # FOCO DA ALTERAÇÃO: Força falso se for um fluxo padrão de produto catalogado
         session['is_outros'] = False
-        resultado = engine.calcular_cotacao_final(produto_id, estado_id)
+        
+        # NOVO: Resgata o multiplicador da sessão (fallback 1.00)
+        multiplicador = session.get('multiplicador_regiao', 1.00)
+        resultado = engine.calcular_cotacao_final(produto_id, estado_id, multiplicador)
+        
         produto_info = engine.obter_produto_por_id(produto_id)
         categoria_id = produto_info.get('categoria_id') if produto_info else 1
         foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
@@ -156,7 +199,9 @@ def cotar():
             'estado_descricao': descricao_estado,
             'foto_url': foto_url_final,
             # FOCO DA ALTERAÇÃO: Registra no próprio dicionário do item se ele veio do fluxo de "Outros"
-            'is_outros': session.get('is_outros', False)
+            'is_outros': session.get('is_outros', False),
+            # NOVO: Grava o multiplicador no item
+            'multiplicador_aplicado': resultado.get('multiplicador_aplicado', 1.00)
         }
         
         lista_atual = session.get('itens_avaliados', [])
@@ -242,7 +287,7 @@ def finalizar_lote():
         
         return redirect(url_for('finalizar'))
         
-    return "Erro na identificação do lote.", 500
+    return "Erro na identification do lote.", 500
 
 # 6ª TELA: PROCESSAMENTO DE PROTOCOLO E FINALIZAÇÃO
 @app.route('/finalizar', methods=['GET', 'POST'])
@@ -368,6 +413,50 @@ def api_buscar_cidades():
                     break
 
     return jsonify(cidades_filtradas)
+
+
+# --- ENDPOINTS DE HANDOFF E UPLOAD REMOTO (MOBILE) ---
+
+@app.route('/upload-remoto/<token>', methods=['GET'])
+def tela_upload_mobile(token):
+    # Rota acessada pelo celular via QR Code (Gera uma página de upload minimalista)
+    return render_template('upload_mobile.html', token=token)
+
+@app.route('/api/upload-mobile/<token>', methods=['POST'])
+def receber_fotos_mobile(token):
+    if 'fotos_pericia' not in request.files:
+        return jsonify({'erro': 'Nenhuma foto enviada'}), 400
+
+    arquivos = request.files.getlist('fotos_pericia')
+    pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token)
+    os.makedirs(pasta_token, exist_ok=True)
+    
+    fotos_salvas_count = 0
+    for arquivo in arquivos:
+        if arquivo and allowed_file(arquivo.filename):
+            nome_seguro = secure_filename(arquivo.filename)
+            caminho_completo = os.path.join(pasta_token, nome_seguro)
+            arquivo.save(caminho_completo)
+            fotos_salvas_count += 1
+
+    if fotos_salvas_count == 0:
+        return jsonify({'erro': 'Nenhum arquivo válido foi salvo'}), 400
+
+    return jsonify({'sucesso': True, 'quantidade': fotos_salvas_count}), 200
+
+@app.route('/api/status-upload/<token>', methods=['GET'])
+def checar_status_upload(token):
+    pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token)
+    
+    # Se o diretório com o token existe, verifica se há mídias salvas nele
+    if os.path.exists(pasta_token):
+        fotos = [f for f in os.listdir(pasta_token) if allowed_file(f)]
+        if len(fotos) > 0:
+            caminhos = [f"/static/uploads/pericia/{token}/{foto}" for foto in fotos]
+            return jsonify({'status': 'concluido', 'fotos': caminhos}), 200
+            
+    return jsonify({'status': 'aguardando'}), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

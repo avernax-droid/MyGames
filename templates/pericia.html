@@ -13,6 +13,9 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 28/05/2026: Remoção da lógica de upload local, agora centralizada no main.js.
+  - 30/05/2026: Inclusão de abas para upload remoto (QR Code Mobile) vs Local e JS de sincronização.
+  - 30/05/2026: Correção de UX no upload local com feedback visual de arquivos selecionados e ajuste de z-index.
+  - 30/05/2026: Correção do bug de reinicialização do polling de escuta do QR Code ao alternar abas.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -102,11 +105,30 @@
 
         <div class="upload-section">
             <p class="label-secao">Fotos do Produto (Opcional):</p>
-            <div class="file-drop-area" id="drop-area">
+            
+            <div class="upload-tabs">
+                <button type="button" class="btn-tab active" id="tab-pc">Upload do Computador</button>
+                <button type="button" class="btn-tab" id="tab-celular">📸 Usar Câmera do Celular</button>
+            </div>
+
+            <div class="file-drop-area" id="area-upload-pc">
                 <span class="fake-btn">Escolher Fotos</span>
                 <span class="file-msg" id="file-msg">ou arraste as imagens aqui</span>
                 <input type="file" name="fotos" id="file-input" class="file-input" accept="image/*" multiple>
             </div>
+
+            <div class="qr-code-area" id="area-upload-celular" style="display: none; text-align: center; padding: 25px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px;">
+                <p style="color: var(--texto-dim); margin-bottom: 15px; font-size: 14px;">Escaneie o código com seu celular para tirar as fotos. A tela atualizará sozinha.</p>
+                
+                <div id="qrcode" style="display: inline-block; padding: 15px; background: white; border-radius: 8px;"></div>
+                
+                <p style="color: var(--cor-destaque); margin-top: 15px; font-size: 14px; font-weight: bold; display: none;" id="status-qr">
+                    ✅ Fotos recebidas! Você já pode clicar em Avaliar.
+                </p>
+                
+                <input type="hidden" name="token_sessao" id="token_sessao" value="{{ token_sessao }}">
+            </div>
+
             <p class="file-hint">Envie fotos nítidas da frente, verso e selos de garantia.</p>
         </div>
 
@@ -119,22 +141,113 @@
     </form>
 </div>
 
-<script>
-    const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
-    const campoComentarios = document.getElementById('campo-comentarios');
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    radiosOpcoes.forEach(radio => {
-        radio.addEventListener('change', function() {
-            const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Lógica de obrigatoriedade de comentários (MANTIDA)
+        const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
+        const campoComentarios = document.getElementById('campo-comentarios');
+
+        radiosOpcoes.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
+                
+                if (textoOpcao.includes('especifique nos comentários')) {
+                    campoComentarios.setAttribute('required', 'required');
+                    campoComentarios.placeholder = "OBRIGATÓRIO: Por favor, especifique os detalhes aqui...";
+                    campoComentarios.style.borderColor = "#ffaa00"; 
+                } else {
+                    campoComentarios.removeAttribute('required');
+                    campoComentarios.placeholder = "Ex: Acompanha caixa original, detalhe no analógico, etc.";
+                    campoComentarios.style.borderColor = "#333";
+                }
+            });
+        });
+
+        // Abas de Upload e Sincronização Mobile
+        const tabPc = document.getElementById('tab-pc');
+        const tabCelular = document.getElementById('tab-celular');
+        const areaPc = document.getElementById('area-upload-pc');
+        const areaCelular = document.getElementById('area-upload-celular');
+        const statusQr = document.getElementById('status-qr');
+        const token = document.getElementById("token_sessao").value;
+        
+        let pollingInterval;
+
+        tabPc.addEventListener('click', () => {
+            tabPc.classList.add('active');
+            tabCelular.classList.remove('active');
+            areaPc.style.display = 'flex';
+            areaCelular.style.display = 'none';
+            clearInterval(pollingInterval);
+        });
+
+        tabCelular.addEventListener('click', () => {
+            tabCelular.classList.add('active');
+            tabPc.classList.remove('active');
+            areaCelular.style.display = 'block';
+            areaPc.style.display = 'none';
             
-            if (textoOpcao.includes('especifique nos comentários')) {
-                campoComentarios.setAttribute('required', 'required');
-                campoComentarios.placeholder = "OBRIGATÓRIO: Por favor, especifique os detalhes aqui...";
-                campoComentarios.style.borderColor = "#ffaa00"; 
+            const qrContainer = document.getElementById("qrcode");
+            
+            // Lógica isolada para apenas desenhar o QR Code na primeira vez
+            if (qrContainer.innerHTML === "") {
+                const urlBase = window.location.origin; 
+                const urlMobile = `${urlBase}/upload-remoto/${token}`;
+                
+                new QRCode(qrContainer, {
+                    text: urlMobile,
+                    width: 160,
+                    height: 160,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff"
+                });
+            }
+
+            // Lógica de polling isolada para iniciar sempre que a aba for aberta
+            // Limpa o anterior por segurança e só roda se as fotos ainda não tiverem chegado
+            clearInterval(pollingInterval);
+            
+            if (statusQr.style.display !== "block") {
+                pollingInterval = setInterval(() => {
+                    fetch(`/api/status-upload/${token}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'concluido') {
+                                clearInterval(pollingInterval);
+                                qrContainer.style.opacity = "0.2"; 
+                                statusQr.style.display = "block";
+                            }
+                        })
+                        .catch(err => console.error("Erro na checagem:", err));
+                }, 3000);
+            }
+        });
+
+        // Feedback visual para upload local do PC
+        const fileInputPc = document.getElementById('file-input');
+        const fileMsgPc = document.getElementById('file-msg');
+        const fakeBtn = document.querySelector('.fake-btn');
+
+        fileInputPc.addEventListener('change', function() {
+            const qtd = this.files.length;
+            
+            if (qtd === 1) {
+                fileMsgPc.innerText = "1 foto selecionada";
+                fileMsgPc.style.color = "var(--cor-destaque)";
+                fileMsgPc.style.fontWeight = "bold";
+                fakeBtn.innerText = "Trocar Foto";
+            } else if (qtd > 1) {
+                fileMsgPc.innerText = `${qtd} fotos selecionadas`;
+                fileMsgPc.style.color = "var(--cor-destaque)";
+                fileMsgPc.style.fontWeight = "bold";
+                fakeBtn.innerText = "Trocar Fotos";
             } else {
-                campoComentarios.removeAttribute('required');
-                campoComentarios.placeholder = "Ex: Acompanha caixa original, detalhe no analógico, etc.";
-                campoComentarios.style.borderColor = "#333";
+                fileMsgPc.innerText = "ou arraste as imagens aqui";
+                fileMsgPc.style.color = "#888";
+                fileMsgPc.style.fontWeight = "normal";
+                fakeBtn.innerText = "Escolher Fotos";
             }
         });
     });
@@ -158,12 +271,18 @@
     .inputs-qtd-group label { display: flex; justify-content: space-between; align-items: center; color: #ddd; font-size: 15px; }
     .input-qtd { width: 80px; padding: 10px; background: var(--bg-fundo); border: 1px solid #555; border-radius: 8px; color: var(--texto-br); font-size: 16px; text-align: center; outline: none; transition: 0.3s; }
     .input-qtd:focus { border-color: var(--cor-destaque); box-shadow: 0 0 10px rgba(0,255,0,0.1); }
+    
+    /* Upload Section & Tabs */
     .upload-section { margin-bottom: 30px; }
+    .upload-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+    .btn-tab { flex: 1; padding: 12px; background: var(--bg-fundo); border: 2px solid #333; color: #888; border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; }
+    .btn-tab.active { background: #252525; color: var(--cor-destaque); border-color: var(--cor-destaque); }
     .file-drop-area { position: relative; display: flex; align-items: center; padding: 25px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; transition: 0.3s; text-align: center; justify-content: center; }
-    .file-input { position: absolute; left: 0; top: 0; height: 100%; width: 100%; opacity: 0; cursor: pointer; }
+    .file-input { position: absolute; left: 0; top: 0; height: 100%; width: 100%; opacity: 0; cursor: pointer; z-index: 2; }
     .fake-btn { background: #333; color: var(--texto-br); padding: 8px 15px; border-radius: 5px; font-size: 13px; margin-right: 10px; }
     .file-msg { color: #888; font-size: 14px; }
     .file-hint { color: #555; font-size: 12px; margin-top: 8px; }
+    
     .obs-section { margin-bottom: 30px; }
     .text-obs { width: 100%; height: 100px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px; color: var(--texto-br); font-family: inherit; resize: none; transition: 0.3s; }
     .text-obs:focus { border-color: var(--cor-destaque); outline: none; background: #252525; }

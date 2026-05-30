@@ -10,6 +10,10 @@
 #
 # HISTÓRICO DE ALTERAÇÕES:
 # - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+# - 29/05/2026: Implementação do multiplicador de preço por região de atendimento.
+# - 29/05/2026: Exibição do bônus/ajuste regional no corpo do e-mail de resumo.
+# - 29/05/2026: Inclusão da política de avaliação física presencial no corpo do e-mail.
+# - 30/05/2026: Correção na função salvar_lead com lógica de UPSERT baseada em CPF para evitar duplicação de cadastros.
 # ==============================================================================
 
 import mysql.connector
@@ -51,21 +55,43 @@ def salvar_lead(dados):
         cpf = ''.join(filter(str.isdigit, str(dados.get('cpf', '')))) if dados.get('cpf') else None
         cep = ''.join(filter(str.isdigit, str(dados.get('cep', '')))) if dados.get('cep') else None
 
-        sql = """INSERT INTO clientes_usuarios 
-                 (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead, cpf, cep) 
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                 ON DUPLICATE KEY UPDATE 
-                 nome_completo = VALUES(nome_completo), whatsapp = VALUES(whatsapp),
-                 cidade = VALUES(cidade), estado_nome = VALUES(estado_nome), estado_uf = VALUES(estado_uf),
-                 cpf = COALESCE(VALUES(cpf), cpf), cep = COALESCE(VALUES(cep), cep)"""
-        cursor.execute(sql, (dados['nome_completo'], dados['email'], whatsapp, dados['cidade'], 
-                             dados.get('estado_nome'), dados.get('estado_uf'), dados['origem_lead'], cpf, cep))
-        db.commit()
-        
-        if cursor.lastrowid: return cursor.lastrowid
-        cursor.execute("SELECT id FROM clientes_usuarios WHERE email = %s", (dados['email'],))
-        res = cursor.fetchone()
-        return res['id'] if res else None
+        cliente_existente_id = None
+
+        # Passo 1: Verifica se o lead já existe pelo CPF
+        if cpf:
+            cursor.execute("SELECT id FROM clientes_usuarios WHERE cpf = %s LIMIT 1", (cpf,))
+            res = cursor.fetchone()
+            if res:
+                cliente_existente_id = res['id']
+
+        # Passo 2: UPSERT manual
+        if cliente_existente_id:
+            # UPDATE: Se achou, atualiza os dados para não duplicar
+            sql_update = """UPDATE clientes_usuarios SET 
+                            nome_completo = %s, email = %s, whatsapp = %s, 
+                            cidade = %s, estado_nome = %s, estado_uf = %s, 
+                            origem_lead = %s, cep = COALESCE(%s, cep)
+                            WHERE id = %s"""
+            cursor.execute(sql_update, (
+                dados['nome_completo'], dados['email'], whatsapp, 
+                dados['cidade'], dados.get('estado_nome'), dados.get('estado_uf'), 
+                dados['origem_lead'], cep, cliente_existente_id
+            ))
+            db.commit()
+            return cliente_existente_id
+        else:
+            # INSERT: Se não achou (ou não tem CPF ainda), cria um novo registro
+            sql_insert = """INSERT INTO clientes_usuarios 
+                     (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead, cpf, cep) 
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            cursor.execute(sql_insert, (
+                dados['nome_completo'], dados['email'], whatsapp, 
+                dados['cidade'], dados.get('estado_nome'), dados.get('estado_uf'), 
+                dados['origem_lead'], cpf, cep
+            ))
+            db.commit()
+            return cursor.lastrowid
+
     except Error as e:
         print(f"ERRO: Falha ao persistir lead: {e}")
         return None
@@ -121,7 +147,7 @@ def obter_produto_por_id(produto_id):
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-def calcular_cotacao_final(produto_id, estado_id):
+def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00):
     db = conectar_bd()
     if not db: return None
     try:
@@ -134,11 +160,16 @@ def calcular_cotacao_final(produto_id, estado_id):
         
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
+        multiplicador = Decimal(str(multiplicador_regiao))
         
         base_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
-        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator
+        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator * multiplicador
         
-        return {"produto": produto['nome_produto'], "valor_final": float(valor_final)}
+        return {
+            "produto": produto['nome_produto'], 
+            "valor_final": float(valor_final),
+            "multiplicador_aplicado": float(multiplicador_regiao)
+        }
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
@@ -172,7 +203,18 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
                 corpo += " Valor: Sob Consulta\n\n"
                 tem_analise_manual = True
             else:
-                corpo += f" Valor: R$ {item['valor_pix_unitario']:.2f}\n\n"
+                mult = float(item.get('multiplicador_aplicado', 1.0))
+                valor_final = float(item['valor_pix_unitario'])
+                
+                if mult != 1.0:
+                    valor_original = valor_final / mult
+                    if mult > 1.0:
+                        corpo += " ✨ Bônus Regional Aplicado!\n"
+                    else:
+                        corpo += " 📍 Preço Ajustado à sua Região\n"
+                    corpo += f" De: R$ {valor_original:.2f} | Por: R$ {valor_final:.2f}\n\n"
+                else:
+                    corpo += f" Valor: R$ {valor_final:.2f}\n\n"
         
         if tem_analise_manual:
             corpo += "--------------------------------------------------------\n"
@@ -180,7 +222,18 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             corpo += "Notamos que o seu lote contém itens que não estão cadastrados em nosso sistema padrão.\n"
             corpo += "Nossa equipe técnica avaliará as informações e fotos enviadas, e entrará em contato "
             corpo += "com você em até 24 horas úteis para apresentar a oferta final destes itens.\n"
-            corpo += "--------------------------------------------------------\n"
+            corpo += "--------------------------------------------------------\n\n"
+            
+        corpo += "--------------------------------------------------------\n"
+        corpo += "POLÍTICA DE AVALIAÇÃO FÍSICA:\n"
+        corpo += "Lembramos que as cotações acima são pré-avaliações baseadas nas \n"
+        corpo += "informações fornecidas. A aprovação da oferta e o pagamento final \n"
+        corpo += "estão sujeitos à conferência e avaliação técnica presencial pela \n"
+        corpo += "nossa equipe, assim que os produtos forem recebidos em nossa \n"
+        corpo += "empresa via Correios.\n"
+        corpo += "--------------------------------------------------------\n\n"
+        
+        corpo += "Atenciosamente,\nEquipe MyGames"
             
         msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
         
@@ -212,6 +265,25 @@ def finalizar_proposta(dados_proposta):
         if db and db.is_connected(): cursor.close(); db.close()
 
 # --- MÓDULO DE BUSCA ---
+
+def obter_multiplicador_regiao(cidade, estado_uf):
+    db = conectar_bd()
+    if not db: return 1.00
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        query = "SELECT multiplicador_preco FROM regioes_atendimento WHERE cidade = %s AND estado_uf = %s AND ativo = 1"
+        cursor.execute(query, (cidade, estado_uf))
+        res = cursor.fetchone()
+        
+        if res and res.get('multiplicador_preco') is not None:
+            return float(res['multiplicador_preco'])
+            
+        return 1.00
+    except Error as e:
+        print(f"ERRO: Falha ao buscar multiplicador de região: {e}")
+        return 1.00
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
 
 def buscar_produtos_por_categoria(categoria_id):
     db = conectar_bd()

@@ -1,0 +1,196 @@
+📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V2.6)
+
+-----------------------------------------------------------------------------------------------------------------
+objetivo deste arquivo:
+- Manter a memoria do projeto para ser utilizada principalmente pela IA.
+- O conteudo deste arquivo deve ser atualizado, pela IA, sempre que necessario.
+- Sempre que o desenvolvedor iniciar um novo chat com a IA este arquivo será anexado para conhecimento da IA.
+------------------------------------------------------------------------------------------------------------------
+
+1. VISÃO GERAL
+Nome: MyGames
+Objetivo: Sistema de recompra (Buyback) de jogos e consoles usados para um cliente de e-commerce. O sistema capta o lead, permite ao usuário 
+selecionar produtos, indicar o estado de conservação (perícia), calcula a depreciação e exibe uma oferta.
+Fluxo do Usuário (Stepper):
+Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta > Resumo do Lote > Identificação > Sucesso/Protocolo.
+
+2. AMBIENTE E TECNOLOGIAS
+Linguagem/Framework: Python com Flask.
+Banco de Dados: MySQL (Banco: mygames_dev).
+Infraestrutura: Docker (planejado/em uso).
+Ambiente de Desenvolvimento: Host em Windows 11 utilizando VS Code (Tema Dark Mode) com terminal integrado em Linux - Ubuntu.
+Metodologia: "Design First" (As interfaces visuais, regras de UX e estruturas de banco são definidas antes da codificação).
+
+3. ARQUITETURA DE ARQUIVOS (MÓDULOS)
+
+├── DOCS
+│   ├── IA_memoria.txt
+│   ├── arquivo_memoria.txt
+│   ├── especificação.txt
+│   ├── especificação_V0.txt
+│   ├── estimativa.txt
+│   ├── mermoria.txt
+│   └── proposta.txt
+├── __pycache__
+│   ├── engine.cpython-312.pyc
+│   └── server.cpython-312.pyc
+├── catalogo_exportado_fabio.xlsx:Zone.Identifier
+├── dev.sh
+├── engine.py
+├── requirements.txt
+├── server.py
+├── static
+│   ├── css
+│   │   └── style.css
+│   ├── images
+│   │   └── catalogo
+│   ├── img
+│   │   └── logo.jpeg
+│   ├── js
+│   │   ├── main.js
+│   │   └── ux-helper.js
+│   └── uploads
+│       └── pericia
+├── templates
+│   ├── base.html
+│   ├── boas_vindas.html
+│   ├── cadastro_complementar.html
+│   ├── pericia.html
+│   ├── produto.html
+│   ├── resultado.html
+│   ├── resumo_lote.html
+│   └── sucesso.html
+├── utils
+│   ├── Troca Game Avaliação - Geral.xlsx
+│   ├── auditoria.py
+│   ├── baixar_imagens.py
+│   ├── catalogo.py
+│   ├── catalogo_exportado.csv
+│   ├── catalogo_exportado_fabio.xlsx
+│   ├── categorias.csv
+│   ├── categorias.xlsx
+│   ├── deleta.py
+│   ├── exporta_catalogo.py
+│   ├── faltando_fotos.csv
+│   ├── gerar_carga_consoles.py
+│   ├── insere_novos.py
+│   ├── popula.py
+│   ├── popula_catalogo.py
+│   ├── popula_consoles.sql
+│   ├── sonabase.csv
+│   └── teste_rawg.py
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.12
+    │   ├── python -> python3.12
+    │   ├── python3 -> python3.12
+    │   └── python3.12 -> /usr/bin/python3.12
+    ├── include
+    │   └── python3.12
+    ├── lib
+    │   └── python3.12
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+
+engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de
+perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE) e envio de e-mails automatizados.
+
+server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, processa uploads de arquivos
+(fotos da perícia) e faz a ponte entre o front-end e o engine.py.
+
+Diretório /templates:
+
+base.html: Estrutura padrão de layout.
+
+boas_vindas.html: Landing page, captura canal de aquisição e cidade (integração IBGE).
+
+produto.html: Catálogo de seleção.
+
+pericia.html: Formulário de estado de conservação, upload de fotos e comentários.
+
+resultado.html: Exibe a cotação. Possui lógica condicional para multiplicador de região e itens "Sob Consulta".
+
+resumo_lote.html: Carrinho/resumo dos itens avaliados.
+
+cadastro_complementar.html: Formulário final de captura de lead completo.
+
+sucesso.html: Geração do protocolo final.
+
+Diretório /static:
+
+/css/style.css, /js/ux-helper.js (Modais e funções auxiliares).
+
+/uploads/pericia: Destino das fotos enviadas pelos usuários.
+
+4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
+Plaintext
+TABELA                | COLUNA                   | TIPO           | CHAVE
+--------------------------------------------------------------------------
+avaliacoes_manuais    | id                       | INT            | PK, AI
+                      | nome_produto_informado   | VARCHAR(255)   | -
+                      | descricao_estado         | TEXT           | -
+                      | email_contato            | VARCHAR(150)   | -
+                      | data_solicitacao         | DATETIME       | -
+                      | status                   | ENUM           | -
+--------------------------------------------------------------------------
+canais_aquisicao      | id                       | INT            | PK, AI
+                      | slug_tecnico             | VARCHAR(50)    | -
+                      | nome_exibicao            | VARCHAR(100)   | -
+                      | ativo                    | TINYINT(1)     | -
+--------------------------------------------------------------------------
+catalogo_mestre       | id                       | INT            | PK, AI
+                      | nome_produto             | VARCHAR(255)   | -
+                      | categoria_id             | INT            | -
+                      | valor_pix_base           | DECIMAL(10,2)  | -
+                      | ativo                    | TINYINT(1)     | -
+--------------------------------------------------------------------------
+clientes_usuarios     | id                       | INT            | PK, AI
+                      | nome_completo            | VARCHAR(255)   | -
+                      | email                    | VARCHAR(150)   | -
+                      | whatsapp                 | VARCHAR(20)    | -
+                      | cpf                      | VARCHAR(14)    | -
+                      | chave_pix                | VARCHAR(100)   | -
+--------------------------------------------------------------------------
+itens_periciados      | id                       | INT            | PK, AI
+                      | protocolo_id             | INT            | -
+                      | fotos_json               | JSON           | -
+                      | valor_pix_unitario       | DECIMAL(10,2)  | -
+--------------------------------------------------------------------------
+opcoes_estado         | id                       | INT            | PK, AI
+                      | categoria_id             | INT            | -
+                      | fator_depreciacao        | DECIMAL(5,2)   | -
+--------------------------------------------------------------------------
+protocolos_recompra   | id                       | INT            | PK, AI
+                      | numero_protocolo         | VARCHAR(20)    | -
+                      | status                   | ENUM           | -
+--------------------------------------------------------------------------
+regioes_atendimento   | id                       | INT            | PK, AI
+                      | multiplicador_preco      | DECIMAL(4,2)   | -
+
+5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES
+Precificação Regional: O front-end e o e-mail exibem alertas visuais ("✨ Bônus Regional Aplicado!") e a ancoragem do preço original 
+riscado se a cidade tiver multiplicador diferente de 1.0 na tabela regioes_atendimento.
+
+Itens "Outros" / Sob Consulta: Produtos com prefixo cat_ ou outro_cat_ ativam a flag is_outros. O preço não é calculado na hora; o
+sistema e o e-mail avisam sobre a avaliação humana em até 24h úteis.
+
+Política de Avaliação: O e-mail final contém uma cláusula jurídica informando que a oferta está sujeita à avaliação técnica presencial.
+
+Modal de Descarte: O usuário pode ejetar itens do lote em resultado.html sem recarregar a tela (AJAX).
+
+6. DIRETRIZES GERAIS DE DESENVOLVIMENTO (INSTRUÇÕES PARA A IA)
+Não altere a estrutura base de arquivos a menos que solicitado.
+
+Mantenha a divisão clara: Regras de negócio e queries SQL vivem no engine.py. Roteamento e manipulação de sessão vivem no server.py.
+
+Forneça os códigos um módulo por vez.
+
+Sempre atualize o cabeçalho de documentação dos módulos (Data de criação, Função e Histórico de alterações) ao fornecer um código atualizado.
+
+Mantenha a UX fluida (evite quebras de layout e scroll desnecessário).

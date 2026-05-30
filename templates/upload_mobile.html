@@ -1,0 +1,172 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: upload_mobile.html
+  DATA DE CRIAÇÃO: 30/05/2026
+  TÍTULO: Interface Mobile de Câmera (Handoff Remoto)
+  FUNÇÃO: Tela ultra-leve acessada via QR Code pelo smartphone do usuário. 
+  Permite o acesso nativo à câmera do dispositivo ou galeria para captura de fotos 
+  da perícia. Envia os arquivos diretamente para o servidor via AJAX e informa a 
+  conclusão para que o desktop possa prosseguir.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 30/05/2026: Criação da página focada em conversão mobile e script de upload.
+  - 30/05/2026: Inclusão de lógica de acúmulo de fotos em memória (array) para evitar sobrescrita de arquivos ao tirar múltiplas fotos consecutivas.
+  ==============================================================================
+#}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Câmera - MyGames</title>
+    <style>
+        :root {
+            --bg-fundo: #121212;
+            --cor-destaque: #00e676; /* Verde chamativo para ação no mobile */
+            --texto-br: #ffffff;
+            --texto-dim: #aaaaaa;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { background-color: var(--bg-fundo); color: var(--texto-br); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; text-align: center; }
+        
+        .container { background: #1e1e1e; border: 1px solid #333; border-radius: 16px; padding: 30px 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        .icone-camera { font-size: 48px; margin-bottom: 15px; }
+        
+        h2 { font-size: 22px; margin-bottom: 10px; color: var(--cor-destaque); }
+        
+        p { font-size: 14px; color: var(--texto-dim); margin-bottom: 25px; line-height: 1.5; }
+        
+        /* O input original fica invisível para podermos estilizar o botão nativo */
+        input[type="file"] { display: none; }
+        
+        .btn-camera { background-color: transparent; border: 2px dashed var(--cor-destaque); color: var(--cor-destaque); padding: 18px 20px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: 0.3s; margin-bottom: 15px; }
+        .btn-camera:active { background-color: rgba(0, 230, 118, 0.1); }
+        
+        .btn-enviar { background-color: var(--cor-destaque); color: #000; border: none; padding: 16px 20px; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.3s; display: none; /* Só aparece quando tem foto escolhida */ }
+        .btn-enviar:active { opacity: 0.8; transform: scale(0.98); }
+        
+        .info-selecionado { font-size: 13px; color: #fff; margin-bottom: 20px; font-weight: bold; }
+        
+        /* Telas de Estado (Carregando e Sucesso) */
+        #tela-uploading, #tela-sucesso { display: none; flex-direction: column; align-items: center; justify-content: center; }
+        
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-top: 4px solid var(--cor-destaque); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .icone-sucesso { font-size: 60px; color: var(--cor-destaque); margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="tela-principal">
+        <div class="icone-camera">📸</div>
+        <h2>Câmera Conectada</h2>
+        <p>Você está conectado ao sistema <strong>MyGames</strong>. Tire fotos do produto para adicionar à sua avaliação.</p>
+
+        <form id="form-mobile">
+            <input type="hidden" id="token" value="{{ token }}">
+            
+            <label class="btn-camera">
+                Tirar Fotos
+                <input type="file" id="fotos_pericia" name="fotos_pericia" accept="image/*" capture="environment" multiple>
+            </label>
+            
+            <div class="info-selecionado" id="contador-fotos">Nenhuma foto selecionada</div>
+            
+            <button type="submit" class="btn-enviar" id="btn-enviar">Fazer Upload das Fotos</button>
+        </form>
+    </div>
+
+    <div class="container" id="tela-uploading">
+        <div class="spinner"></div>
+        <h2 style="color: #fff;">Enviando fotos...</h2>
+        <p style="color: #ffaa00; font-weight: bold;">Não feche ou bloqueie a tela do celular!</p>
+    </div>
+
+    <div class="container" id="tela-sucesso">
+        <div class="icone-sucesso">✅</div>
+        <h2>Fotos Recebidas!</h2>
+        <p>As fotos já foram enviadas para o computador.</p>
+        <p style="color: #fff; font-weight: bold;">Você já pode fechar esta tela no celular e continuar o processo no seu notebook/desktop.</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('fotos_pericia');
+            const contadorTexto = document.getElementById('contador-fotos');
+            const btnEnviar = document.getElementById('btn-enviar');
+            
+            const telaPrincipal = document.getElementById('tela-principal');
+            const telaUploading = document.getElementById('tela-uploading');
+            const telaSucesso = document.getElementById('tela-sucesso');
+            const form = document.getElementById('form-mobile');
+            const token = document.getElementById('token').value;
+
+            // Variável para acumular as fotos em memória
+            let fotosAcumuladas = [];
+
+            // Escuta a seleção de arquivos para atualizar a UI e o acumulador
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    // Adiciona as novas fotos tiradas ao array
+                    for (let i = 0; i < fileInput.files.length; i++) {
+                        fotosAcumuladas.push(fileInput.files[i]);
+                    }
+                    
+                    // Limpa o input nativo para permitir que o usuário clique e tire mais fotos
+                    fileInput.value = "";
+
+                    const qtd = fotosAcumuladas.length;
+                    contadorTexto.innerText = qtd === 1 ? '1 foto pronta para envio' : `${qtd} fotos prontas para envio`;
+                    contadorTexto.style.color = 'var(--cor-destaque)';
+                    btnEnviar.style.display = 'block';
+                }
+            });
+
+            // Gerencia o envio via AJAX
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                if (fotosAcumuladas.length === 0) return;
+
+                // Esconde a tela principal e mostra o carregamento
+                telaPrincipal.style.display = 'none';
+                telaUploading.style.display = 'flex';
+
+                const formData = new FormData();
+                // Adiciona todas as fotos acumuladas ao payload de envio
+                fotosAcumuladas.forEach((foto) => {
+                    formData.append('fotos_pericia', foto);
+                });
+
+                // Dispara o POST para a rota configurada no server.py
+                fetch(`/api/upload-mobile/${token}`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Erro no envio');
+                    return response.json();
+                })
+                .then(data => {
+                    // Esconde carregamento e mostra sucesso
+                    telaUploading.style.display = 'none';
+                    telaSucesso.style.display = 'flex';
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert("Ocorreu um erro ao enviar as fotos. Por favor, tente novamente.");
+                    // Restaura a tela principal em caso de erro
+                    telaUploading.style.display = 'none';
+                    telaPrincipal.style.display = 'block';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

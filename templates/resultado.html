@@ -15,6 +15,8 @@
   - 29/05/2026: Redução proporcional do tamanho da fonte no valor da cotação.
   - 29/05/2026: Alinhamento dos três botões de ação na mesma linha.
   - 29/05/2026: Integração com Modal Global e correção da navegação pós-descarte.
+  - 29/05/2026: Inclusão de alerta visual (badge) para multiplicador de preço regional.
+  - 29/05/2026: Exibição do valor normal riscado ao lado do valor com bônus e compactação de layout.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -35,16 +37,44 @@
             </header>
             
             {% if session.get('is_outros') %}
-            <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: left;">
-                <h3 style="color: var(--cor-destaque); margin-top: 0; font-size: 16px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">ℹ️ Avaliação Sob Consulta</h3>
-                <p style="color: var(--texto-br); font-size: 14px; margin-bottom: 8px;">Este item será avaliado manualmente por nossa equipe técnica.</p>
-                <p style="color: var(--texto-dim); font-size: 13px; margin: 0;">Entraremos em contato em até <strong>24 horas úteis</strong> através do WhatsApp ou E-mail informados no seu cadastro para concluir a oferta.</p>
+            <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin: 15px 0; text-align: left;">
+                <h3 style="color: var(--cor-destaque); margin-top: 0; font-size: 15px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">ℹ️ Avaliação Sob Consulta</h3>
+                <p style="color: var(--texto-br); font-size: 13px; margin-bottom: 5px;">Este item será avaliado manualmente por nossa equipe técnica.</p>
+                <p style="color: var(--texto-dim); font-size: 12px; margin: 0;">Entraremos em contato em até <strong>24 horas úteis</strong> através do WhatsApp ou E-mail informados no seu cadastro para concluir a oferta.</p>
             </div>
             {% else %}
+            
+            {% if cotacao.multiplicador_aplicado and cotacao.multiplicador_aplicado != 1.0 %}
+            <div class="badge-regional" style="margin-bottom: 5px;">
+                <span style="background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: #ffd700; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; display: inline-block;">
+                    {% if cotacao.multiplicador_aplicado > 1.0 %}
+                        ✨ Bônus Regional Aplicado!
+                    {% else %}
+                        📍 Preço Ajustado à sua Região
+                    {% endif %}
+                </span>
+            </div>
+            
+            <!-- EXIBIÇÃO LADO A LADO DO VALOR ORIGINAL E DO VALOR COM MULTIPLICADOR (COMPACTO) -->
+            <div class="valor-container" style="display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 5px 0;">
+                <span style="text-decoration: line-through; color: var(--texto-dim); font-size: 16px; font-weight: normal;">
+                    R$ {{ "%.2f"|format(cotacao.valor_final / cotacao.multiplicador_aplicado) }}
+                </span>
+                
+                <div>
+                    <span class="simbolo-monetario" {% if cotacao.multiplicador_aplicado > 1.0 %}style="color: #ffd700;"{% endif %}>R$</span>
+                    <span class="valor-pix" {% if cotacao.multiplicador_aplicado > 1.0 %}style="color: #ffd700;"{% endif %}>{{ "%.2f"|format(cotacao.valor_final) }}</span>
+                </div>
+            </div>
+
+            {% else %}
+            <!-- VALOR NORMAL (SEM MULTIPLICADOR) -->
             <div class="valor-container">
                 <span class="simbolo-monetario">R$</span>
                 <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
             </div>
+            {% endif %}
+            
             {% endif %}
             
             <div class="info-estado">
@@ -80,13 +110,13 @@
             <p>Este item foi ejetado e não fará parte do lote.</p>
         </div>
 
-        <div class="acoes-finais" style="margin-top: 25px;">
-            <div style="display: flex; justify-content: space-between; gap: 15px;">
+        <div class="acoes-finais" style="margin-top: 15px;">
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
                 <a href="{{ url_for('produto') }}" class="btn-secondary">
                     MAIS PRODUTOS
                 </a>
 
-                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 10px; font-size: 13px;">
                     DESCARTAR AVALIAÇÃO
                 </button>
 
@@ -117,48 +147,49 @@
 </script>
 
 <style>
+    /* COMPACTAÇÃO DE MARGENS APLICADA */
     .produto-thumb-wrapper {
-        width: 100px; height: 100px; margin: 0 auto 15px;
+        width: 90px; height: 90px; margin: 0 auto 10px;
         display: flex; align-items: center; justify-content: center;
         background: rgba(0, 0, 0, 0.2); border: var(--borda-fina);
         border-radius: 12px; padding: 5px;
     }
 
     .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
-    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 18px; font-weight: bold; }
+    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 17px; font-weight: bold; }
     
-    .valor-container { margin: 10px 0; }
-    .simbolo-monetario { color: var(--cor-destaque); font-size: 18px; vertical-align: top; font-weight: bold; margin-top: 5px; display: inline-block; }
-    .valor-pix { color: var(--cor-destaque); font-size: 36px; font-weight: bold; line-height: 1; font-family: monospace; }
+    .valor-container { margin: 5px 0; }
+    .simbolo-monetario { color: var(--cor-destaque); font-size: 16px; vertical-align: top; font-weight: bold; margin-top: 5px; display: inline-block; }
+    .valor-pix { color: var(--cor-destaque); font-size: 34px; font-weight: bold; line-height: 1; font-family: monospace; }
 
-    .info-estado { margin-bottom: 25px; }
+    .info-estado { margin-bottom: 15px; }
     .badge-estado-selecionado {
         display: inline-block; background: rgba(0, 255, 0, 0.08);
         border: 1px solid var(--cor-destaque); color: var(--cor-destaque);
-        padding: 8px 18px; border-radius: 6px;
-        font-weight: bold; font-size: 14px; text-transform: uppercase;
+        padding: 6px 14px; border-radius: 6px;
+        font-weight: bold; font-size: 13px; text-transform: uppercase;
     }
 
     .revisao-pericia { 
-        background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; 
-        margin-bottom: 20px; text-align: left; border: var(--borda-fina);
+        background: rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; 
+        margin-bottom: 15px; text-align: left; border: var(--borda-fina);
     }
-    .label-mini { color: var(--texto-dim); font-size: 11px; text-transform: uppercase; margin-bottom: 8px; }
+    .label-mini { color: var(--texto-dim); font-size: 11px; text-transform: uppercase; margin-bottom: 6px; }
     .fotos-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
-    .thumb-revisao { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: var(--borda-fina); }
+    .thumb-revisao { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: var(--borda-fina); }
     
     .texto-comentario { 
-        color: var(--texto-dim); font-size: 13px; font-style: italic; margin: 0;
+        color: var(--texto-dim); font-size: 12px; font-style: italic; margin: 0;
         word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;
     }
 
     .msg-feedback-descarte {
-        padding: 25px 15px; margin-bottom: 20px;
+        padding: 20px 15px; margin-bottom: 15px;
         border: 1px dashed #ff4444; border-radius: 12px;
         background: rgba(255, 68, 68, 0.02);
     }
-    .icone-lixeira { font-size: 36px; margin-bottom: 8px; }
-    .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 6px 0; font-size: 16px; text-transform: uppercase; }
-    .msg-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 13px; }
+    .icone-lixeira { font-size: 32px; margin-bottom: 8px; }
+    .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 6px 0; font-size: 15px; text-transform: uppercase; }
+    .msg-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 12px; }
 </style>
 {% endblock %}
