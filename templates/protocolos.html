@@ -1,0 +1,111 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: protocolos.html
+  DATA DE CRIAÇÃO: 30/05/2026
+  TÍTULO: Gestão de Protocolos (Recompras)
+  FUNÇÃO: Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.
+  ==============================================================================
+#}
+{% extends 'base.html' %}
+
+{% block title %}Protocolos - MyGames Admin{% endblock %}
+
+{% block page_title %}Gestão de Protocolos{% endblock %}
+
+{% block content %}
+<style>
+    /* Estilos específicos para a tabela do Backoffice */
+    .table-admin {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        color: var(--texto-br);
+    }
+
+    .table-admin th {
+        background-color: #151515;
+        padding: 15px;
+        text-align: left;
+        font-size: 13px;
+        text-transform: uppercase;
+        color: var(--texto-dim);
+        border-bottom: 2px solid #333;
+    }
+
+    .table-admin td {
+        padding: 15px;
+        border-bottom: 1px solid #2a2a2a;
+        font-size: 14px;
+        vertical-align: middle;
+    }
+
+    .table-admin tr:hover {
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges de Status */
+    .status-badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .status-aberto { background: rgba(255, 193, 7, 0.1); color: #ffc107; border: 1px solid #ffc107; }
+    .status-recebido { background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid #00e676; }
+    .status-cancelado { background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid #ff4444; }
+
+    .btn-action {
+        background: #333;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 13px;
+        transition: 0.3s;
+    }
+    .btn-action:hover { background: var(--cor-destaque); color: #000; }
+</style>
+
+<div class="card-admin">
+    <table class="table-admin">
+        <thead>
+            <tr>
+                <th>Protocolo</th>
+                <th>Cliente</th>
+                <th>Data</th>
+                <th>Valor (PIX)</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prot in protocolos %}
+            <tr>
+                <td><strong>#{{ prot.numero_protocolo }}</strong></td>
+                <td>{{ prot.cliente_nome }}</td>
+                <td>{{ prot.data_criacao.strftime('%d/%m/%Y %H:%M') if prot.data_criacao else '--' }}</td>
+                <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format(prot.valor_total_pix) }}</td>
+                <td>
+                    <span class="status-badge 
+                        {% if prot.status == 'Aberto' %}status-aberto
+                        {% elif prot.status == 'Recebido' or prot.status == 'Pago' %}status-recebido
+                        {% else %}status-cancelado{% endif %}">
+                        {{ prot.status }}
+                    </span>
+                </td>
+                <td>
+                    <a href="#" class="btn-action"><i class="fas fa-eye"></i> Detalhes</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 30px; color: var(--texto-dim);">
+                    Nenhum protocolo encontrado no banco de dados.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

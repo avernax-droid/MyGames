@@ -1,0 +1,150 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: login.html
+  DATA DE CREIAÇÃO: 30/05/2026
+  TÍTULO: Tela de Autenticação da Equipe
+  FUNÇÃO: Interface de login seguro para o painel administrativo. Valida 
+  as credenciais de acesso via Identidade do Usuário e exibe mensagens de erro.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 30/05/2026: Criação da interface inicial seguindo a identidade visual Dark Mode.
+  - 30/05/2026: Alteração do campo de credencial de E-mail para Identidade do Usuário.
+  ==============================================================================
+#}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Administrativo - MyGames</title>
+    <style>
+        :root {
+            --bg-fundo: #121212;
+            --cor-destaque: #00e676;
+            --texto-br: #ffffff;
+            --texto-dim: #aaaaaa;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-fundo); 
+            color: var(--texto-br); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+        }
+
+        .login-wrapper {
+            background: #1e1e1e;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .login-wrapper h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: var(--cor-destaque);
+            font-size: 24px;
+        }
+
+        .login-wrapper p {
+            text-align: center;
+            color: var(--texto-dim);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: var(--texto-dim); 
+            font-size: 13px; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .form-control { 
+            width: 100%; 
+            padding: 14px; 
+            background: #121212; 
+            border: 1px solid #444; 
+            border-radius: 8px; 
+            color: #fff; 
+            font-size: 15px; 
+            transition: 0.3s; 
+        }
+        
+        .form-control:focus { 
+            outline: none; 
+            border-color: var(--cor-destaque); 
+            background: #252525;
+        }
+
+        .btn-login { 
+            width: 100%; 
+            padding: 15px; 
+            background: var(--cor-destaque); 
+            color: #000; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.3s; 
+            margin-top: 10px; 
+        }
+        
+        .btn-login:hover { opacity: 0.9; transform: scale(0.98); }
+
+        .flash-error { 
+            background: rgba(255, 68, 68, 0.1); 
+            border: 1px dashed #ff4444; 
+            color: #ff4444; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            font-size: 14px; 
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-wrapper">
+        <h2>Painel MyGames</h2>
+        <p>Acesso restrito à equipe</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="/" method="POST">
+            <div class="form-group">
+                <label>Identidade do Usuário</label>
+                <input type="text" name="usuario_login" class="form-control" placeholder="ex: antonio.verna" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Senha de Acesso</label>
+                <input type="password" name="senha" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-login">ACESSAR SISTEMA</button>
+        </form>
+    </div>
+
+</body>
+</html>
