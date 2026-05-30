@@ -10,7 +10,8 @@
 # - 30/05/2026: Substituição do HTML de texto provisório pela renderização do dashboard.
 # - 30/05/2026: Implementação de Controle de Acesso Baseado em Funções (RBAC) e Decorator.
 # - 30/05/2026: Migração da autenticação de E-mail para Identidade do Usuário (usuario_login).
-# - 30/05/2026: Criação da rota /protocolos com JOIN entre protocolos_recompra e clientes_usuarios.
+# - 30/05/2026: Criação da rota /protocolos com JOIN entre tabelas.
+# - 30/05/2026: Adição da rota protegida para visualização detalhada de um protocolo específico.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -19,6 +20,9 @@ from werkzeug.security import check_password_hash
 import os
 from functools import wraps
 from dotenv import load_dotenv
+
+# Importa o motor de dados do backoffice que processará as regras de negócio
+import admin_engine
 
 load_dotenv()
 
@@ -76,13 +80,11 @@ def login():
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        # Captura a identidade digitada no formulário
         usuario_login = request.form.get('usuario_login')
         senha = request.form.get('senha')
 
         db = conectar_bd()
         cursor = db.cursor(dictionary=True)
-        # A busca agora é feita estritamente pela coluna usuario_login
         cursor.execute("SELECT * FROM usuarios_admin WHERE usuario_login = %s AND ativo = 1", (usuario_login,))
         usuario = cursor.fetchone()
         db.close()
@@ -109,7 +111,6 @@ def listar_protocolos():
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
     
-    # Faz um JOIN para pegar os dados do protocolo e o nome do cliente associado
     query = """
         SELECT p.id, p.numero_protocolo, p.status, p.valor_total_pix, p.data_criacao,
                c.nome_completo as cliente_nome
@@ -122,6 +123,25 @@ def listar_protocolos():
     db.close()
     
     return render_template('protocolos.html', protocolos=lista_protocolos)
+
+@app.route('/protocolos/<int:protocolo_id>')
+@requer_permissao('protocolos', 'read')
+def detalhes_protocolo(protocolo_id):
+    # 1. Busca os dados gerais do protocolo (Pai) e do cliente através do motor
+    dados_protocolo = admin_engine.obter_cabecalho_protocolo(protocolo_id)
+    
+    # Se o protocolo não existir no banco, joga de volta para a listagem com erro
+    if not dados_protocolo:
+        flash('Protocolo não encontrado.', 'error')
+        return redirect(url_for('listar_protocolos'))
+    
+    # 2. Busca a lista de itens pertencentes a este protocolo (Filhos)
+    itens_protocolo = admin_engine.obter_itens_protocolo(protocolo_id)
+    
+    # Renderiza a tela de detalhes passando os dicionários estruturados
+    return render_template('detalhes_protocolo.html', 
+                           protocolo=dados_protocolo, 
+                           itens=itens_protocolo)
 
 @app.route('/logout')
 def logout():

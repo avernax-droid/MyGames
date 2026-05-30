@@ -1,0 +1,115 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: detalhes_protocolo.html
+  DATA DE CRIAÇÃO: 30/05/2026
+  FUNÇÃO: Exibe o raio-x completo do protocolo.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 30/05/2026: Estrutura inicial.
+  - 30/05/2026: Adição do botão de retorno padrão alinhado à direita.
+  ==============================================================================
+#}
+{% extends 'base.html' %}
+
+{% block title %}Detalhes #{{ protocolo.numero_protocolo }} - MyGames Admin{% endblock %}
+
+{% block page_title %}
+    <div style="display: flex; align-items: center; gap: 15px;">
+        Protocolo #{{ protocolo.numero_protocolo }}
+    </div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .grid-detalhes { display: grid; grid-template-columns: 1fr 2fr; gap: 25px; margin-bottom: 25px; }
+    .info-section h3 { color: var(--cor-destaque); font-size: 16px; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .info-row { margin-bottom: 10px; font-size: 14px; }
+    .info-row strong { color: var(--texto-dim); display: inline-block; width: 120px; }
+    .table-itens { width: 100%; border-collapse: collapse; color: var(--texto-br); margin-top: 10px; }
+    .table-itens th { background-color: #151515; padding: 12px; text-align: left; font-size: 12px; color: var(--texto-dim); }
+    .table-itens td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    
+    /* Container para alinhar o botão à direita */
+    .btn-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+
+    /* Botão com tamanho ajustado ao conteúdo */
+    .btn-voltar {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #333;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 14px;
+        transition: background 0.2s;
+        text-align: center;
+    }
+    .btn-voltar:hover { background-color: #444; }
+
+    .galeria-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+    .foto-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; }
+    .foto-card img { max-width: 100%; border-radius: 4px; margin-bottom: 8px; }
+    .foto-legenda { font-size: 12px; color: var(--texto-dim); }
+</style>
+
+<div class="grid-detalhes">
+    <div class="card-admin info-section">
+        <h3>Dados do Cliente</h3>
+        <div class="info-row"><strong>Nome:</strong> {{ protocolo.cliente_nome }}</div>
+        <div class="info-row"><strong>WhatsApp:</strong> {{ protocolo.cliente_whatsapp | default('Não informado') }}</div>
+        <div class="info-row"><strong>Status:</strong> {{ protocolo.status }}</div>
+    </div>
+
+    <div class="card-admin info-section">
+        <h3>Itens Periciados</h3>
+        <table class="table-itens">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Qtd</th>
+                    <th>Valor Unit. (PIX)</th>
+                    <th>Comentários</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in itens %}
+                <tr>
+                    <td><strong>{{ item.nome_produto }}</strong></td>
+                    <td>{{ item.quantidade }}</td>
+                    <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format(item.valor_pix_unitario or 0) }}</td>
+                    <td>{{ item.comentarios or '--' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card-admin info-section">
+    <h3>Galeria de Inspeção (Handoff Mobile)</h3>
+    <div class="galeria-fotos">
+        {% for item in itens %}
+            {% for foto in item.fotos_lista %}
+            <div class="foto-card">
+                <img src="{{ url_for('static', filename='uploads/pericia/' + foto) }}" alt="Foto">
+                <div class="foto-legenda">{{ item.nome_produto }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: var(--texto-dim);">Nenhuma foto enviada.</p>
+        {% endfor %}
+    </div>
+
+    <div class="btn-container">
+        <a href="/protocolos" class="btn-voltar">
+            Voltar para Protocolos
+        </a>
+    </div>
+</div>
+{% endblock %}
