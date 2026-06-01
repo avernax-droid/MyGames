@@ -14,6 +14,8 @@
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Alinhamento horizontal dos três botões de ação final.
   - 29/05/2026: Substituição do confirm() nativo pelo Modal Global de confirmação.
+  - 01/06/2026: Atualização da renderização de imagens (src) para utilizar a 
+                nova rota compartilhada de mídias caso a foto seja do usuário.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -43,6 +45,15 @@
                             <div class="foto-thumb">
                                 {% if item.foto_url and item.foto_url != 'None' and item.foto_url != '' %}
                                     <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}">
+                                    
+                                {% elif item.fotos_json and item.fotos_json != '[]' %}
+                                    {% set lista_fotos = item.fotos_json | from_json %}
+                                    {% if lista_fotos %}
+                                        <img src="/media/pericia/{{ lista_fotos[0] }}" alt="Foto enviada">
+                                    {% else %}
+                                        <span>🎮</span>
+                                    {% endif %}
+                                    
                                 {% else %}
                                     <span>🎮</span>
                                 {% endif %}

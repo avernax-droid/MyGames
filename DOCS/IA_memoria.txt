@@ -1,4 +1,4 @@
-📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V2.7)
+📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V2.8)
 
 -----------------------------------------------------------------------------------------------------------------
 objetivo deste arquivo:
@@ -61,16 +61,16 @@ Metodologia: "Design First" (As interfaces visuais, regras de UX e estruturas de
 │   └── [Scripts auxiliares de carga e auditoria de banco de dados]
 └── venv
 
-engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE) e envio de e-mails automatizados.
+engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados e gestão segura de leads via UPSERT (validação por CPF).
 
-server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, processa formulários, integra as chamadas ao engine.py e atende os endpoints de Handoff Remoto (recebendo mídias via mobile e respondendo status para o desktop).
+server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, processa uploads de arquivos e atende os endpoints de Handoff Remoto (recebendo mídias via mobile com prefixação UUID e respondendo status via polling).
 
 Diretório /templates:
 base.html: Estrutura padrão de layout.
 boas_vindas.html: Landing page, captura canal de aquisição e cidade (integração IBGE).
 produto.html: Catálogo de seleção.
-pericia.html: Formulário de estado de conservação e comentários. Possui interface com abas divididas para upload local via PC ou handoff remoto gerando QR Code dinâmico para o smartphone, sincronizando as imagens recebidas via AJAX.
-upload_mobile.html: Interface mobile ultra leve (acessada pelo QR Code). Acessa a câmera nativa do celular e envia os arquivos de mídia silenciosamente para o Flask via API.
+pericia.html: Formulário de estado de conservação, comentários e interface dividida em abas para upload local via PC (com feedback visual de arquivos) ou handoff remoto gerando QR Code dinâmico para o smartphone. Controla a sincronização AJAX de forma isolada para evitar falhas ao alternar abas.
+upload_mobile.html: Interface mobile ultra leve acessada pelo QR Code. Acessa a câmera nativa do celular, acumula múltiplas fotos em memória (array JS) e envia os arquivos para o Flask via API.
 resultado.html: Exibe a cotação. Possui lógica condicional para multiplicador de região e itens "Sob Consulta".
 resumo_lote.html: Carrinho/resumo dos itens avaliados.
 cadastro_complementar.html: Formulário final de captura de lead completo.
@@ -81,21 +81,66 @@ Diretório /static:
 /uploads/pericia: Destino das fotos enviadas pelos usuários.
 
 4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
-Tabelas Core de Negócio:
-clientes_usuarios: Armazena os leads (nome, email, whatsapp, cpf, cep, chave pix).
-catalogo_mestre: Produtos disponíveis para recompra com valor base (valor_pix_base).
-opcoes_estado: Fatores de depreciação vinculados ao estado de conservação.
-regioes_atendimento: Controle de multiplicadores de preço por cidade/estado (Bônus/Desconto).
-protocolos_recompra: Cabeçalho dos lotes fechados (valor total, status, data).
-itens_periciados: Itens individuais atrelados a um protocolo (fotos em JSON, valor calculado, comentários).
-canais_aquisicao: Origens de marketing do lead (ativo = 1).
+TABELA                | COLUNA                   | TIPO           | CHAVE
+--------------------------------------------------------------------------
+avaliacoes_manuais    | id                       | INT            | PK, AI
+                      | nome_produto_informado   | VARCHAR(255)   | -
+                      | descricao_estado         | TEXT           | -
+                      | email_contato            | VARCHAR(150)   | -
+                      | data_solicitacao         | DATETIME       | -
+                      | status                   | ENUM           | -
+--------------------------------------------------------------------------
+canais_aquisicao      | id                       | INT            | PK, AI
+                      | slug_tecnico             | VARCHAR(50)    | -
+                      | nome_exibicao            | VARCHAR(100)   | -
+                      | ativo                    | TINYINT(1)     | -
+--------------------------------------------------------------------------
+catalogo_mestre       | id                       | INT            | PK, AI
+                      | nome_produto             | VARCHAR(255)   | -
+                      | categoria_id             | INT            | -
+                      | valor_pix_base           | DECIMAL(10,2)  | -
+                      | ativo                    | TINYINT(1)     | -
+--------------------------------------------------------------------------
+clientes_usuarios     | id                       | INT            | PK, AI
+                      | nome_completo            | VARCHAR(255)   | -
+                      | email                    | VARCHAR(150)   | -
+                      | whatsapp                 | VARCHAR(20)    | -
+                      | cidade                   | VARCHAR(100)   | -
+                      | estado_nome              | VARCHAR(50)    | -
+                      | estado_uf                | VARCHAR(2)     | -
+                      | origem_lead              | VARCHAR(50)    | -
+                      | cpf                      | VARCHAR(14)    | -
+                      | chave_pix                | VARCHAR(100)   | -
+                      | cep                      | VARCHAR(9)     | -
+                      | endereco                 | VARCHAR(255)   | -
+                      | numero                   | VARCHAR(20)    | -
+                      | complemento              | VARCHAR(100)   | -
+                      | bairro                   | VARCHAR(100)   | -
+                      | data_cadastro            | DATETIME       | -
+--------------------------------------------------------------------------
+itens_periciados      | id                       | INT            | PK, AI
+                      | protocolo_id             | INT            | -
+                      | fotos_json               | JSON           | -
+                      | valor_pix_unitario       | DECIMAL(10,2)  | -
+--------------------------------------------------------------------------
+opcoes_estado         | id                       | INT            | PK, AI
+                      | categoria_id             | INT            | -
+                      | fator_depreciacao        | DECIMAL(5,2)   | -
+--------------------------------------------------------------------------
+protocolos_recompra   | id                       | INT            | PK, AI
+                      | numero_protocolo         | VARCHAR(20)    | -
+                      | status                   | ENUM           | -
+--------------------------------------------------------------------------
+regioes_atendimento   | id                       | INT            | PK, AI
+                      | multiplicador_preco      | DECIMAL(4,2)   | -
 
 5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES
 Precificação Regional: O front-end e o e-mail exibem alertas visuais ("✨ Bônus Regional Aplicado!") e a ancoragem do preço original riscado se a cidade tiver multiplicador diferente de 1.0 na tabela regioes_atendimento.
 Itens "Outros" / Sob Consulta: Produtos com prefixo cat_ ou outro_cat_ ativam a flag is_outros. O preço não é calculado na hora; o sistema e o e-mail avisam sobre a avaliação humana em até 24h úteis.
 Política de Avaliação: O e-mail final contém uma cláusula jurídica informando que a oferta está sujeita à avaliação técnica presencial.
 Modal de Descarte: O usuário pode ejetar itens do lote em resultado.html sem recarregar a tela (AJAX).
-Handoff Mobile (QR Code): Se o usuário acessar via desktop e desejar enviar fotos do celular, o sistema gera uma sessão com Token UUID e exibe um QR Code. O celular envia as fotos diretamente para a subpasta do Token via API, e a tela do desktop atualiza automaticamente via polling de JavaScript (AJAX), unificando a experiência de envio de mídias sem transferência de arquivos.
+Gestão de Leads (UPSERT): Para evitar duplicação de clientes na base, a função salvar_lead realiza um UPSERT manual. Se o CPF fornecido já existir no banco, o sistema faz um UPDATE nos dados de contato/endereço em vez de gerar um novo ID.
+Handoff Mobile (QR Code): Se o usuário acessar via desktop e desejar enviar fotos do celular, o sistema gera uma sessão com Token UUID e exibe um QR Code. O celular envia as fotos acumuladas em memória, e o servidor as salva com um prefixo UUID para evitar colisão de nomes. A tela do desktop atualiza automaticamente via polling de JavaScript (AJAX), unificando a experiência de envio de mídias sem transferência manual de arquivos.
 
 6. DIRETRIZES GERAIS DE DESENVOLVIMENTO (INSTRUÇÕES PARA A IA)
 Não altere a estrutura base de arquivos a menos que solicitado.

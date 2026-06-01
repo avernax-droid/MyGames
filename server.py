@@ -12,13 +12,15 @@
 # - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
 # - 29/05/2026: Integração do multiplicador de preço por região nas rotas definir_regiao e cotar.
 # - 30/05/2026: Implementação do fluxo de handoff remoto (QR Code) para envio de mídias via mobile.
+# - 01/06/2026: Parametrização do diretório de uploads via .env e criação da rota de 
+#               mídia compartilhada, unificando o armazenamento para preparação de Docker.
 # ==============================================================================
 
 import os
 import json
 import uuid
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -42,11 +44,13 @@ def from_json_filter(value):
     return value
 
 # --- CONFIGURAÇÃO DE UPLOADS ---
-UPLOAD_FOLDER = 'static/uploads/pericia'
+# Agora lê o caminho absoluto do .env, essencial para o compartilhamento de volumes
+UPLOAD_FOLDER = os.getenv("DIRETORIO_UPLOADS_PERICIA", 'static/uploads/pericia')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if UPLOAD_FOLDER:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -452,11 +456,17 @@ def checar_status_upload(token):
     if os.path.exists(pasta_token):
         fotos = [f for f in os.listdir(pasta_token) if allowed_file(f)]
         if len(fotos) > 0:
-            caminhos = [f"/static/uploads/pericia/{token}/{foto}" for foto in fotos]
+            # Aponta para a nova rota dinâmica e compartilhada
+            caminhos = [f"/media/pericia/{token}/{foto}" for foto in fotos]
             return jsonify({'status': 'concluido', 'fotos': caminhos}), 200
             
     return jsonify({'status': 'aguardando'}), 200
 
+# --- ROTA DE MÍDIA COMPARTILHADA ---
+@app.route('/media/pericia/<path:nome_arquivo>')
+def media_pericia(nome_arquivo):
+    # O uso de <path:nome_arquivo> garante que arquivos em subpastas (como o token mobile) sejam encontrados
+    return send_from_directory(app.config['UPLOAD_FOLDER'], nome_arquivo)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
