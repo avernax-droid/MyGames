@@ -15,6 +15,7 @@
                 tanto na visualização da tabela quanto na manipulação via formulário/JS do Modal.
   - 01/06/2026: Padronização visual e estilização estrita dos botões Cancelar e Salvar 
                 do Modal de acordo com as especificações do Design System.
+  - 01/06/2026: Padronização do botão "+ Novo Produto" e globalização das classes btn-primary e btn-secondary.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -24,7 +25,7 @@
 {% block page_title %}
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span>Catálogo Mestre</span>
-        <button onclick="abrirModalCatalogo()" class="btn-primary" style="font-size: 14px; padding: 8px 15px;">
+        <button onclick="abrirModalCatalogo()" class="btn-primary">
             + Novo Produto
         </button>
     </div>
@@ -208,7 +209,7 @@
     .input-dark { width: 100%; padding: 12px; background: #151515; border: 1px solid #333; border-radius: 6px; color: var(--texto-br); font-family: inherit; font-size: 14px; transition: 0.3s; }
     .input-dark:focus { border-color: var(--cor-destaque); outline: none; background: #1a1a1a; box-shadow: 0 0 5px rgba(0, 255, 0, 0.1); }
 
-    /* ALTERAÇÃO: Estilização unificada do bloco e dos botões do Modal */
+    /* ALTERAÇÃO: Container de ações do modal */
     .modal-acoes {
         margin-top: 30px;
         padding-top: 20px;
@@ -218,7 +219,8 @@
         gap: 15px;
     }
     
-    .modal-acoes .btn-primary {
+    /* ALTERAÇÃO: Estilos Globais para Botões Primários e Secundários */
+    .btn-primary {
         background-color: var(--cor-destaque);
         color: #000000;
         border: none;
@@ -231,12 +233,12 @@
         transition: 0.2s ease-in-out;
     }
     
-    .modal-acoes .btn-primary:hover {
+    .btn-primary:hover {
         background-color: #00b45a;
         box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
     }
     
-    .modal-acoes .btn-secondary {
+    .btn-secondary {
         background: transparent;
         border: 1px solid #444;
         color: var(--texto-dim);
@@ -249,7 +251,7 @@
         transition: 0.2s ease-in-out;
     }
     
-    .modal-acoes .btn-secondary:hover {
+    .btn-secondary:hover {
         background-color: #222;
         border-color: #666;
         color: var(--texto-br);

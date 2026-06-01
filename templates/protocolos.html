@@ -5,6 +5,11 @@
   DATA DE CRIAÇÃO: 30/05/2026
   TÍTULO: Gestão de Protocolos (Recompras)
   FUNÇÃO: Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 30/05/2026: Criação da listagem inicial em Dark Mode.
+  - 01/06/2026: Inclusão da coluna Telefone, definição de widths para as colunas e ajuste de colspan.
+  - 01/06/2026: Aplicação de máscara de formatação (DDD + Número) para a coluna telefone via Jinja2.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -71,12 +76,13 @@
     <table class="table-admin">
         <thead>
             <tr>
-                <th>Protocolo</th>
-                <th>Cliente</th>
-                <th>Data</th>
-                <th>Valor (PIX)</th>
-                <th>Status</th>
-                <th>Ações</th>
+                <th width="12%">Protocolo</th>
+                <th width="23%">Cliente</th>
+                <th width="15%">Telefone</th>
+                <th width="15%">Data</th>
+                <th width="15%">Valor (PIX)</th>
+                <th width="10%">Status</th>
+                <th width="10%" style="text-align: center;">Ações</th>
             </tr>
         </thead>
         <tbody>
@@ -84,6 +90,20 @@
             <tr>
                 <td><strong>#{{ prot.numero_protocolo }}</strong></td>
                 <td>{{ prot.cliente_nome }}</td>
+                <td style="color: #ccc; font-family: monospace; font-size: 15px;">
+                    {% if prot.cliente_telefone %}
+                        {% set tel = prot.cliente_telefone | string %}
+                        {% if tel | length == 11 %}
+                            ({{ tel[:2] }}) {{ tel[2:7] }}-{{ tel[7:] }}
+                        {% elif tel | length == 10 %}
+                            ({{ tel[:2] }}) {{ tel[2:6] }}-{{ tel[6:] }}
+                        {% else %}
+                            {{ tel }}
+                        {% endif %}
+                    {% else %}
+                        Não informado
+                    {% endif %}
+                </td>
                 <td>{{ prot.data_criacao.strftime('%d/%m/%Y %H:%M') if prot.data_criacao else '--' }}</td>
                 <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format(prot.valor_total_pix) }}</td>
                 <td>
@@ -94,13 +114,13 @@
                         {{ prot.status }}
                     </span>
                 </td>
-                <td>
+                <td style="text-align: center;">
                     <a href="/protocolos/{{ prot.id }}" class="btn-action"><i class="fas fa-eye"></i> Detalhes</a>
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" style="text-align: center; padding: 30px; color: var(--texto-dim);">
+                <td colspan="7" style="text-align: center; padding: 30px; color: var(--texto-dim);">
                     Nenhum protocolo encontrado no banco de dados.
                 </td>
             </tr>

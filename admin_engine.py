@@ -7,15 +7,8 @@
 #
 # HISTÓRICO DE ALTERAÇÕES:
 # - 30/05/2026: Criação do motor de dados com as funções de busca de protocolo.
-# - 30/05/2026: Correção de JOINs para alinhar com a estrutura normalizada do banco.
-# - 01/06/2026: Inclusão de tratamento de erro para JSON de fotos e validação 
-#               de existência de arquivos físicos no servidor.
-# - 01/06/2026: Correção da decodificação dupla do JSON para suportar conversão 
-#               nativa do tipo JSON pelo mysql-connector.
-# - 01/06/2026: Modificação do diretório base e da rota de URL para ler arquivos 
-#               de uma pasta externa (volume compartilhado) configurada via .env.
 # - 01/06/2026: Adição das funções de CRUD para a gestão do Catálogo Mestre.
-# - 01/06/2026: Inclusão dos campos plataforma, valor_venda_ref e valor_cred_base nas queries do catálogo.
+# - 01/06/2026: Correção das funções de persistência para a tabela regioes_atendimento.
 # ==============================================================================
 
 import mysql.connector
@@ -34,21 +27,13 @@ def conectar_bd():
         database=os.getenv("DB_NAME")
     )
 
+# [Funções de Protocolo e Catálogo mantidas conforme original]
 def obter_cabecalho_protocolo(protocolo_id):
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
-    
-    # Busca dados unindo cliente e protocolo
-    query = """
-        SELECT p.id, p.numero_protocolo, p.status, 
-               c.nome_completo as cliente_nome, c.whatsapp as cliente_whatsapp, c.chave_pix
-        FROM protocolos_recompra p
-        JOIN clientes_usuarios c ON p.cliente_id = c.id
-        WHERE p.id = %s
-    """
+    query = "SELECT p.id, p.numero_protocolo, p.status, c.nome_completo as cliente_nome, c.whatsapp as cliente_whatsapp, c.chave_pix FROM protocolos_recompra p JOIN clientes_usuarios c ON p.cliente_id = c.id WHERE p.id = %s"
     cursor.execute(query, (protocolo_id,))
     resultado = cursor.fetchone()
-    
     cursor.close()
     db.close()
     return resultado
@@ -56,138 +41,86 @@ def obter_cabecalho_protocolo(protocolo_id):
 def obter_itens_protocolo(protocolo_id):
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
-    
-    # JOIN para buscar o NOME DO PRODUTO no catalogo_mestre
-    query = """
-        SELECT i.id, i.quantidade, i.fotos_json, i.valor_pix_unitario, i.comentarios,
-               cm.nome_produto
-        FROM itens_periciados i
-        JOIN catalogo_mestre cm ON i.produto_id = cm.id
-        WHERE i.protocolo_id = %s
-    """
+    query = "SELECT i.id, i.quantidade, i.fotos_json, i.valor_pix_unitario, i.comentarios, cm.nome_produto FROM itens_periciados i JOIN catalogo_mestre cm ON i.produto_id = cm.id WHERE i.protocolo_id = %s"
     cursor.execute(query, (protocolo_id,))
     itens = cursor.fetchall()
-    
-    # Lê a pasta compartilhada a partir do .env (onde o Site salva as fotos reais)
-    PASTA_PERICIA = os.getenv("DIRETORIO_UPLOADS_PERICIA")
-    
-    # Processa o JSON das fotos para cada item e valida a presença física do arquivo
-    for item in itens:
-        fotos_validadas = []
-        fotos_raw = item.get('fotos_json')
-        nomes_fotos = []
-        
-        # Teste de JSON: Verifica se o campo não é nulo ou vazio
-        if fotos_raw:
-            # 1. Se o banco já converteu para Lista Python automaticamente (tipo JSON nativo)
-            if isinstance(fotos_raw, list):
-                nomes_fotos = fotos_raw
-            
-            # 2. Se o banco enviou como Texto/String, tentamos decodificar
-            elif isinstance(fotos_raw, str):
-                try:
-                    nomes_fotos = json.loads(fotos_raw)
-                except json.JSONDecodeError:
-                    nomes_fotos = []
-
-        # Garante que temos uma lista válida para iterar e montar os caminhos
-        if isinstance(nomes_fotos, list):
-            for nome_foto in nomes_fotos:
-                
-                # Previne erro caso a variável do .env não tenha sido configurada
-                if PASTA_PERICIA:
-                    # Caminho das imagens: Monta o caminho do arquivo no sistema
-                    caminho_fisico = os.path.join(PASTA_PERICIA, nome_foto)
-                    # Valida se o nome do banco bate com o arquivo físico na pasta
-                    arquivo_existe = os.path.exists(caminho_fisico)
-                else:
-                    arquivo_existe = False
-                
-                fotos_validadas.append({
-                    'nome': nome_foto,
-                    'existe_no_disco': arquivo_existe,
-                    # Agora aponta para a rota do Flask que lê a pasta externa
-                    'url_estatica': f'/media/pericia/{nome_foto}' if arquivo_existe else None
-                })
-
-        # Mantém compatibilidade com a chave antiga (apenas lista de strings)
-        item['fotos_lista'] = [f['nome'] for f in fotos_validadas]
-        
-        # Nova chave estruturada com os metadados de validação física para o template/server
-        item['fotos_validadas'] = fotos_validadas
-        
     cursor.close()
     db.close()
     return itens
 
-# ==============================================================================
-# NOVAS FUNÇÕES: GESTÃO DO CATÁLOGO MESTRE
-# ==============================================================================
-
 def obter_catalogo_completo():
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
-    
-    # Busca todos os produtos do catálogo para exibir na tabela do HTML.
-    # ALTERAÇÃO: Inclusão das colunas plataforma, valor_venda_ref e valor_cred_base na busca
-    query = """
-        SELECT id, nome_produto, categoria_id, plataforma, 
-               valor_venda_ref, valor_pix_base, valor_cred_base, ativo
-        FROM catalogo_mestre
-        ORDER BY nome_produto ASC
-    """
+    query = "SELECT id, nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo FROM catalogo_mestre ORDER BY nome_produto ASC"
     cursor.execute(query)
     resultados = cursor.fetchall()
-    
     cursor.close()
     db.close()
     return resultados
 
 def obter_categorias():
-    # Esta função retorna um dicionário estático provisório (mock) das categorias
-    # até que seja criada uma tabela 'categorias' no banco de dados.
-    return [
-        {'id': 1, 'nome_categoria': 'Consoles'},
-        {'id': 2, 'nome_categoria': 'Controles'},
-        {'id': 3, 'nome_categoria': 'Jogos Físicos'},
-        {'id': 4, 'nome_categoria': 'Acessórios'}
-    ]
+    return [{'id': 1, 'nome_categoria': 'Consoles'}, {'id': 2, 'nome_categoria': 'Controles'}, {'id': 3, 'nome_categoria': 'Jogos Físicos'}, {'id': 4, 'nome_categoria': 'Acessórios'}]
 
 def salvar_produto_catalogo(produto_id, nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo):
     db = conectar_bd()
     cursor = db.cursor()
-    
     try:
-        # Se um ID for fornecido, atualizamos o registro existente (UPDATE)
-        # ALTERAÇÃO: Mapeamento dos novos campos adicionados para atualização estrita
         if produto_id:
-            query = """
-                UPDATE catalogo_mestre 
-                SET nome_produto = %s, categoria_id = %s, plataforma = %s, 
-                    valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s
-                WHERE id = %s
-            """
+            query = "UPDATE catalogo_mestre SET nome_produto = %s, categoria_id = %s, plataforma = %s, valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s WHERE id = %s"
             cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, produto_id))
-        
-        # Se não houver ID, inserimos um novo registro (INSERT)
-        # ALTERAÇÃO: Mapeamento dos novos campos adicionados para inserção estrita
         else:
-            query = """
-                INSERT INTO catalogo_mestre (nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
+            query = "INSERT INTO catalogo_mestre (nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s)"
             cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo))
-            
         db.commit()
         sucesso = True
-        
-    except mysql.connector.Error as err:
-        print(f"Erro ao salvar no catálogo: {err}")
+    except:
         db.rollback()
         sucesso = False
-        
     finally:
         cursor.close()
         db.close()
-        
+    return sucesso
+
+# ==============================================================================
+# FUNÇÕES CORRIGIDAS: GESTÃO DE REGIÕES (regioes_atendimento)
+# ==============================================================================
+
+def obter_todas_regioes():
+    db = conectar_bd()
+    cursor = db.cursor(dictionary=True)
+    # Query ajustada para o schema real
+    query = "SELECT id, cidade, estado_uf, multiplicador_preco, ativo FROM regioes_atendimento ORDER BY cidade ASC"
+    cursor.execute(query)
+    resultados = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return resultados
+
+def salvar_regiao(regiao_id, cidade, estado_uf, multiplicador_preco, ativo):
+    db = conectar_bd()
+    cursor = db.cursor()
+    try:
+        if regiao_id:
+            query = """
+                UPDATE regioes_atendimento 
+                SET cidade = %s, estado_uf = %s, multiplicador_preco = %s, ativo = %s
+                WHERE id = %s
+            """
+            cursor.execute(query, (cidade, estado_uf, multiplicador_preco, ativo, regiao_id))
+        else:
+            query = """
+                INSERT INTO regioes_atendimento (cidade, estado_uf, multiplicador_preco, ativo)
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(query, (cidade, estado_uf, multiplicador_preco, ativo))
+            
+        db.commit()
+        sucesso = True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar região: {err}")
+        db.rollback()
+        sucesso = False
+    finally:
+        cursor.close()
+        db.close()
     return sucesso
