@@ -12,9 +12,10 @@
 # - 30/05/2026: Migração da autenticação de E-mail para Identidade do Usuário (usuario_login).
 # - 30/05/2026: Criação da rota /protocolos com JOIN entre tabelas.
 # - 30/05/2026: Adição da rota protegida para visualização detalhada de um protocolo específico.
+# - 01/06/2026: Criação de rota para servir arquivos de mídia externos (volume compartilhado).
 # ==============================================================================
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 import mysql.connector
 from werkzeug.security import check_password_hash
 import os
@@ -142,6 +143,18 @@ def detalhes_protocolo(protocolo_id):
     return render_template('detalhes_protocolo.html', 
                            protocolo=dados_protocolo, 
                            itens=itens_protocolo)
+
+# --- ROTA DE ARQUIVOS COMPARTILHADOS ---
+@app.route('/media/pericia/<nome_arquivo>')
+def media_pericia(nome_arquivo):
+    # Lê a pasta física configurada no .env
+    pasta_uploads = os.getenv("DIRETORIO_UPLOADS_PERICIA")
+    
+    if not pasta_uploads:
+        return "Caminho de uploads não configurado no .env", 500
+        
+    # O Flask busca e entrega o arquivo com segurança
+    return send_from_directory(pasta_uploads, nome_arquivo)
 
 @app.route('/logout')
 def logout():

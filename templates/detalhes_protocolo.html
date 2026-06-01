@@ -8,6 +8,8 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 30/05/2026: Estrutura inicial.
   - 30/05/2026: Adição do botão de retorno padrão alinhado à direita.
+  - 01/06/2026: Implementação do suporte a fotos_validadas, renderizando
+                alertas visuais para arquivos físicos ausentes na pasta uploads.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -52,10 +54,17 @@
     }
     .btn-voltar:hover { background-color: #444; }
 
+    /* Galeria e Cards */
     .galeria-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
-    .foto-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; }
+    .foto-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; }
     .foto-card img { max-width: 100%; border-radius: 4px; margin-bottom: 8px; }
-    .foto-legenda { font-size: 12px; color: var(--texto-dim); }
+    .foto-legenda { font-size: 12px; color: var(--texto-dim); margin-top: auto; padding-top: 8px; }
+
+    /* Estilização para imagens que constam no banco mas não na pasta */
+    .foto-erro { border: 1px dashed #ff4444; background-color: rgba(255, 68, 68, 0.05); border-radius: 4px; padding: 20px 5px; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; }
+    .foto-erro-icone { font-size: 20px; margin-bottom: 5px; }
+    .foto-erro-titulo { font-size: 11px; color: #ff4444; font-weight: bold; margin-bottom: 5px; }
+    .foto-erro-arquivo { font-size: 9px; color: var(--texto-dim); word-break: break-all; }
 </style>
 
 <div class="grid-detalhes">
@@ -95,20 +104,30 @@
     <h3>Galeria de Inspeção (Handoff Mobile)</h3>
     <div class="galeria-fotos">
         {% for item in itens %}
-            {% for foto in item.fotos_lista %}
+            {% for foto in item.fotos_validadas %}
             <div class="foto-card">
-                <img src="{{ url_for('static', filename='uploads/pericia/' + foto) }}" alt="Foto">
+                
+                {% if foto.existe_no_disco %}
+                    <img src="{{ foto.url_estatica }}" alt="Foto">
+                {% else %}
+                    <div class="foto-erro">
+                        <span class="foto-erro-icone">⚠️</span>
+                        <span class="foto-erro-titulo">Arquivo ausente</span>
+                        <span class="foto-erro-arquivo">{{ foto.nome }}</span>
+                    </div>
+                {% endif %}
+                
                 <div class="foto-legenda">{{ item.nome_produto }}</div>
             </div>
             {% endfor %}
         {% else %}
-            <p style="color: var(--texto-dim);">Nenhuma foto enviada.</p>
+            <p style="color: var(--texto-dim);">Nenhum item com fotos foi registrado neste protocolo.</p>
         {% endfor %}
     </div>
 
     <div class="btn-container">
         <a href="/protocolos" class="btn-voltar">
-            Voltar para Protocolos
+            Voltar
         </a>
     </div>
 </div>
