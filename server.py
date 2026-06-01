@@ -14,6 +14,11 @@
 # - 30/05/2026: Implementação do fluxo de handoff remoto (QR Code) para envio de mídias via mobile.
 # - 01/06/2026: Parametrização do diretório de uploads via .env e criação da rota de 
 #               mídia compartilhada, unificando o armazenamento para preparação de Docker.
+# - 01/06/2026: Correção na rota /cotar para processar corretamente a quantidade e cálculo de Lotes.
+# - 01/06/2026: Refatoração na rota /cotar para forçar tipagem de dados (Integer) nas variáveis.
+# - 01/06/2026: Correção do bug do "Multiplicador Duplo". Ajuste no dicionário novo_item para 
+#               armazenar o valor unitário real, e atualização das rotas /resumo e /finalizar 
+#               para calcular os totais multiplicando pela quantidade.
 # ==============================================================================
 
 import os
@@ -60,9 +65,7 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     session.clear()
-    # NOVO: Busca os canais no banco
     canais_do_banco = engine.buscar_canais_aquisicao() 
-    # ALTERADO: Envia a lista 'canais' para o HTML renderizar os botões
     return render_template('boas_vindas.html', canais=canais_do_banco)
 
 @app.route('/definir_regiao', methods=['POST'])
@@ -72,10 +75,7 @@ def definir_regiao():
     
     session['cidade_usuario'] = cidade
     session['uf_usuario'] = estado_uf
-    # NOVO: Captura o canal escolhido no HTML e guarda na sessão para gravar depois
     session['canal_aquisicao_id'] = request.form.get('canal_aquisicao_id') 
-    
-    # NOVO: Busca e salva o multiplicador de preço da região na sessão
     session['multiplicador_regiao'] = engine.obter_multiplicador_regiao(cidade, estado_uf)
     
     return redirect(url_for('produto'))
@@ -88,15 +88,11 @@ def produto():
 
 @app.route('/pericia/<produto_id>')
 def pericia(produto_id):
-    # Intercepta os IDs especiais criados no passo anterior (Jogos e Outros)
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
         categoria_id = str(produto_id).split('_')[-1]
         id_oficial = produto_id
-        
-        # FOCO DA ALTERAÇÃO: Define a flag com base no prefixo 'outro_cat_'
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
     else:
-        # FOCO DA ALTERAÇÃO: Garante que se for um produto normal, a flag permaneça falsa
         session['is_outros'] = False
         produto = engine.obter_produto_por_id(produto_id)
         if not produto:
@@ -105,10 +101,8 @@ def pericia(produto_id):
         id_oficial = produto['id']
     
     opcoes = engine.buscar_opcoes_pericia(categoria_id)
-    
     session['produto_selecionado_id'] = id_oficial
     
-    # Geração do token de handoff único para esta sessão de upload remoto
     token_sessao = str(uuid.uuid4())
     
     return render_template('pericia.html', opcoes=opcoes, produto_id=id_oficial, fase_atual=1, categoria_id=categoria_id, token_sessao=token_sessao)
@@ -120,9 +114,21 @@ def cotar():
     estado_id = request.form.get('estado_id')
     comentarios = request.form.get('comentarios', '')
     
+    qtd_fisica_str = str(request.form.get('qtd_fisica', '1')).strip()
+    qtd_digital_str = str(request.form.get('qtd_digital', '0')).strip()
+    
+    try:
+        qtd_fisica = int(qtd_fisica_str) if qtd_fisica_str.isdigit() else 1
+    except ValueError:
+        qtd_fisica = 1
+        
+    try:
+        qtd_digital = int(qtd_digital_str) if qtd_digital_str.isdigit() else 0
+    except ValueError:
+        qtd_digital = 0
+
     fotos_salvas = []
     
-    # 1. Processa fotos enviadas diretamente via upload local do Desktop
     if 'fotos' in request.files:
         files = request.files.getlist('fotos')
         for file in files:
@@ -133,7 +139,6 @@ def cotar():
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 fotos_salvas.append(filename)
 
-    # 2. Processa fotos recebidas de forma remota via celular (Mobile Handoff)
     token_sessao = request.form.get('token_sessao')
     if token_sessao:
         pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token_sessao)
@@ -149,40 +154,75 @@ def cotar():
                     
                     os.rename(caminho_antigo, caminho_novo)
                     fotos_salvas.append(novo_nome)
-            
-            # Remove o diretório temporário do token após mover os arquivos
             try:
                 os.rmdir(pasta_token)
             except Exception:
                 pass
 
-    # Lida com o cálculo dependendo se é um produto real ou genérico
+    multiplicador = session.get('multiplicador_regiao', 1.00)
+    qtd_final_calculo = 1
+
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
-        # FOCO DA ALTERAÇÃO: Mantém ou atualiza a flag de controle da sessão ativa
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
-        resultado = {
-            "produto": "Lote de Jogos" if str(produto_id).startswith('cat_') else "Produto não listado",
-            "valor_final": 0.0,
-            "multiplicador_aplicado": 1.00
-        }
-        categoria_id = str(produto_id).split('_')[-1]
+        categoria_id_str = str(produto_id).split('_')[-1]
+        
+        if str(produto_id).startswith('cat_'):
+            qtd_final_calculo = qtd_fisica
+            
+            if qtd_digital > 0:
+                comentarios += f" [Mídia Digital informada: {qtd_digital} un]"
+                
+            try:
+                cat_id_int = int(categoria_id_str)
+            except ValueError:
+                cat_id_int = 3
+                
+            try:
+                est_id_int = int(estado_id) if estado_id else 0
+            except ValueError:
+                est_id_int = 0
+
+            resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador)
+            
+            if resultado_unitario and resultado_unitario.get('valor_final') is not None:
+                 valor_lote = float(resultado_unitario['valor_final']) * qtd_final_calculo
+                 resultado = {
+                    "produto": f"Lote de Jogos ({qtd_final_calculo}x)",
+                    "valor_final": valor_lote,
+                    "multiplicador_aplicado": multiplicador
+                 }
+            else:
+                resultado = {
+                    "produto": f"Lote de Jogos ({qtd_final_calculo}x)",
+                    "valor_final": 0.0,
+                    "multiplicador_aplicado": multiplicador
+                }
+        else:
+            resultado = {
+                "produto": "Produto não listado",
+                "valor_final": 0.0,
+                "multiplicador_aplicado": multiplicador
+            }
+            
         foto_url_final = None
     else:
-        # FOCO DA ALTERAÇÃO: Força falso se for um fluxo padrão de produto catalogado
         session['is_outros'] = False
-        
-        # NOVO: Resgata o multiplicador da sessão (fallback 1.00)
-        multiplicador = session.get('multiplicador_regiao', 1.00)
-        resultado = engine.calcular_cotacao_final(produto_id, estado_id, multiplicador)
-        
-        produto_info = engine.obter_produto_por_id(produto_id)
+        try:
+            prod_id_int = int(produto_id)
+            est_id_int = int(estado_id) if estado_id else 0
+        except ValueError:
+            prod_id_int = produto_id
+            est_id_int = estado_id
+
+        resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador)
+        produto_info = engine.obter_produto_por_id(prod_id_int)
         categoria_id = produto_info.get('categoria_id') if produto_info else 1
         foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
 
     if resultado:
         resultado['foto_url'] = foto_url_final
         
-        opcoes = engine.buscar_opcoes_pericia(categoria_id)
+        opcoes = engine.buscar_opcoes_pericia(categoria_id if 'categoria_id' in locals() else cat_id_int)
         descricao_estado = "Estado Selecionado"
         if opcoes:
             for op in opcoes:
@@ -192,19 +232,20 @@ def cotar():
         
         resultado['descricao'] = descricao_estado
 
+        # --- CORREÇÃO: Garante o valor unitário real, isolando a quantidade do cálculo base ---
+        valor_unit_real = float(resultado['valor_final']) / qtd_final_calculo if qtd_final_calculo > 0 else 0.0
+
         novo_item = {
             'produto_id': produto_id,
             'produto_nome': resultado['produto'],
-            'valor_pix_unitario': resultado['valor_final'],
-            'valor_cred_unitario': resultado['valor_final'] * 1.2,
+            'valor_pix_unitario': valor_unit_real,
+            'valor_cred_unitario': valor_unit_real * 1.2,
             'fotos_json': json.dumps(fotos_salvas), 
             'comentarios': comentarios,
-            'quantidade': 1,
+            'quantidade': qtd_final_calculo,
             'estado_descricao': descricao_estado,
             'foto_url': foto_url_final,
-            # FOCO DA ALTERAÇÃO: Registra no próprio dicionário do item se ele veio do fluxo de "Outros"
             'is_outros': session.get('is_outros', False),
-            # NOVO: Grava o multiplicador no item
             'multiplicador_aplicado': resultado.get('multiplicador_aplicado', 1.00)
         }
         
@@ -224,7 +265,8 @@ def resumo():
     if not itens:
         return redirect(url_for('produto'))
     
-    total_lote = sum(item['valor_pix_unitario'] for item in itens)
+    # CORREÇÃO: Multiplica o unitário pela quantidade ao exibir o total
+    total_lote = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
     return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
 
 @app.route('/descartar-lote')
@@ -307,14 +349,14 @@ def finalizar():
 
     cliente = engine.obter_cliente(cliente_id)
     
-    total_pix = sum(item['valor_pix_unitario'] for item in itens)
-    total_cred = sum(item['valor_cred_unitario'] for item in itens)
+    # CORREÇÃO: Multiplica o unitário pela quantidade na geração do protocolo final
+    total_pix = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
+    total_cred = sum(item['valor_cred_unitario'] * item.get('quantidade', 1) for item in itens)
 
     dados_protocolo = {
         'cliente_id': cliente_id,
         'total_pix': total_pix,
         'total_cred': total_cred,
-        # NOVO: Injeta o ID resgatado da sessão no dicionário
         'canal_aquisicao_id': session.get('canal_aquisicao_id') 
     }
 
@@ -322,7 +364,6 @@ def finalizar():
 
     if res_protocolo:
         for item in itens:
-            # CORREÇÃO: Garante que o ID seja numérico para o banco de dados
             produto_id_original = item.get('produto_id')
             item['produto_id'] = int(produto_id_original) if str(produto_id_original).isdigit() else 0
             
@@ -384,18 +425,14 @@ def sair():
 @app.route('/api/buscar_produtos')
 def api_buscar_produtos():
     categoria_id = request.args.get('categoria_id', '')
-    
     if not categoria_id:
         return jsonify([])
-
     produtos = engine.buscar_produtos_por_categoria(categoria_id)
-    
     return jsonify(produtos)
 
 @app.route('/api/buscar_cidades')
 def api_buscar_cidades():
     termo = request.args.get('q', '')
-    
     if not termo or len(termo) < 3:
         return jsonify([])
 
@@ -412,18 +449,15 @@ def api_buscar_cidades():
                 uf = uf_obj.get('sigla', '??')
                 
                 cidades_filtradas.append({'cidade': nome_cidade, 'uf': uf})
-                
                 if len(cidades_filtradas) >= 8:
                     break
 
     return jsonify(cidades_filtradas)
 
-
 # --- ENDPOINTS DE HANDOFF E UPLOAD REMOTO (MOBILE) ---
 
 @app.route('/upload-remoto/<token>', methods=['GET'])
 def tela_upload_mobile(token):
-    # Rota acessada pelo celular via QR Code (Gera uma página de upload minimalista)
     return render_template('upload_mobile.html', token=token)
 
 @app.route('/api/upload-mobile/<token>', methods=['POST'])
@@ -451,21 +485,16 @@ def receber_fotos_mobile(token):
 @app.route('/api/status-upload/<token>', methods=['GET'])
 def checar_status_upload(token):
     pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token)
-    
-    # Se o diretório com o token existe, verifica se há mídias salvas nele
     if os.path.exists(pasta_token):
         fotos = [f for f in os.listdir(pasta_token) if allowed_file(f)]
         if len(fotos) > 0:
-            # Aponta para a nova rota dinâmica e compartilhada
             caminhos = [f"/media/pericia/{token}/{foto}" for foto in fotos]
             return jsonify({'status': 'concluido', 'fotos': caminhos}), 200
             
     return jsonify({'status': 'aguardando'}), 200
 
-# --- ROTA DE MÍDIA COMPARTILHADA ---
 @app.route('/media/pericia/<path:nome_arquivo>')
 def media_pericia(nome_arquivo):
-    # O uso de <path:nome_arquivo> garante que arquivos em subpastas (como o token mobile) sejam encontrados
     return send_from_directory(app.config['UPLOAD_FOLDER'], nome_arquivo)
 
 if __name__ == '__main__':

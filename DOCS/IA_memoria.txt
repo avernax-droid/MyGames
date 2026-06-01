@@ -7,6 +7,9 @@ objetivo deste arquivo:
 - Sempre que o desenvolvedor iniciar um novo chat com a IA este arquivo será anexado para conhecimento da IA.
 ------------------------------------------------------------------------------------------------------------------
 
+NUNCA ALTERAR, EXCLUIR, MELHORAR OU MODIFICAR QUALQUER PARTE DO CÓDIGO, ESTRUTURA OU ARQUIVOS QUE NÃO SEJA O FOCO DIRETO 
+E ESTRITO DA ALTERAÇÃO OU PROBLEMA SOLICITADO, SEM AUTORIZAÇÃO EXPRESSA.
+
 1. VISÃO GERAL
 Nome: MyGames
 Objetivo: Sistema de recompra (Buyback) de jogos e consoles usados para um cliente de e-commerce. O sistema capta o lead, permite ao usuário selecionar produtos, indicar o estado de conservação (perícia), calcula a depreciação e exibe uma oferta.
