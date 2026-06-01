@@ -14,6 +14,8 @@
 #               nativa do tipo JSON pelo mysql-connector.
 # - 01/06/2026: Modificação do diretório base e da rota de URL para ler arquivos 
 #               de uma pasta externa (volume compartilhado) configurada via .env.
+# - 01/06/2026: Adição das funções de CRUD para a gestão do Catálogo Mestre.
+# - 01/06/2026: Inclusão dos campos plataforma, valor_venda_ref e valor_cred_base nas queries do catálogo.
 # ==============================================================================
 
 import mysql.connector
@@ -117,3 +119,75 @@ def obter_itens_protocolo(protocolo_id):
     cursor.close()
     db.close()
     return itens
+
+# ==============================================================================
+# NOVAS FUNÇÕES: GESTÃO DO CATÁLOGO MESTRE
+# ==============================================================================
+
+def obter_catalogo_completo():
+    db = conectar_bd()
+    cursor = db.cursor(dictionary=True)
+    
+    # Busca todos os produtos do catálogo para exibir na tabela do HTML.
+    # ALTERAÇÃO: Inclusão das colunas plataforma, valor_venda_ref e valor_cred_base na busca
+    query = """
+        SELECT id, nome_produto, categoria_id, plataforma, 
+               valor_venda_ref, valor_pix_base, valor_cred_base, ativo
+        FROM catalogo_mestre
+        ORDER BY nome_produto ASC
+    """
+    cursor.execute(query)
+    resultados = cursor.fetchall()
+    
+    cursor.close()
+    db.close()
+    return resultados
+
+def obter_categorias():
+    # Esta função retorna um dicionário estático provisório (mock) das categorias
+    # até que seja criada uma tabela 'categorias' no banco de dados.
+    return [
+        {'id': 1, 'nome_categoria': 'Consoles'},
+        {'id': 2, 'nome_categoria': 'Controles'},
+        {'id': 3, 'nome_categoria': 'Jogos Físicos'},
+        {'id': 4, 'nome_categoria': 'Acessórios'}
+    ]
+
+def salvar_produto_catalogo(produto_id, nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo):
+    db = conectar_bd()
+    cursor = db.cursor()
+    
+    try:
+        # Se um ID for fornecido, atualizamos o registro existente (UPDATE)
+        # ALTERAÇÃO: Mapeamento dos novos campos adicionados para atualização estrita
+        if produto_id:
+            query = """
+                UPDATE catalogo_mestre 
+                SET nome_produto = %s, categoria_id = %s, plataforma = %s, 
+                    valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s
+                WHERE id = %s
+            """
+            cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, produto_id))
+        
+        # Se não houver ID, inserimos um novo registro (INSERT)
+        # ALTERAÇÃO: Mapeamento dos novos campos adicionados para inserção estrita
+        else:
+            query = """
+                INSERT INTO catalogo_mestre (nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo))
+            
+        db.commit()
+        sucesso = True
+        
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar no catálogo: {err}")
+        db.rollback()
+        sucesso = False
+        
+    finally:
+        cursor.close()
+        db.close()
+        
+    return sucesso

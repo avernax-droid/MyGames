@@ -1,0 +1,290 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: catalogo.html
+  DATA DE CRIAÇÃO: 01/06/2026
+  FUNÇÃO: Interface de listagem e gestão (CRUD) do Catálogo Mestre de produtos.
+  Utiliza janela Modal nativa para criação e edição ágil de itens sem 
+  necessidade de recarregar páginas separadas.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 01/06/2026: Criação da interface inicial com tabela e Modal em Dark Mode.
+  - 01/06/2026: Correção de bug no Jinja2 adicionando checagem condicional (is not none) 
+                para evitar estouro de erro TypeError com valores nulos no preço.
+  - 01/06/2026: Inclusão das colunas de plataforma, valor_venda_ref e valor_cred_base 
+                tanto na visualização da tabela quanto na manipulação via formulário/JS do Modal.
+  - 01/06/2026: Padronização visual e estilização estrita dos botões Cancelar e Salvar 
+                do Modal de acordo com as especificações do Design System.
+  ==============================================================================
+#}
+{% extends 'base.html' %}
+
+{% block title %}Catálogo de Produtos - MyGames Admin{% endblock %}
+
+{% block page_title %}
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span>Catálogo Mestre</span>
+        <button onclick="abrirModalCatalogo()" class="btn-primary" style="font-size: 14px; padding: 8px 15px;">
+            + Novo Produto
+        </button>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="card-admin">
+    <div style="overflow-x: auto;">
+        <table class="table-catalogo">
+            <thead>
+                <tr>
+                    <th width="5%">ID</th>
+                    <th width="25%">Nome do Produto</th>
+                    <th width="12%">Plataforma</th>
+                    <th width="13%">Categoria</th>
+                    <th width="12%">Val. Venda (Ref)</th>
+                    <th width="12%">Val. Base (PIX)</th>
+                    <th width="12%">Val. Base (Cred)</th>
+                    <th width="5%">Status</th>
+                    <th width="4%" style="text-align: center;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if produtos %}
+                    {% for item in produtos %}
+                    <tr>
+                        <td style="color: var(--texto-dim);">#{{ item.id }}</td>
+                        <td><strong>{{ item.nome_produto }}</strong></td>
+                        <td style="color: #e0e0e0;">{{ item.plataforma or '-' }}</td>
+                        <td>{{ item.categoria_nome or 'Categoria ' ~ item.categoria_id }}</td>
+                        
+                        <td style="color: #4fc3f7; font-family: monospace; font-size: 14px;">
+                            {% if item.valor_venda_ref is not none %}
+                                R$ {{ "%.2f"|format(item.valor_venda_ref) }}
+                            {% else %}
+                                R$ 0.00
+                            {% endif %}
+                        </td>
+                        
+                        <td style="color: var(--cor-destaque); font-family: monospace; font-size: 14px;">
+                            {% if item.valor_pix_base is not none %}
+                                R$ {{ "%.2f"|format(item.valor_pix_base) }}
+                            {% else %}
+                                R$ 0.00
+                            {% endif %}
+                        </td>
+                        
+                        <td style="color: #ffb74d; font-family: monospace; font-size: 14px;">
+                            {% if item.valor_cred_base is not none %}
+                                R$ {{ "%.2f"|format(item.valor_cred_base) }}
+                            {% else %}
+                                R$ 0.00
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if item.ativo %}
+                                <span class="badge badge-ativo">Ativo</span>
+                            {% else %}
+                                <span class="badge badge-inativo">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            <button class="btn-editar" 
+                                onclick="abrirModalCatalogo('{{ item.id }}', '{{ item.nome_produto }}', '{{ item.categoria_id }}', '{{ item.plataforma or '' }}', '{{ item.valor_venda_ref if item.valor_venda_ref is not none else '' }}', '{{ item.valor_pix_base if item.valor_pix_base is not none else '' }}', '{{ item.valor_cred_base if item.valor_cred_base is not none else '' }}', '{{ item.ativo }}')">
+                                Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 30px; color: var(--texto-dim);">
+                            Nenhum produto cadastrado no catálogo ainda.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-catalogo" class="modal-overlay">
+    <div class="modal-box card-admin" style="max-width: 600px;">
+        <header class="modal-header">
+            <h3 id="modal-titulo" style="color: var(--cor-destaque); margin: 0; text-transform: uppercase;">Novo Produto</h3>
+            <button type="button" class="btn-fechar" onclick="fecharModalCatalogo()">✖</button>
+        </header>
+
+        <form action="/catalogo/salvar" method="POST" id="form-catalogo">
+            <input type="hidden" name="produto_id" id="modal-id" value="">
+
+            <div class="form-group">
+                <label for="modal-nome">Nome do Produto</label>
+                <input type="text" name="nome_produto" id="modal-nome" required class="input-dark" placeholder="Ex: Xbox Series S - 512GB">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="modal-plataforma">Plataforma</label>
+                    <input type="text" name="plataforma" id="modal-plataforma" class="input-dark" placeholder="Ex: Sony, Microsoft, Nintendo">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="modal-categoria">Categoria</label>
+                    <select name="categoria_id" id="modal-categoria" required class="input-dark">
+                        <option value="" disabled selected>Selecione...</option>
+                        {% if categorias %}
+                            {% for cat in categorias %}
+                                <option value="{{ cat.id }}">{{ cat.nome_categoria }}</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="1">Consoles</option>
+                            <option value="2">Controles</option>
+                            <option value="3">Jogos Físicos</option>
+                            <option value="4">Acessórios</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="modal-venda">Valor Venda Ref (R$)</label>
+                    <input type="number" step="0.01" min="0" name="valor_venda_ref" id="modal-venda" class="input-dark" placeholder="0.00">
+                </div>
+
+                <div class="form-group" style="flex: 1;">
+                    <label for="modal-valor">Valor PIX Base (R$)</label>
+                    <input type="number" step="0.01" min="0" name="valor_pix_base" id="modal-valor" class="input-dark" placeholder="0.00">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label for="modal-credito">Valor Cred Base (R$)</label>
+                    <input type="number" step="0.01" min="0" name="valor_cred_base" id="modal-credito" class="input-dark" placeholder="0.00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="modal-ativo">Status do Produto</label>
+                <select name="ativo" id="modal-ativo" required class="input-dark">
+                    <option value="1">Ativo (Aparece no Site)</option>
+                    <option value="0">Inativo (Oculto no Site)</option>
+                </select>
+            </div>
+
+            <div class="modal-acoes">
+                <button type="button" class="btn-secondary" onclick="fecharModalCatalogo()">CANCELAR</button>
+                <button type="submit" class="btn-primary">SALVAR PRODUTO</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Estilos da Tabela */
+    .table-catalogo { width: 100%; border-collapse: collapse; color: var(--texto-br); }
+    .table-catalogo th { background-color: #151515; padding: 15px; text-align: left; font-size: 12px; color: var(--texto-dim); border-bottom: 2px solid #333; text-transform: uppercase; }
+    .table-catalogo td { padding: 15px; border-bottom: 1px solid #2a2a2a; font-size: 14px; vertical-align: middle; }
+    .table-catalogo tbody tr:hover { background-color: rgba(255, 255, 255, 0.02); }
+
+    /* Badges e Botões da Tabela */
+    .badge { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .badge-ativo { background: rgba(0, 255, 0, 0.1); color: #00ff00; border: 1px solid rgba(0, 255, 0, 0.2); }
+    .badge-inativo { background: rgba(255, 255, 255, 0.05); color: #888; border: 1px solid #444; }
+    
+    .btn-editar { background: #333; border: 1px solid #555; color: var(--texto-br); padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 12px; }
+    .btn-editar:hover { background: #444; border-color: var(--cor-destaque); color: var(--cor-destaque); }
+
+    /* Estilos do Modal Overlay */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+    .modal-box { width: 100%; max-width: 500px; background: #111; padding: 30px; position: relative; border: 1px solid #333; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+    .btn-fechar { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; transition: 0.2s; }
+    .btn-fechar:hover { color: #ff4444; }
+
+    /* Inputs do Formulário Dark Mode */
+    .form-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
+    .form-row { display: flex; gap: 15px; }
+    .form-group label { color: var(--texto-dim); font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+    .input-dark { width: 100%; padding: 12px; background: #151515; border: 1px solid #333; border-radius: 6px; color: var(--texto-br); font-family: inherit; font-size: 14px; transition: 0.3s; }
+    .input-dark:focus { border-color: var(--cor-destaque); outline: none; background: #1a1a1a; box-shadow: 0 0 5px rgba(0, 255, 0, 0.1); }
+
+    /* ALTERAÇÃO: Estilização unificada do bloco e dos botões do Modal */
+    .modal-acoes {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #2a2a2a;
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+    }
+    
+    .modal-acoes .btn-primary {
+        background-color: var(--cor-destaque);
+        color: #000000;
+        border: none;
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s ease-in-out;
+    }
+    
+    .modal-acoes .btn-primary:hover {
+        background-color: #00b45a;
+        box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
+    }
+    
+    .modal-acoes .btn-secondary {
+        background: transparent;
+        border: 1px solid #444;
+        color: var(--texto-dim);
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s ease-in-out;
+    }
+    
+    .modal-acoes .btn-secondary:hover {
+        background-color: #222;
+        border-color: #666;
+        color: var(--texto-br);
+    }
+</style>
+
+<script>
+    // Função que alimenta o Modal Dinamicamente mapeando os novos campos
+    function abrirModalCatalogo(id = '', nome = '', categoriaId = '', plataforma = '', valorVenda = '', valorPix = '', valorCred = '', ativo = '1') {
+        document.getElementById('modal-titulo').innerText = id ? 'Editar Produto' : 'Novo Produto';
+        
+        document.getElementById('modal-id').value = id;
+        document.getElementById('modal-nome').value = nome;
+        document.getElementById('modal-categoria').value = categoriaId;
+        document.getElementById('modal-plataforma').value = plataforma;
+        
+        // Formatação correta para inputs HTML5 do tipo number (aceitar decimais vazios ou preenchidos)
+        document.getElementById('modal-venda').value = valorVenda ? parseFloat(valorVenda).toFixed(2) : '';
+        document.getElementById('modal-valor').value = valorPix ? parseFloat(valorPix).toFixed(2) : '';
+        document.getElementById('modal-credito').value = valorCred ? parseFloat(valorCred).toFixed(2) : '';
+        
+        document.getElementById('modal-ativo').value = ativo;
+
+        document.getElementById('modal-catalogo').style.display = 'flex';
+    }
+
+    function fecharModalCatalogo() {
+        document.getElementById('modal-catalogo').style.display = 'none';
+        document.getElementById('form-catalogo').reset();
+    }
+    
+    document.getElementById('modal-catalogo').addEventListener('click', function(e) {
+        if (e.target === this) {
+            fecharModalCatalogo();
+        }
+    });
+</script>
+{% endblock %}

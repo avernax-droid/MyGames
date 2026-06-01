@@ -2,7 +2,7 @@
   ==============================================================================
   PROJETO: MyGames - Backoffice
   MÓDULO: base.html
-  DATA DE CRIAÇÃO: 30/05/2026
+  DATA DE CREIAÇÃO: 30/05/2026
   TÍTULO: Template Base do Painel Administrativo
   FUNÇÃO: Estrutura o layout principal do sistema de gestão (Dashboard).
   Contém a barra lateral de navegação (Sidebar), rodapé de usuário e a área 
@@ -12,6 +12,7 @@
   - 30/05/2026: Criação do layout inicial com Sidebar fixa em Dark Mode.
   - 30/05/2026: Implementação de lógica condicional RBAC para ocultar menus não autorizados ao Operador.
   - 30/05/2026: Atualização do href do menu de Protocolos para apontar para a rota correta.
+  - 01/06/2026: Atualização do href do menu de Catálogo para apontar para a rota /catalogo.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -189,7 +190,7 @@
             <a href="/dashboard" class="menu-item active"><i class="fas fa-chart-line"></i> Dashboard</a>
             
             <a href="/protocolos" class="menu-item"><i class="fas fa-file-invoice-dollar"></i> Protocolos</a>
-            <a href="#" class="menu-item"><i class="fas fa-gamepad"></i> Catálogo</a>
+            <a href="/catalogo" class="menu-item"><i class="fas fa-gamepad"></i> Catálogo</a>
             
             {% if nivel == 'Administrador' %}
             <a href="#" class="menu-item"><i class="fas fa-map-marker-alt"></i> Regiões</a>

@@ -13,6 +13,9 @@
 # - 30/05/2026: Criação da rota /protocolos com JOIN entre tabelas.
 # - 30/05/2026: Adição da rota protegida para visualização detalhada de um protocolo específico.
 # - 01/06/2026: Criação de rota para servir arquivos de mídia externos (volume compartilhado).
+# - 01/06/2026: Adição das rotas controller para a visualização e salvamento (UPSERT) do Catálogo Mestre.
+# - 01/06/2026: Correção e expansão da rota /catalogo/salvar para receber e converter os novos campos: 
+#               plataforma, valor_venda_ref e valor_cred_base vindos do formulário do Modal.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
@@ -155,6 +158,56 @@ def media_pericia(nome_arquivo):
         
     # O Flask busca e entrega o arquivo com segurança
     return send_from_directory(pasta_uploads, nome_arquivo)
+
+# ==============================================================================
+# ROTAS DE CONTROLE: GESTÃO DO CATÁLOGO MESTRE
+# ==============================================================================
+
+@app.route('/catalogo')
+@requer_permissao('catalogo', 'read')
+def listar_catalogo():
+    # Busca a lista completa de produtos cadastrados através do motor de dados
+    produtos_catalogo = admin_engine.obter_catalogo_completo()
+    # Busca a lista estruturada de categorias para popular o <select> do modal
+    categorias_lista = admin_engine.obter_categorias()
+    
+    return render_template('catalogo.html', produtos=produtos_catalogo, categories=categorias_lista)
+
+@app.route('/catalogo/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_catalogo():
+    # Coleta os inputs vindos do formulário interno do Modal
+    produto_id = request.form.get('produto_id')
+    nome_produto = request.form.get('nome_produto')
+    categoria_id = request.form.get('categoria_id')
+    plataforma = request.form.get('plataforma')
+    valor_venda_ref = request.form.get('valor_venda_ref')
+    valor_pix_base = request.form.get('valor_pix_base')
+    valor_cred_base = request.form.get('valor_cred_base')
+    ativo = request.form.get('ativo')
+    
+    # Garante a tipagem correta e alinhada com as colunas do banco de dados
+    produto_id = int(produto_id) if produto_id and produto_id.isdigit() else None
+    categoria_id = int(categoria_id) if categoria_id else None
+    
+    # Permite conversões seguras suportando valores vazios (NULL no banco)
+    valor_venda_ref = float(valor_venda_ref) if valor_venda_ref else None
+    valor_pix_base = float(valor_pix_base) if valor_pix_base else None
+    valor_cred_base = float(valor_cred_base) if valor_cred_base else None
+    ativo = int(ativo)
+
+    # Invoca a persistência via motor de dados do backoffice contendo toda a nova assinatura
+    sucesso = admin_engine.salvar_produto_catalogo(
+        produto_id, nome_produto, categoria_id, plataforma,
+        valor_venda_ref, valor_pix_base, valor_cred_base, ativo
+    )
+    
+    if sucesso:
+        flash('Alterações do catálogo salvas com sucesso!', 'success')
+    else:
+        flash('Ocorreu um erro ao tentar persistir os dados do produto.', 'error')
+        
+    return redirect(url_for('listar_catalogo'))
 
 @app.route('/logout')
 def logout():
