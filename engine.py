@@ -15,6 +15,8 @@
 # - 29/05/2026: Inclusão da política de avaliação física presencial no corpo do e-mail.
 # - 30/05/2026: Correção na função salvar_lead com lógica de UPSERT baseada em CPF para evitar duplicação de cadastros.
 # - 02/06/2026: Remoção da exibição visual do bônus regional e preços riscados no corpo do e-mail.
+# - 02/06/2026: Adição da função salvar_feedback_recusa para o fluxo V2.9.
+# - 02/06/2026: Inclusão do valor total do lote no início do corpo do e-mail (enviar_email_resumo).
 # ==============================================================================
 
 import mysql.connector
@@ -194,7 +196,9 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         msg = MIMEMultipart()
         msg['From'], msg['To'], msg['Subject'] = remetente, cliente['email'], f"Confirmação MyGames - Protocolo {dados_email['protocolo']}"
         
-        corpo = f"Olá {cliente['nome_completo']},\n\nProtocolo: {dados_email['protocolo']}\n\n"
+        corpo = f"Olá {cliente['nome_completo']},\n\n"
+        corpo += f"Protocolo: {dados_email['protocolo']}\n"
+        corpo += f"Valor Total do Lote (PIX): R$ {dados_email.get('total_pix', 0.0):.2f}\n\n"
         
         tem_analise_manual = False
         
@@ -252,6 +256,39 @@ def finalizar_proposta(dados_proposta):
         p_id = cursor.lastrowid
         db.commit()
         return {"id": p_id, "numero": protocolo}
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+# --- MÓDULO DE FEEDBACK E RECUSA ---
+
+def salvar_feedback_recusa(dados):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        sql = """INSERT INTO feedbacks_recusa 
+                 (sessao_uuid, motivo_texto, cidade_informada, estado_uf, canal_aquisicao, 
+                  valor_oferta_recusada, itens_carrinho_json, user_agent, ip_origem, data_recusa) 
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())"""
+        
+        valores = (
+            dados.get('sessao_uuid'),
+            dados.get('motivo_texto'),
+            dados.get('cidade_informada'),
+            dados.get('estado_uf'),
+            dados.get('canal_aquisicao'),
+            dados.get('valor_oferta_recusada', 0.0),
+            dados.get('itens_carrinho_json'),
+            dados.get('user_agent'),
+            dados.get('ip_origem')
+        )
+        
+        cursor.execute(sql, valores)
+        db.commit()
+        return True
+    except Error as e:
+        print(f"ERRO: Falha ao salvar feedback de recusa: {e}")
+        return False
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 

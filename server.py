@@ -17,6 +17,7 @@
 # - 01/06/2026: Refatoração na rota /cotar para forçar tipagem de dados e correção de Multiplicador Duplo.
 # - 02/06/2026: Ajuste na rota /pericia para capturar e mapear corretamente o nome do produto e categoria.
 # - 02/06/2026: Correção de regra na rota /pericia para exibir "Jogos" no badge em vez de "Lote".
+# - 02/06/2026: Adição das rotas /termos_oferta, /aceitar_termos e /descartar-lote-final (Fluxo V2.9).
 # ==============================================================================
 
 import os
@@ -313,6 +314,64 @@ def descartar_atual():
     session.pop('item_atual', None)
     session.pop('produto_selecionado_id', None)
     return jsonify({'status': 'sucesso', 'mensagem': 'Avaliação descartada com sucesso.'})
+
+
+# ==============================================================================
+# 4.5 TELA: TERMOS DA OFERTA E BARREIRA DE VALIDAÇÃO (NOVO FLUXO V2.9)
+# ==============================================================================
+@app.route('/termos_oferta')
+def termos_oferta():
+    itens = session.get('itens_avaliados', [])
+    if not itens:
+        return redirect(url_for('produto'))
+    return render_template('termos_oferta.html', fase_atual=4)
+
+@app.route('/aceitar_termos', methods=['POST'])
+def aceitar_termos():
+    # Ao confirmar aceite, o usuário é direcionado para a tela de Identificação
+    return redirect(url_for('identificacao'))
+
+@app.route('/descartar-lote-final', methods=['POST'])
+def descartar_lote_final():
+    dados = request.get_json()
+    motivo = dados.get('motivo', '') if dados else ''
+    
+    itens = session.get('itens_avaliados', [])
+    
+    # Captura o IP real, respeitando arquitetura de Proxy/Docker (Ngrok)
+    ip_origem = request.headers.get('X-Forwarded-For', request.remote_addr)
+    # Se houver múltiplos IPs no X-Forwarded-For, pega o primeiro (origem real)
+    if ip_origem and ',' in ip_origem:
+        ip_origem = ip_origem.split(',')[0].strip()
+
+    valor_oferta = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens) if itens else 0.0
+    
+    # Prepara o objeto de dados para o UPSERT no Banco
+    dados_feedback = {
+        'sessao_uuid': str(uuid.uuid4()),
+        'motivo_texto': motivo,
+        'cidade_informada': session.get('cidade_usuario', ''),
+        'estado_uf': session.get('uf_usuario', ''),
+        'canal_aquisicao': session.get('canal_aquisicao_id', ''),
+        'valor_oferta_recusada': valor_oferta,
+        'itens_carrinho_json': json.dumps(itens),
+        'user_agent': request.headers.get('User-Agent', ''),
+        'ip_origem': ip_origem
+    }
+    
+    try:
+        # A chamada ao banco vai persistir a rejeição
+        engine.salvar_feedback_recusa(dados_feedback)
+    except Exception as e:
+        print(f"Erro ao salvar feedback de recusa: {e}")
+        
+    # Limpa a sessão independentemente do sucesso do banco, garantindo o descarte
+    session.pop('itens_avaliados', None)
+    session.pop('item_atual', None)
+    session.pop('produto_selecionado_id', None)
+    
+    return jsonify({'status': 'sucesso', 'mensagem': 'Lote descartado e feedback registrado com sucesso.'}), 200
+
 
 # 5ª TELA: CADASTRO COMPLETO UNIFICADO
 @app.route('/identificacao', methods=['GET'])

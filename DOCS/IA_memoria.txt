@@ -1,4 +1,4 @@
-📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V2.8)
+📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V2.9)
 
 -----------------------------------------------------------------------------------------------------------------
 objetivo deste arquivo:
@@ -12,9 +12,11 @@ E ESTRITO DA ALTERAÇÃO OU PROBLEMA SOLICITADO, SEM AUTORIZAÇÃO EXPRESSA.
 
 1. VISÃO GERAL
 Nome: MyGames
-Objetivo: Sistema de recompra (Buyback) de jogos e consoles usados para um cliente de e-commerce. O sistema capta o lead, permite ao usuário selecionar produtos, indicar o estado de conservação (perícia), calcula a depreciação e exibe uma oferta.
+Objetivo: Sistema de recompra (Buyback) de jogos e consoles usados para um cliente de e-commerce.
+O sistema capta o lead, permite ao usuário selecionar produtos, indicar o estado de conservação (perícia), calcula a depreciação e exibe uma oferta.
+
 Fluxo do Usuário (Stepper):
-Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta > Resumo do Lote > Identificação > Sucesso/Protocolo.
+Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta > Termos da Oferta/Política > Resumo do Lote > Identificação > Sucesso/Protocolo.
 
 2. AMBIENTE E TECNOLOGIAS
 Linguagem/Framework: Python com Flask.
@@ -59,12 +61,14 @@ Metodologia: "Design First" (As interfaces visuais, regras de UX e estruturas de
 │   ├── resultado.html
 │   ├── resumo_lote.html
 │   ├── sucesso.html
+│   ├── termos_oferta.html
 │   └── upload_mobile.html
 ├── utils
 │   └── [Scripts auxiliares de carga e auditoria de banco de dados]
 └── venv
 
-engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados e gestão segura de leads via UPSERT (validação por CPF).
+engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema.
+Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados e gestão segura de leads via UPSERT (validação por CPF).
 
 server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, processa uploads de arquivos e atende os endpoints de Handoff Remoto (recebendo mídias via mobile com prefixação UUID e respondendo status via polling).
 
@@ -75,6 +79,7 @@ produto.html: Catálogo de seleção.
 pericia.html: Formulário de estado de conservação, comentários e interface dividida em abas para upload local via PC (com feedback visual de arquivos) ou handoff remoto gerando QR Code dinâmico para o smartphone. Controla a sincronização AJAX de forma isolada para evitar falhas ao alternar abas.
 upload_mobile.html: Interface mobile ultra leve acessada pelo QR Code. Acessa a câmera nativa do celular, acumula múltiplas fotos em memória (array JS) e envia os arquivos para o Flask via API.
 resultado.html: Exibe a cotação. Possui lógica condicional para multiplicador de região e itens "Sob Consulta".
+termos_oferta.html: Interface de exibição da política da empresa pós-oferta com validação de aceite ou recusa com modal de feedback de desistência.
 resumo_lote.html: Carrinho/resumo dos itens avaliados.
 cadastro_complementar.html: Formulário final de captura de lead completo.
 sucesso.html: Geração do protocolo final.
@@ -121,6 +126,18 @@ clientes_usuarios     | id                       | INT            | PK, AI
                       | bairro                   | VARCHAR(100)   | -
                       | data_cadastro            | DATETIME       | -
 --------------------------------------------------------------------------
+feedbacks_recusa      | id                       | INT            | PK, AI
+                      | sessao_uuid              | VARCHAR(50)    | NOT NULL
+                      | motivo_texto             | TEXT           | -
+                      | cidade_informada         | VARCHAR(100)   | -
+                      | estado_uf                | VARCHAR(2)     | -
+                      | canal_aquisicao          | VARCHAR(50)    | -
+                      | valor_oferta_recusada    | DECIMAL(10,2)  | -
+                      | itens_carrinho_json      | JSON           | -
+                      | user_agent               | VARCHAR(255)   | -
+                      | ip_origem                | VARCHAR(45)    | -
+                      | data_recusa              | DATETIME       | -
+--------------------------------------------------------------------------
 itens_periciados      | id                       | INT            | PK, AI
                       | protocolo_id             | INT            | -
                       | fotos_json               | JSON           | -
@@ -136,6 +153,62 @@ protocolos_recompra   | id                       | INT            | PK, AI
 --------------------------------------------------------------------------
 regioes_atendimento   | id                       | INT            | PK, AI
                       | multiplicador_preco      | DECIMAL(4,2)   | -
+--------------------------------------------------------------------------
+
+Detalhe da tabela feedbacks_recusa
+
+1. user_agent (Agente de Usuário)
+O que é: É uma string (uma linha de texto) que o navegador envia silenciosamente no cabeçalho (header) de cada requisição 
+HTTP. Ela serve para o navegador se "apresentar" ao servidor.
+
+O que ele revela: Ele informa qual é o navegador (Chrome, Safari, Firefox, Edge), a versão desse navegador e o sistema 
+operacional / dispositivo da pessoa (Windows 11, Mac, iOS, Android).
+
+Exemplo prático: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) 
+Version/16.5 Mobile/15E148 Safari/604.1
+(Neste exemplo, você sabe imediatamente que o usuário abandonou a oferta usando um iPhone rodando iOS 16.5 no navegador 
+Safari).
+
+Por que é estratégico guardar isso nas recusas:
+Diagnóstico de Interface: Se você cruzar os dados e notar que 90% das recusas ou abandonos vêm de um user_agent de um 
+modelo específico de Android, pode ser um forte indício de que o botão "Concordar" está quebrado ou escondido naquela 
+tela específica, e não que a pessoa realmente rejeitou a oferta.
+
+Comportamento do Cliente: Permite ao dono do e-commerce saber se os clientes tendem a desistir mais quando estão pelo 
+celular na rua ou pelo computador em casa.
+
+No Flask: Você captura esse dado em uma linha: request.headers.get('User-Agent').
+
+2. canal_aquisicao
+registra a porta de entrada do usuário, ou seja, de onde essa pessoa veio antes de iniciar a avaliação dos 
+jogos (exemplo: Instagram Ads, Google Orgânico, Indicação de Parceiros, Link do YouTube, etc.).
+Ver a tabela canais_aquisicao.
+
+2. ip_origem (Endereço IP)
+O que é: É o endereço numérico de rede de onde a conexão daquele usuário partiu. Todo dispositivo conectado à internet 
+possui um IP público fornecido pela operadora.
+
+O que ele revela: A origem da rede do usuário. Através do IP, é possível consultar serviços de geolocalização para 
+descobrir o país, o estado, a cidade aproximada e até o provedor de internet da pessoa.
+
+Exemplo prático:
+177.10.200.55 (Formato IPv4 comum no Brasil).
+
+Por que é estratégico guardar isso nas recusas:
+Segurança e Antifraude: Imagine que um concorrente crie um robô (script) para simular milhares de perícias no seu site só 
+para mapear a sua tabela de preços ou derrubar o seu servidor. Com o ip_origem gravado nas recusas, você perceberá 
+que 500 rejeições vieram do mesmo IP em 5 minutos. Com essa informação, você pode bloquear esse IP na infraestrutura.
+
+Validação de Coerência: Se o usuário selecionou na tela de Boas-Vindas que mora em "São Paulo" (cidade_informada), mas 
+o IP de origem mostra uma conexão da "Rússia" ou de um data center da Amazon, você sabe que é tráfego automatizado ou 
+uso de VPN.
+
+No Flask: Geralmente é capturado com request.remote_addr.
+Nota Técnica de Infraestrutura: Como você planeja usar o Ngrok para túneis de teste web/mobile e Docker, o tráfego 
+passará por um proxy. O request.remote_addr vai acabar mostrando o IP interno do Docker ou do Ngrok. Para contornar isso 
+e pegar o IP real do usuário, no server.py você precisará ler o cabeçalho de repasse: 
+request.headers.get('X-Forwarded-For').
+
 
 5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES
 Precificação Regional: O front-end e o e-mail exibem alertas visuais ("✨ Bônus Regional Aplicado!") e a ancoragem do preço original riscado se a cidade tiver multiplicador diferente de 1.0 na tabela regioes_atendimento.
@@ -144,10 +217,12 @@ Política de Avaliação: O e-mail final contém uma cláusula jurídica informa
 Modal de Descarte: O usuário pode ejetar itens do lote em resultado.html sem recarregar a tela (AJAX).
 Gestão de Leads (UPSERT): Para evitar duplicação de clientes na base, a função salvar_lead realiza um UPSERT manual. Se o CPF fornecido já existir no banco, o sistema faz um UPDATE nos dados de contato/endereço em vez de gerar um novo ID.
 Handoff Mobile (QR Code): Se o usuário acessar via desktop e desejar enviar fotos do celular, o sistema gera uma sessão com Token UUID e exibe um QR Code. O celular envia as fotos acumuladas em memória, e o servidor as salva com um prefixo UUID para evitar colisão de nomes. A tela do desktop atualiza automaticamente via polling de JavaScript (AJAX), unificando a experiência de envio de mídias sem transferência manual de arquivos.
+Política de Aceite e Recusa de Oferta: Após visualizar a cotação em resultado.html, o usuário é direcionado para os termos de política da empresa (termos_oferta.html). O avanço para a identificação só ocorre mediante o aceite do usuário. Caso clique em "Não Concordo", um modal opcional recolhe o feedback textual e dispara uma persistência assíncrona na tabela feedbacks_recusa, capturando o estado do carrinho (JSON), valor global recusado, identificadores de sessão, parâmetros regionais originais da requisição, metadados do dispositivo (user_agent) e IP, executando a limpeza do lote logo em seguida.
 
 6. DIRETRIZES GERAIS DE DESENVOLVIMENTO (INSTRUÇÕES PARA A IA)
 Não altere a estrutura base de arquivos a menos que solicitado.
-Mantenha a divisão clara: Regras de negócio e queries SQL vivem no engine.py. Roteamento e manipulação de sessão vivem no server.py.
+Mantenha a divisão clara: Regras de negócio e queries SQL vivem no engine.py.
+Roteamento e manipulação de sessão vivem no server.py.
 Forneça os códigos um módulo por vez.
 Sempre atualize o cabeçalho de documentação dos módulos (Data de criação, Função e Histórico de alterações) ao fornecer um código atualizado.
 Mantenha a UX fluida (evite quebras de layout e scroll desnecessário).

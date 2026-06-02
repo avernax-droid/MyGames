@@ -7,8 +7,8 @@
   FUNÇÃO: Exibe uma lista detalhada de todos os itens avaliados pelo usuário até 
   o momento, com seus respectivos estados de conservação, fotos (se houver), 
   observações e valores calculados (ou indicação de análise manual). Oferece 
-  opções para retornar à seleção de produtos, prosseguir para a identificação 
-  do player ou descartar todo o lote atual.
+  opções para retornar à seleção de produtos, prosseguir para os termos da oferta 
+  ou descartar todo o lote atual.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
@@ -16,6 +16,7 @@
   - 29/05/2026: Substituição do confirm() nativo pelo Modal Global de confirmação.
   - 01/06/2026: Atualização da renderização de imagens (src) para utilizar a 
                 nova rota compartilhada de mídias caso a foto seja do usuário.
+  - 02/06/2026: Alteração do redirecionamento do botão Continuar para a rota de termos_oferta conforme fluxo V2.9.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -93,7 +94,7 @@
                     DESCARTAR LOTE
                 </button>
 
-                <a href="{{ url_for('identificacao') }}" class="btn-primary">CONTINUAR</a>
+                <a href="{{ url_for('termos_oferta') }}" class="btn-primary">CONTINUAR</a>
             </div>
         </div>
     </div>

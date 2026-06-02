@@ -609,3 +609,39 @@ Aplicar as atualizações nos botões do templates/resumo_lote.html para chamare
 Aplicar a correção de navegação e a chamada do modal no templates/resultado.html (para que os botões "MAIS PRODUTOS" e "FECHAR" continuem visíveis após o descarte).
 
 Nota para a IA: O código destas 3 páginas já foi gerado na conversa anterior e está pronto para ser testado e validado pelo usuário.
+
+======
+02/06
+Histórico da Intervenção: Implementação Fluxo V2.9
+Objetivo da Mudança:
+O objetivo principal é criar uma "barreira de validação" e um "ponto de captura de desistência". Antes de coletar os dados sensíveis do usuário (na tela de identificação/cadastro), o sistema deve apresentar as políticas formais de recompra da MyGames, garantindo que o usuário esteja ciente das condições técnicas e prazos de pagamento. Além disso, queremos coletar dados sobre os motivos de desistência dos clientes que optam por não avançar com a oferta após visualizar o resumo do lote.
+
+O que foi feito até agora (Status das Alterações):
+Arquitetura do Fluxo: Definimos que a sequência correta de telas deve ser:
+
+Resultado (Avaliação Individual)
+
+Resumo do Lote (Conferência Geral)
+
+Termos da Oferta (Barreira de Aceite - nova tela)
+
+Identificação (Coleta de Dados)
+
+Criação do Módulo de Termos: Criado o template templates/termos_oferta.html contendo as políticas de recompra, o botão de aceite (que avança para identificação) e o modal de recusa (que dispara o feedback de descarte).
+
+Implementação de Lógica UX: Atualizado o arquivo static/js/ux-helper.js para incluir a manipulação do modal de recusa e o envio de dados via fetch (AJAX) para o backend, permitindo que o sistema persista o motivo do abandono do lote mesmo antes do cadastro completo.
+
+Atualização de Roteamento: As rotas no server.py foram criadas/adaptadas para suportar o novo endpoint /termos_oferta e a lógica de processamento de descarte via /descartar-lote-final, que salva os dados no banco e limpa a sessão de forma segura.
+
+O que falta fazer (Pendências):
+Persistência no Backend (Engine): Falta implementar a função salvar_feedback_recusa(feedback_data) no módulo engine.py. Esta função é a responsável final por inserir no banco de dados a estrutura de feedback que definimos no server.py (UUID da sessão, motivo, valor recusado, etc.).
+
+Validação Final do Fluxo: Após a implementação do engine.py, será necessário realizar um teste de integração de ponta a ponta para garantir que:
+
+Ao chegar no resumo_lote.html, o botão "CONTINUAR" leve estritamente ao /termos_oferta.
+
+Ao aceitar os termos, o redirecionamento para identificacao ocorra sem perda de sessão.
+
+Ao recusar a oferta via modal, o feedback seja gravado e o sistema seja limpo (logout/limpeza de sessão).
+
+Revisão do Layout: Após a integração funcional, validar se o design da página termos_oferta.html segue fielmente o padrão de dark mode e o Design System dos demais módulos do projeto.

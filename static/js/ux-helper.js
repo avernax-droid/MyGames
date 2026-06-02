@@ -10,6 +10,7 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 02/06/2026: Adição do controle do modal de recusa (Termos da Oferta) e requisição de descarte de lote.
   ==============================================================================
 */
 
@@ -135,4 +136,57 @@ document.addEventListener('DOMContentLoaded', () => {
             sugestoesCidades.innerHTML = '';
         }
     });
+
+    // --- 5. CONTROLE DO MODAL DE RECUSA E DESCARTE DE LOTE (TERMOS DA OFERTA) ---
+    const btnAbrirRecusa = document.getElementById('btn-abrir-recusa');
+    const modalRecusa = document.getElementById('modal-recusa');
+    const btnFecharModal = document.getElementById('btn-fechar-modal');
+    const btnConfirmarDescarte = document.getElementById('btn-confirmar-descarte');
+    const inputMotivo = document.getElementById('motivo_recusa');
+
+    if (btnAbrirRecusa && modalRecusa) {
+        btnAbrirRecusa.addEventListener('click', () => {
+            modalRecusa.classList.remove('hidden');
+        });
+    }
+
+    if (btnFecharModal && modalRecusa) {
+        btnFecharModal.addEventListener('click', () => {
+            modalRecusa.classList.add('hidden');
+        });
+    }
+
+    if (btnConfirmarDescarte) {
+        btnConfirmarDescarte.addEventListener('click', async () => {
+            btnConfirmarDescarte.disabled = true;
+            btnConfirmarDescarte.innerText = "Descartando...";
+
+            const motivo = inputMotivo ? inputMotivo.value : "";
+
+            try {
+                // Dispara a requisição para a rota que criaremos no server.py
+                const response = await fetch('/descartar-lote-final', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ motivo: motivo })
+                });
+
+                if (response.ok) {
+                    // Limpa a tela e devolve o usuário para o início do funil
+                    window.location.href = '/';
+                } else {
+                    alert("Ocorreu um erro ao processar o descarte. Tente novamente.");
+                    btnConfirmarDescarte.disabled = false;
+                    btnConfirmarDescarte.innerText = "Confirmar Descarte";
+                }
+            } catch (error) {
+                console.error("Erro de comunicação ao descartar:", error);
+                alert("Falha de conexão. Verifique sua internet e tente novamente.");
+                btnConfirmarDescarte.disabled = false;
+                btnConfirmarDescarte.innerText = "Confirmar Descarte";
+            }
+        });
+    }
 });
