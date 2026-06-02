@@ -12,13 +12,11 @@
 # - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
 # - 29/05/2026: Integração do multiplicador de preço por região nas rotas definir_regiao e cotar.
 # - 30/05/2026: Implementação do fluxo de handoff remoto (QR Code) para envio de mídias via mobile.
-# - 01/06/2026: Parametrização do diretório de uploads via .env e criação da rota de 
-#               mídia compartilhada, unificando o armazenamento para preparação de Docker.
+# - 01/06/2026: Parametrização do diretório de uploads via .env e criação da rota de mídia.
 # - 01/06/2026: Correção na rota /cotar para processar corretamente a quantidade e cálculo de Lotes.
-# - 01/06/2026: Refatoração na rota /cotar para forçar tipagem de dados (Integer) nas variáveis.
-# - 01/06/2026: Correção do bug do "Multiplicador Duplo". Ajuste no dicionário novo_item para 
-#               armazenar o valor unitário real, e atualização das rotas /resumo e /finalizar 
-#               para calcular os totais multiplicando pela quantidade.
+# - 01/06/2026: Refatoração na rota /cotar para forçar tipagem de dados e correção de Multiplicador Duplo.
+# - 02/06/2026: Ajuste na rota /pericia para capturar e mapear corretamente o nome do produto e categoria.
+# - 02/06/2026: Correção de regra na rota /pericia para exibir "Jogos" no badge em vez de "Lote".
 # ==============================================================================
 
 import os
@@ -49,7 +47,6 @@ def from_json_filter(value):
     return value
 
 # --- CONFIGURAÇÃO DE UPLOADS ---
-# Agora lê o caminho absoluto do .env, essencial para o compartilhamento de volumes
 UPLOAD_FOLDER = os.getenv("DIRETORIO_UPLOADS_PERICIA", 'static/uploads/pericia')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -92,6 +89,18 @@ def pericia(produto_id):
         categoria_id = str(produto_id).split('_')[-1]
         id_oficial = produto_id
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
+        
+        if str(produto_id).startswith('cat_'):
+            # CORREÇÃO: Badge contextual correto para Lote de Jogos
+            if str(categoria_id) == '3':
+                produto_nome = "Lote de Jogos"
+                categoria_nome = "Jogos"
+            else:
+                produto_nome = "Lote"
+                categoria_nome = "Lote"
+        else:
+            produto_nome = "Produto não listado"
+            categoria_nome = "Outros"
     else:
         session['is_outros'] = False
         produto = engine.obter_produto_por_id(produto_id)
@@ -99,13 +108,33 @@ def pericia(produto_id):
             return redirect(url_for('produto'))
         categoria_id = produto.get('categoria_id')
         id_oficial = produto['id']
+        produto_nome = produto.get('nome_produto', 'Produto')
+        
+        mapa_categorias = {
+            '1': 'Console',
+            '2': 'Controle',
+            '3': 'Jogo',
+            '4': 'Acessório'
+        }
+        categoria_nome = mapa_categorias.get(str(categoria_id), 'Outros')
     
     opcoes = engine.buscar_opcoes_pericia(categoria_id)
     session['produto_selecionado_id'] = id_oficial
+    session['produto_nome'] = produto_nome
+    session['categoria_nome'] = categoria_nome
     
     token_sessao = str(uuid.uuid4())
     
-    return render_template('pericia.html', opcoes=opcoes, produto_id=id_oficial, fase_atual=1, categoria_id=categoria_id, token_sessao=token_sessao)
+    return render_template(
+        'pericia.html', 
+        opcoes=opcoes, 
+        produto_id=id_oficial, 
+        fase_atual=1, 
+        categoria_id=categoria_id, 
+        token_sessao=token_sessao,
+        produto_nome=produto_nome,
+        categoria_nome=categoria_nome
+    )
 
 # 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
 @app.route('/cotar', methods=['POST'])
@@ -232,8 +261,8 @@ def cotar():
         
         resultado['descricao'] = descricao_estado
 
-        # --- CORREÇÃO: Garante o valor unitário real, isolando a quantidade do cálculo base ---
-        valor_unit_real = float(resultado['valor_final']) / qtd_final_calculo if qtd_final_calculo > 0 else 0.0
+        qtd_divisor = qtd_final_calculo if qtd_final_calculo > 0 else 1
+        valor_unit_real = float(resultado['valor_final']) / qtd_divisor
 
         novo_item = {
             'produto_id': produto_id,
@@ -265,7 +294,6 @@ def resumo():
     if not itens:
         return redirect(url_for('produto'))
     
-    # CORREÇÃO: Multiplica o unitário pela quantidade ao exibir o total
     total_lote = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
     return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
 
@@ -349,7 +377,6 @@ def finalizar():
 
     cliente = engine.obter_cliente(cliente_id)
     
-    # CORREÇÃO: Multiplica o unitário pela quantidade na geração do protocolo final
     total_pix = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
     total_cred = sum(item['valor_cred_unitario'] * item.get('quantidade', 1) for item in itens)
 

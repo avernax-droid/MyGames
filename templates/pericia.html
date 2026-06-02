@@ -5,18 +5,18 @@
   DATA DE CRIAÇÃO: 28/05/2026
   TÍTULO: Avaliação Técnica e Conservação do Produto
   FUNÇÃO: Tela responsável por coletar informações detalhadas sobre o estado de 
-  conservação do item selecionado. Exibe perguntas dinâmicas extras dependendo da 
-  categoria (ex: se console é bloqueado, se mídia é física/digital), permite o 
-  upload opcional de fotos para perícia e valida obrigatoriedade de comentários 
-  para estados específicos. Também exibe alertas customizados para itens não listados.
+  conservação do item selecionado.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 28/05/2026: Remoção da lógica de upload local, agora centralizada no main.js.
-  - 30/05/2026: Inclusão de abas para upload remoto (QR Code Mobile) vs Local e JS de sincronização.
-  - 30/05/2026: Correção de UX no upload local com feedback visual de arquivos selecionados e ajuste de z-index.
-  - 30/05/2026: Correção do bug de reinicialização do polling de escuta do QR Code ao alternar abas.
-  - 01/06/2026: Preparação do frontend para receber caminhos de mídia parametrizados do .env.
+  - 30/05/2026: Inclusão de abas para upload remoto (QR Code Mobile) vs Local.
+  - 30/05/2026: Correção de UX no upload local com feedback visual.
+  - 30/05/2026: Correção do bug de reinicialização do polling de escuta do QR Code.
+  - 01/06/2026: Preparação do frontend para receber caminhos de mídia via .env.
+  - 02/06/2026: Inserção do contexto de categoria e produto no cabeçalho da página.
+  - 02/06/2026: Ajuste de layout dos botões de ação (Voltar/Avaliar).
+  - 02/06/2026: Bloqueio do input de quantidade física para exigir valor maior que zero.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -27,6 +27,15 @@
 <div class="card-padrao">
     <header style="text-align: center; margin-bottom: 35px;">
         <h2 style="color: var(--cor-destaque); font-size: 28px; margin-bottom: 10px;">Estado de Conservação</h2>
+        
+        <div class="produto-contexto-topo" style="margin-bottom: 15px; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <span class="badge-categoria" style="text-transform: uppercase; font-weight: bold; color: #fff; background-color: #333; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; border: 1px solid #555;">
+                {{ categoria_nome }}
+            </span>
+            <span class="nome-produto" style="color: var(--texto-br); font-weight: 500;">
+                {{ produto_nome }}
+            </span>
+        </div>
         <p style="color: var(--texto-dim); font-size: 15px;">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
     </header>
 
@@ -85,7 +94,9 @@
                 <div class="inputs-qtd-group">
                     <label>
                         <span>QTD Jogos Mídia Física:</span>
-                        <input type="number" name="qtd_fisica" min="0" value="0" class="input-qtd">
+                        <input type="number" name="qtd_fisica" min="1" value="0" class="input-qtd" required 
+                               oninvalid="this.setCustomValidity('Por favor, informe a quantidade de jogos físicos (mínimo 1).')" 
+                               oninput="this.setCustomValidity('')">
                     </label>
                     <label>
                         <span>QTD Jogos Mídia Digital:</span>
@@ -138,7 +149,11 @@
             <textarea name="comentarios" id="campo-comentarios" class="text-obs" placeholder="Ex: Acompanha caixa original, detalhe no analógico, etc."></textarea>
         </div>
 
-        <button type="submit" class="btn-primary" style="width: 100%;">AVALIAR</button>
+        <div class="botoes-acao" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+            <a href="/produto" class="btn-secondary">VOLTAR</a>
+            <button type="submit" class="btn-primary">AVALIAR</button>
+        </div>
+
     </form>
 </div>
 
@@ -146,7 +161,6 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Lógica de obrigatoriedade de comentários (MANTIDA)
         const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
         const campoComentarios = document.getElementById('campo-comentarios');
 
@@ -166,7 +180,6 @@
             });
         });
 
-        // Abas de Upload e Sincronização Mobile
         const tabPc = document.getElementById('tab-pc');
         const tabCelular = document.getElementById('tab-celular');
         const areaPc = document.getElementById('area-upload-pc');
@@ -192,7 +205,6 @@
             
             const qrContainer = document.getElementById("qrcode");
             
-            // Lógica isolada para apenas desenhar o QR Code na primeira vez
             if (qrContainer.innerHTML === "") {
                 const urlBase = window.location.origin; 
                 const urlMobile = `${urlBase}/upload-remoto/${token}`;
@@ -206,8 +218,6 @@
                 });
             }
 
-            // Lógica de polling isolada para iniciar sempre que a aba for aberta
-            // Limpa o anterior por segurança e só roda se as fotos ainda não tiverem chegado
             clearInterval(pollingInterval);
             
             if (statusQr.style.display !== "block") {
@@ -226,7 +236,6 @@
             }
         });
 
-        // Feedback visual para upload local do PC
         const fileInputPc = document.getElementById('file-input');
         const fileMsgPc = document.getElementById('file-msg');
         const fakeBtn = document.querySelector('.fake-btn');
@@ -287,5 +296,10 @@
     .obs-section { margin-bottom: 30px; }
     .text-obs { width: 100%; height: 100px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px; color: var(--texto-br); font-family: inherit; resize: none; transition: 0.3s; }
     .text-obs:focus { border-color: var(--cor-destaque); outline: none; background: #252525; }
+    
+    /* Botões de Ação */
+    .btn-secondary { background: transparent; border: 2px solid #555; color: var(--texto-br); padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; text-align: center; cursor: pointer; transition: 0.3s; }
+    .btn-secondary:hover { border-color: #888; background: #252525; color: #fff; }
+    .btn-primary { padding: 12px 24px; cursor: pointer; border: none; font-weight: bold; border-radius: 8px; transition: 0.3s; }
 </style>
 {% endblock %}

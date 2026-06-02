@@ -14,6 +14,7 @@
 # - 29/05/2026: Exibição do bônus/ajuste regional no corpo do e-mail de resumo.
 # - 29/05/2026: Inclusão da política de avaliação física presencial no corpo do e-mail.
 # - 30/05/2026: Correção na função salvar_lead com lógica de UPSERT baseada em CPF para evitar duplicação de cadastros.
+# - 02/06/2026: Remoção da exibição visual do bônus regional e preços riscados no corpo do e-mail.
 # ==============================================================================
 
 import mysql.connector
@@ -203,18 +204,8 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
                 corpo += " Valor: Sob Consulta\n\n"
                 tem_analise_manual = True
             else:
-                mult = float(item.get('multiplicador_aplicado', 1.0))
                 valor_final = float(item['valor_pix_unitario'])
-                
-                if mult != 1.0:
-                    valor_original = valor_final / mult
-                    if mult > 1.0:
-                        corpo += " ✨ Bônus Regional Aplicado!\n"
-                    else:
-                        corpo += " 📍 Preço Ajustado à sua Região\n"
-                    corpo += f" De: R$ {valor_original:.2f} | Por: R$ {valor_final:.2f}\n\n"
-                else:
-                    corpo += f" Valor: R$ {valor_final:.2f}\n\n"
+                corpo += f" Valor: R$ {valor_final:.2f}\n\n"
         
         if tem_analise_manual:
             corpo += "--------------------------------------------------------\n"
