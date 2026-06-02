@@ -18,6 +18,7 @@
 # - 02/06/2026: Ajuste na rota /pericia para capturar e mapear corretamente o nome do produto e categoria.
 # - 02/06/2026: Correção de regra na rota /pericia para exibir "Jogos" no badge em vez de "Lote".
 # - 02/06/2026: Adição das rotas /termos_oferta, /aceitar_termos e /descartar-lote-final (Fluxo V2.9).
+# - 02/06/2026: Correção de UnboundLocalError na rota /cotar ao processar itens 'outro_cat_'.
 # ==============================================================================
 
 import os
@@ -196,16 +197,17 @@ def cotar():
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
         categoria_id_str = str(produto_id).split('_')[-1]
         
+        # CORREÇÃO: Garantindo que cat_id_int seja resolvido independentemente do tipo 'cat_' ou 'outro_cat_'
+        try:
+            cat_id_int = int(categoria_id_str)
+        except ValueError:
+            cat_id_int = 3
+            
         if str(produto_id).startswith('cat_'):
             qtd_final_calculo = qtd_fisica
             
             if qtd_digital > 0:
                 comentarios += f" [Mídia Digital informada: {qtd_digital} un]"
-                
-            try:
-                cat_id_int = int(categoria_id_str)
-            except ValueError:
-                cat_id_int = 3
                 
             try:
                 est_id_int = int(estado_id) if estado_id else 0

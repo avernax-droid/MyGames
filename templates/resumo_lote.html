@@ -14,9 +14,10 @@
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Alinhamento horizontal dos três botões de ação final.
   - 29/05/2026: Substituição do confirm() nativo pelo Modal Global de confirmação.
-  - 01/06/2026: Atualização da renderização de imagens (src) para utilizar a 
-                nova rota compartilhada de mídias caso a foto seja do usuário.
-  - 02/06/2026: Alteração do redirecionamento do botão Continuar para a rota de termos_oferta conforme fluxo V2.9.
+  - 01/06/2026: Atualização da renderização de imagens (src) para utilizar a nova rota compartilhada.
+  - 02/06/2026: Alteração do redirecionamento do botão Continuar para a rota de termos_oferta.
+  - 02/06/2026: Reestruturação da tabela: Criação de coluna isolada para Quantidade (QTD).
+  - 02/06/2026: Correção de quebra de layout de tabela causada por textos contínuos longos.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -34,9 +35,10 @@
             <table class="tabela-lote">
                 <thead>
                     <tr>
-                        <th></th>
-                        <th>Item</th>
-                        <th style="text-align: right;">Valor PIX</th>
+                        <th style="width: 60px;"></th>
+                        <th style="width: auto;">Item</th>
+                        <th style="width: 60px; text-align: center;">QTD</th>
+                        <th style="width: 110px; text-align: right;">Valor PIX</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,10 +65,17 @@
                         <td>
                             <div class="produto-nome">{{ item.produto_nome }}</div>
                             <div class="detalhes-item">
-                                <span class="badge-estado">{{ item.estado_descricao or 'Estado Geral' }}</span> | 
-                                Qtd: {{ item.quantidade }} 
-                                {% if item.comentarios %}| <em>{{ item.comentarios }}</em>{% endif %}
+                                <span class="badge-estado">{{ item.estado_descricao or 'Estado Geral' }}</span>
+                                
+                                {% if item.comentarios %}
+                                    <div style="margin-top: 4px; color: #888; font-size: 11px; word-break: break-word;">
+                                        <em>Obs: {{ item.comentarios }}</em>
+                                    </div>
+                                {% endif %}
                             </div>
+                        </td>
+                        <td style="text-align: center; vertical-align: middle; color: var(--texto-br); font-weight: bold; font-size: 15px;">
+                            {{ item.quantidade }}
                         </td>
                         <td class="valor-unitario">
                             {% if item.is_outros %}
@@ -103,21 +112,23 @@
 <style>
     /* Estilos padronizados baseados no Design System */
     .titulo-pagina { color: var(--texto-br); margin-top: 0; font-size: 22px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
-    .tabela-container { background: rgba(0, 0, 0, 0.3); border: var(--borda-fina); border-radius: 12px; padding: 10px; margin-bottom: 20px; max-height: 350px; overflow-y: auto; }
-    .tabela-lote { width: 100%; border-collapse: collapse; text-align: left; }
+    .tabela-container { background: rgba(0, 0, 0, 0.3); border: var(--borda-fina); border-radius: 12px; padding: 10px; margin-bottom: 20px; max-height: 350px; overflow-y: auto; overflow-x: hidden; }
+    
+    /* table-layout: fixed; FORÇA a tabela a respeitar a largura da tela e das colunas! */
+    .tabela-lote { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
+    
     .tabela-lote th { color: var(--texto-dim); font-size: 11px; text-transform: uppercase; padding: 10px; border-bottom: var(--borda-fina); }
-    .tabela-lote td { padding: 12px 10px; border-bottom: 1px solid #222; }
+    .tabela-lote td { padding: 12px 10px; border-bottom: 1px solid #222; word-wrap: break-word; overflow-wrap: break-word; }
     
     .foto-thumb { width: 50px; height: 50px; background: #000; border: var(--borda-fina); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .produto-nome { color: var(--texto-br); font-weight: bold; font-size: 14px; text-transform: uppercase; }
+    .produto-nome { color: var(--texto-br); font-weight: bold; font-size: 14px; text-transform: uppercase; word-break: break-word; }
     .detalhes-item { color: var(--texto-dim); font-size: 12px; margin-top: 2px; }
     .badge-estado { color: var(--cor-destaque); font-weight: bold; text-transform: uppercase; font-size: 11px; }
-    .valor-unitario { text-align: right; color: var(--cor-destaque); font-family: monospace; font-size: 15px; font-weight: bold; }
+    .valor-unitario { text-align: right; color: var(--cor-destaque); font-family: monospace; font-size: 15px; font-weight: bold; vertical-align: middle; }
 
     .total-lote-box { display: flex; justify-content: space-between; align-items: center; padding: 18px 15px; background: rgba(0, 255, 0, 0.05); border-radius: 12px; border: 1px dashed var(--cor-destaque); margin-bottom: 25px; font-weight: bold; color: var(--texto-br); }
     .total-lote-box strong { color: var(--cor-destaque); font-size: 26px; font-family: monospace; }
     
-    /* REMOVIDO width: 100% DA CLASSE btn-descartar E ADICIONADO flex-direction: row NA acoes-finais */
     .acoes-finais { display: flex; flex-direction: column; gap: 15px; }
     .botoes-nav { display: flex; justify-content: space-between; align-items: center; }
     .btn-descartar { border-color: #ff4444 !important; color: #ff4444 !important; }
@@ -126,7 +137,7 @@
 
 {% block scripts %}
 <script>
-    // ALTERAÇÃO: Nova função de callback para o Modal Global executar a navegação
+    // Função de callback para o Modal Global executar a navegação
     function executarDescarteLote() {
         window.location.href = "/descartar-lote";
     }
