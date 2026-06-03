@@ -17,6 +17,7 @@
   - 02/06/2026: Inserção do contexto de categoria e produto no cabeçalho da página.
   - 02/06/2026: Ajuste de layout dos botões de ação (Voltar/Avaliar).
   - 02/06/2026: Bloqueio do input de quantidade física para exigir valor maior que zero.
+  - 03/06/2026: Realinhamento das condicionais do Jinja2 para exibir os formulários extras corretos de Jogos (ID 4) e Acessórios (ID 3).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -89,7 +90,7 @@
                     <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Não, é controle pirata." required> Não, é controle pirata.</label>
                 </div>
                 
-            {% elif categoria_id|string == '3' %}
+            {% elif categoria_id|string == '4' %}
                 <p class="label-secao">Os jogos são mídia física (CD) ou digital (na Net)?</p>
                 <div class="inputs-qtd-group">
                     <label>
@@ -104,7 +105,7 @@
                     </label>
                 </div>
                 
-            {% elif categoria_id|string == '4' %}
+            {% elif categoria_id|string == '3' %}
                 <p class="label-secao">O Acessório é original?</p>
                 <div class="radio-group-inline">
                     <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>

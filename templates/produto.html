@@ -13,6 +13,8 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 28/05/2026: Refatoração da função filtrarProdutos() para priorizar resultados que iniciam com o caractere digitado.
+  - 03/06/2026: Correção de inversão de chaves. Atualizados os IDs de Jogo (para 4) e Acessório (para 3) no HTML e na constante ID_JOGO do JS para alinhar com a base de dados.
+  - 03/06/2026: Remoção do atalho (bypass) da categoria Jogo no JavaScript para permitir a visualização e seleção dos jogos específicos cadastrados no catálogo.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -32,10 +34,10 @@
         <div class="card-categoria" onclick="selecionarCategoria(2, 'Controle')">
             <h3>🕹️ Controle</h3>
         </div>
-        <div class="card-categoria" onclick="selecionarCategoria(3, 'Jogo')">
+        <div class="card-categoria" onclick="selecionarCategoria(4, 'Jogo')">
             <h3>💿 Jogo</h3>
         </div>
-        <div class="card-categoria" onclick="selecionarCategoria(4, 'Acessório')">
+        <div class="card-categoria" onclick="selecionarCategoria(3, 'Acessório')">
             <h3>🎧 Acessório</h3>
         </div>
     </div>
@@ -53,16 +55,13 @@
 </div>
 
 <script>
-    const ID_JOGO = 3;
     let produtosDaCategoria = [];
     let categoriaAtualId = null;
 
     async function selecionarCategoria(catId, catNome) {
-        if (catId === ID_JOGO) {
-            window.location.href = `/pericia/cat_${catId}`;
-            return;
-        }
-
+        // O atalho que pulava a tela de jogos foi removido daqui.
+        // Agora todas as categorias carregam a lista de produtos normalmente.
+        
         document.getElementById('stepCategorias').style.display = 'none';
         document.getElementById('stepProdutos').style.display = 'block';
         document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;

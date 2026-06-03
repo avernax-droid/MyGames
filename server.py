@@ -19,6 +19,7 @@
 # - 02/06/2026: Correção de regra na rota /pericia para exibir "Jogos" no badge em vez de "Lote".
 # - 02/06/2026: Adição das rotas /termos_oferta, /aceitar_termos e /descartar-lote-final (Fluxo V2.9).
 # - 02/06/2026: Correção de UnboundLocalError na rota /cotar ao processar itens 'outro_cat_'.
+# - 03/06/2026: Atualização dos IDs chumbados nas rotas /pericia e /cotar para realinhar com a correção do banco de dados (Jogo=4, Acessório=3).
 # ==============================================================================
 
 import os
@@ -93,8 +94,8 @@ def pericia(produto_id):
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
         
         if str(produto_id).startswith('cat_'):
-            # CORREÇÃO: Badge contextual correto para Lote de Jogos
-            if str(categoria_id) == '3':
+            # CORREÇÃO: Atualizado para o ID correto da categoria de Jogos (4)
+            if str(categoria_id) == '4':
                 produto_nome = "Lote de Jogos"
                 categoria_nome = "Jogos"
             else:
@@ -112,11 +113,12 @@ def pericia(produto_id):
         id_oficial = produto['id']
         produto_nome = produto.get('nome_produto', 'Produto')
         
+        # CORREÇÃO: Atualizados os IDs 3 (Acessório) e 4 (Jogo) para o padrão do banco
         mapa_categorias = {
             '1': 'Console',
             '2': 'Controle',
-            '3': 'Jogo',
-            '4': 'Acessório'
+            '3': 'Acessório',
+            '4': 'Jogo'
         }
         categoria_nome = mapa_categorias.get(str(categoria_id), 'Outros')
     
@@ -197,11 +199,10 @@ def cotar():
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
         categoria_id_str = str(produto_id).split('_')[-1]
         
-        # CORREÇÃO: Garantindo que cat_id_int seja resolvido independentemente do tipo 'cat_' ou 'outro_cat_'
         try:
             cat_id_int = int(categoria_id_str)
         except ValueError:
-            cat_id_int = 3
+            cat_id_int = 4 # CORREÇÃO: Alterado fallback de 3 para 4
             
         if str(produto_id).startswith('cat_'):
             qtd_final_calculo = qtd_fisica

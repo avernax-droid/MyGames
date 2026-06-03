@@ -645,3 +645,46 @@ Ao aceitar os termos, o redirecionamento para identificacao ocorra sem perda de 
 Ao recusar a oferta via modal, o feedback seja gravado e o sistema seja limpo (logout/limpeza de sessão).
 
 Revisão do Layout: Após a integração funcional, validar se o design da página termos_oferta.html segue fielmente o padrão de dark mode e o Design System dos demais módulos do projeto.
+
+=====
+02/06
+
+📋 RESUMO DE ARQUITETURA: AMBIENTE DE HOMOLOGAÇÃO REMOTA (MYGAMES)
+
+1. OBJETIVO DO AMBIENTE
+Permitir que um homologador externo (remoto) acesse e teste simultaneamente a integração entre o Site do Cliente (Front/App) e o Painel Administrativo (Backoffice), rodando a partir de um ambiente de desenvolvimento local (Windows 11 + WSL/Ubuntu).
+
+2. ESTRUTURA DOS SISTEMAS
+Os dois sistemas coexistem na pasta pai `/home/userverna/MyGames_homo/`:
+
+-> SISTEMA A: Site do Cliente (MyGames)
+- Diretório: /home/userverna/MyGames/
+- Controlador: server.py
+- Porta Flask: 5000
+- Acesso Externo Principal: Ngrok (plano Free - limite de 1 túnel ativo). Necessário para o Handoff Mobile (QR Code da perícia).
+
+-> SISTEMA B: Backoffice / Painel Admin (MyGames_admin)
+- Diretório: /home/userverna/MyGames_admin/
+- Controlador: server_admin.py
+- Porta Flask: 5002
+- Acesso Externo: Precisa de um túnel secundário, pois o Ngrok Free já está ocupado pela porta 5000.
+
+3. RECURSOS COMPARTILHADOS (A GRANDE VANTAGEM)
+Ambos os projetos leem os mesmos dados, garantindo atualização em tempo real sem sincronização manual:
+- Banco de Dados: mygames_dev (MySQL rodando em 127.0.0.1:3307).
+- Armazenamento de Mídias (Fotos da Perícia): O .env do Admin aponta de forma absoluta para a pasta de uploads do cliente (/home/userverna/MyGames/static/uploads/pericia).
+
+4. SOLUÇÕES PARA EXPÔR A PORTA 5002 (BACKOFFICE) SIMULTANEAMENTE
+Como o Ngrok já expõe a porta 5000, o túnel para a porta 5002 deve usar uma alternativa gratuita e sem limite de instâncias:
+
+-> Opção 1: Pinggy (Mais rápida, via SSH nativo do Ubuntu)
+- Comando: ssh -p 443 -R0:localhost:5002 a.pinggy.io
+- Vantagem: Nenhuma instalação necessária. Gera URL pública na hora.
+
+-> Opção 2: LocalTunnel (Via Node.js)
+- Comando: npx localtunnel --port 5002
+- Vantagem: Rápido, mas requer npm instalado. Gera URL temporária (loca.lt).
+
+-> Opção 3: Cloudflare Tunnel (Definitiva)
+- Requer instalação do 'cloudflared' e conta Cloudflare. Permite mapear as portas 5000 e 5002 simultaneamente 
+no mesmo serviço com máxima estabilidade e URLs fixas, ideal se a homologação durar vários dias.
