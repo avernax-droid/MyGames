@@ -9,6 +9,8 @@
 # - 30/05/2026: Criação do motor de dados com as funções de busca de protocolo.
 # - 01/06/2026: Adição das funções de CRUD para a gestão do Catálogo Mestre.
 # - 01/06/2026: Correção das funções de persistência para a tabela regioes_atendimento.
+# - 04/06/2026: Atualização no CRUD do catálogo para suportar gravação da coluna foto_oficial_url.
+# - 04/06/2026: Adição da função buscar_produtos_por_nome para alimentar o auto-completar inteligente.
 # ==============================================================================
 
 import mysql.connector
@@ -27,7 +29,7 @@ def conectar_bd():
         database=os.getenv("DB_NAME")
     )
 
-# [Funções de Protocolo e Catálogo mantidas conforme original]
+# [Funções de Protocolo]
 def obter_cabecalho_protocolo(protocolo_id):
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
@@ -48,11 +50,29 @@ def obter_itens_protocolo(protocolo_id):
     db.close()
     return itens
 
+# [Funções do Catálogo Mestre]
 def obter_catalogo_completo():
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
-    query = "SELECT id, nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo FROM catalogo_mestre ORDER BY nome_produto ASC"
+    query = "SELECT id, nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo, foto_oficial_url FROM catalogo_mestre ORDER BY nome_produto ASC"
     cursor.execute(query)
+    resultados = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return resultados
+
+def buscar_produtos_por_nome(termo):
+    db = conectar_bd()
+    cursor = db.cursor(dictionary=True)
+    query = """
+        SELECT id, nome_produto, categoria_id, plataforma, 
+               valor_venda_ref, valor_pix_base, valor_cred_base, 
+               ativo, foto_oficial_url 
+        FROM catalogo_mestre 
+        WHERE nome_produto LIKE %s 
+        ORDER BY nome_produto ASC LIMIT 10
+    """
+    cursor.execute(query, (f"%{termo}%",))
     resultados = cursor.fetchall()
     cursor.close()
     db.close()
@@ -61,19 +81,25 @@ def obter_catalogo_completo():
 def obter_categorias():
     return [{'id': 1, 'nome_categoria': 'Consoles'}, {'id': 2, 'nome_categoria': 'Controles'}, {'id': 3, 'nome_categoria': 'Jogos Físicos'}, {'id': 4, 'nome_categoria': 'Acessórios'}]
 
-def salvar_produto_catalogo(produto_id, nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo):
+def salvar_produto_catalogo(produto_id, nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, foto_url=None):
     db = conectar_bd()
     cursor = db.cursor()
     try:
         if produto_id:
-            query = "UPDATE catalogo_mestre SET nome_produto = %s, categoria_id = %s, plataforma = %s, valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s WHERE id = %s"
-            cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, produto_id))
+            if foto_url:
+                query = "UPDATE catalogo_mestre SET nome_produto = %s, categoria_id = %s, plataforma = %s, valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s, foto_oficial_url = %s WHERE id = %s"
+                cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, foto_url, produto_id))
+            else:
+                query = "UPDATE catalogo_mestre SET nome_produto = %s, categoria_id = %s, plataforma = %s, valor_venda_ref = %s, valor_pix_base = %s, valor_cred_base = %s, ativo = %s WHERE id = %s"
+                cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, produto_id))
         else:
-            query = "INSERT INTO catalogo_mestre (nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo))
+            query = "INSERT INTO catalogo_mestre (nome_produto, categoria_id, plataforma, valor_venda_ref, valor_pix_base, valor_cred_base, ativo, foto_oficial_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(query, (nome, categoria, plataforma, valor_venda, valor_pix, valor_cred, ativo, foto_url))
+            
         db.commit()
         sucesso = True
-    except:
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar produto: {err}")
         db.rollback()
         sucesso = False
     finally:
@@ -81,14 +107,10 @@ def salvar_produto_catalogo(produto_id, nome, categoria, plataforma, valor_venda
         db.close()
     return sucesso
 
-# ==============================================================================
-# FUNÇÕES CORRIGIDAS: GESTÃO DE REGIÕES (regioes_atendimento)
-# ==============================================================================
-
+# [Funções de Gestão de Regiões]
 def obter_todas_regioes():
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
-    # Query ajustada para o schema real
     query = "SELECT id, cidade, estado_uf, multiplicador_preco, ativo FROM regioes_atendimento ORDER BY cidade ASC"
     cursor.execute(query)
     resultados = cursor.fetchall()

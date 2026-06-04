@@ -10,6 +10,8 @@
   - 30/05/2026: Adição do botão de retorno padrão alinhado à direita.
   - 01/06/2026: Implementação do suporte a fotos_validadas, renderizando
                 alertas visuais para arquivos físicos ausentes na pasta uploads.
+  - 04/06/2026: Ajuste na tabela de itens para exibir a coluna "Subtotal", 
+                multiplicando o valor unitário pela quantidade.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -83,6 +85,7 @@
                     <th>Produto</th>
                     <th>Qtd</th>
                     <th>Valor Unit. (PIX)</th>
+                    <th>Subtotal (PIX)</th>
                     <th>Comentários</th>
                 </tr>
             </thead>
@@ -91,7 +94,8 @@
                 <tr>
                     <td><strong>{{ item.nome_produto }}</strong></td>
                     <td>{{ item.quantidade }}</td>
-                    <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format(item.valor_pix_unitario or 0) }}</td>
+                    <td style="color: var(--texto-dim);">R$ {{ "%.2f"|format(item.valor_pix_unitario or 0) }}</td>
+                    <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format((item.valor_pix_unitario or 0) * (item.quantidade or 1)) }}</td>
                     <td>{{ item.comentarios or '--' }}</td>
                 </tr>
                 {% endfor %}
