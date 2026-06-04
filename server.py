@@ -20,6 +20,7 @@
 # - 02/06/2026: Adição das rotas /termos_oferta, /aceitar_termos e /descartar-lote-final (Fluxo V2.9).
 # - 02/06/2026: Correção de UnboundLocalError na rota /cotar ao processar itens 'outro_cat_'.
 # - 03/06/2026: Atualização dos IDs chumbados nas rotas /pericia e /cotar para realinhar com a correção do banco de dados (Jogo=4, Acessório=3).
+# - 04/06/2026: Correção na rota /cotar para passar o parâmetro de quantidade à engine e remoção de multiplicação redundante.
 # ==============================================================================
 
 import os
@@ -193,7 +194,7 @@ def cotar():
                 pass
 
     multiplicador = session.get('multiplicador_regiao', 1.00)
-    qtd_final_calculo = 1
+    qtd_final_calculo = qtd_fisica
 
     if str(produto_id).startswith('cat_') or str(produto_id).startswith('outro_cat_'):
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
@@ -205,7 +206,6 @@ def cotar():
             cat_id_int = 4 # CORREÇÃO: Alterado fallback de 3 para 4
             
         if str(produto_id).startswith('cat_'):
-            qtd_final_calculo = qtd_fisica
             
             if qtd_digital > 0:
                 comentarios += f" [Mídia Digital informada: {qtd_digital} un]"
@@ -215,10 +215,11 @@ def cotar():
             except ValueError:
                 est_id_int = 0
 
-            resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador)
+            # A engine agora calcula e retorna o valor final já multiplicado pela quantidade
+            resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo)
             
             if resultado_unitario and resultado_unitario.get('valor_final') is not None:
-                 valor_lote = float(resultado_unitario['valor_final']) * qtd_final_calculo
+                 valor_lote = float(resultado_unitario['valor_final'])
                  resultado = {
                     "produto": f"Lote de Jogos ({qtd_final_calculo}x)",
                     "valor_final": valor_lote,
@@ -247,7 +248,7 @@ def cotar():
             prod_id_int = produto_id
             est_id_int = estado_id
 
-        resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador)
+        resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo)
         produto_info = engine.obter_produto_por_id(prod_id_int)
         categoria_id = produto_info.get('categoria_id') if produto_info else 1
         foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None
@@ -587,4 +588,4 @@ def media_pericia(nome_arquivo):
     return send_from_directory(app.config['UPLOAD_FOLDER'], nome_arquivo)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)

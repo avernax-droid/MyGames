@@ -17,6 +17,7 @@
 # - 02/06/2026: Remoção da exibição visual do bônus regional e preços riscados no corpo do e-mail.
 # - 02/06/2026: Adição da função salvar_feedback_recusa para o fluxo V2.9.
 # - 02/06/2026: Inclusão do valor total do lote no início do corpo do e-mail (enviar_email_resumo).
+# - 04/06/2026: Inclusão do parâmetro quantidade na função calcular_cotacao_final para multiplicação correta de múltiplos itens.
 # ==============================================================================
 
 import mysql.connector
@@ -150,7 +151,7 @@ def obter_produto_por_id(produto_id):
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00):
+def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, quantidade=1):
     db = conectar_bd()
     if not db: return None
     try:
@@ -164,14 +165,16 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00):
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
         multiplicador = Decimal(str(multiplicador_regiao))
+        qtd = Decimal(str(quantidade))
         
         base_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
-        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator * multiplicador
+        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator * multiplicador * qtd
         
         return {
             "produto": produto['nome_produto'], 
             "valor_final": float(valor_final),
-            "multiplicador_aplicado": float(multiplicador_regiao)
+            "multiplicador_aplicado": float(multiplicador_regiao),
+            "quantidade_considerada": int(quantidade)
         }
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
