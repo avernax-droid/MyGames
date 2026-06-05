@@ -14,6 +14,11 @@
   horizontal fluida (flex-row) utilizando classes do base_mobile.html.
   - 05/06/2026: Correção de overflow (trava absoluta com !important) nas imagens 
   da lista de produtos para forçar o limite de 60x60px contra vazamento nativo.
+  - 05/06/2026: Correção na lógica JavaScript para exibir o botão "Produto não listado?" 
+  apenas após o usuário iniciar a digitação. Substituição do ícone de voltar (⬅) por um 
+  caractere tipográfico universal (❮) para evitar distorções de renderização.
+  - 05/06/2026: Inclusão de botão secundário "VOLTAR" na tela inicial de categorias, 
+  alinhado à direita e com largura ajustada estritamente ao tamanho do texto.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -134,6 +139,13 @@
     }
 
     .item-outro { border-style: dashed; border-color: #666; justify-content: center; text-align: center; padding: 20px;}
+
+    /* Modificador para o botão voltar do ínicio não esticar a tela inteira */
+    .btn-voltar-inicio {
+        width: max-content;
+        padding: 12px 25px;
+        font-size: 14px;
+    }
 </style>
 {% endblock %}
 
@@ -158,12 +170,16 @@
             <span class="categoria-icone-mobile">🎧</span>
             <span class="categoria-texto-mobile">Acessório</span>
         </div>
+
+        <div style="text-align: right; margin-top: 15px;">
+            <a href="/" class="btn-secondary btn-voltar-inicio">VOLTAR</a>
+        </div>
     </div>
 
     <div id="stepProdutos" style="display: none;">
         <div class="mobile-busca-wrapper">
             <button class="btn-voltar-icon" onclick="voltarCategorias()">
-                ⬅
+                &#10094;
             </button>
             <input type="text" id="inputBusca" class="input-busca-mobile" placeholder="Buscar..." oninput="filtrarProdutos()" autocomplete="off" autocorrect="off" spellcheck="false">
         </div>
@@ -207,7 +223,7 @@
             produtosDaCategoria = await response.json();
             // Inicia a renderização vazia aguardando a digitação
             container.innerHTML = '';
-            filtrarProdutos(); // Chama o filtro para exibir o botão "Outros" de imediato
+            filtrarProdutos(); 
         } catch (error) {
             console.error("Erro na busca:", error);
             container.innerHTML = '<p style="color: #ff4444; text-align: center;">Erro ao conectar com o banco.</p>';
@@ -239,36 +255,38 @@
             });
 
             // 3. Renderiza o DOM (Novo Layout em Lista)
-            produtosFiltrados.forEach(p => {
-                const item = document.createElement('div');
-                item.className = 'mobile-item-produto';
-                item.onclick = () => window.location.href = `/pericia/${p.id}`;
-                
-                item.innerHTML = `
-                    <div class="item-img-wrapper">
-                        <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
-                    </div>
-                    <div class="item-info">
-                        <h4>${p.nome_produto}</h4>
-                        <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
+            if (produtosFiltrados.length > 0) {
+                produtosFiltrados.forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'mobile-item-produto';
+                    item.onclick = () => window.location.href = `/pericia/${p.id}`;
+                    
+                    item.innerHTML = `
+                        <div class="item-img-wrapper">
+                            <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
+                        </div>
+                        <div class="item-info">
+                            <h4>${p.nome_produto}</h4>
+                            <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
 
-        // Opção "Outros" sempre disponível no fim da lista
-        const itemOutro = document.createElement('div');
-        itemOutro.className = 'mobile-item-produto item-outro';
-        itemOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
-        itemOutro.innerHTML = `
-            <div style="font-size: 24px; color: var(--cor-destaque); margin-right: 10px;">➕</div>
-            <div class="item-info">
-                <h4>Produto não listado?</h4>
-                <span style="font-size: 12px; color: var(--texto-dim);">Avaliar manualmente</span>
-            </div>
-        `;
-        container.appendChild(itemOutro);
+            // 4. Opção "Outros" exibida no fim da lista (ou isolada, se a busca for vazia)
+            const itemOutro = document.createElement('div');
+            itemOutro.className = 'mobile-item-produto item-outro';
+            itemOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
+            itemOutro.innerHTML = `
+                <div style="font-size: 24px; color: var(--cor-destaque); margin-right: 10px;">➕</div>
+                <div class="item-info">
+                    <h4>Produto não listado?</h4>
+                    <span style="font-size: 12px; color: var(--texto-dim);">Avaliar manualmente</span>
+                </div>
+            `;
+            container.appendChild(itemOutro);
+        }
     }
 </script>
 {% endblock %}

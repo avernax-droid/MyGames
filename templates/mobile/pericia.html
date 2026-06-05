@@ -8,6 +8,10 @@
   para toques largos, adapta os formulários de perguntas extras (quantidade/original)
   e remove a lógica complexa de QR Code (Handoff), substituindo-a por um botão 
   nativo de acionamento direto da câmera do dispositivo.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 05/06/2026: Adição do contêiner e implementação de lógica JavaScript 
+    para renderização de miniaturas (thumbnails) dinâmicas das fotos capturadas.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -312,6 +316,7 @@
                 <input type="file" name="fotos" id="file-input-mobile" class="file-input-mobile" accept="image/*" capture="environment" multiple>
             </div>
             <span class="file-feedback-mobile" id="file-msg-mobile">Nenhuma foto tirada ainda.</span>
+            <div id="preview-fotos-mobile" style="display: flex; gap: 10px; margin-top: 15px; overflow-x: auto; padding-bottom: 5px;"></div>
         </div>
 
         <span class="label-secao-mobile">Observações:</span>
@@ -349,17 +354,37 @@
             });
         });
 
-        // Feedback visual imediato ao tirar a foto nativa
+        // Feedback visual imediato ao tirar a foto nativa (Com Miniaturas)
         const fileInputMobile = document.getElementById('file-input-mobile');
         const fileMsgMobile = document.getElementById('file-msg-mobile');
+        const previewContainer = document.getElementById('preview-fotos-mobile');
 
         fileInputMobile.addEventListener('change', function() {
-            const qtd = this.files.length;
+            const arquivos = this.files;
+            const qtd = arquivos.length;
             
-            if (qtd === 1) {
-                fileMsgMobile.innerHTML = "✅ <strong style='color: var(--cor-destaque);'>1 foto capturada!</strong>";
-            } else if (qtd > 1) {
-                fileMsgMobile.innerHTML = `✅ <strong style='color: var(--cor-destaque);'>${qtd} fotos capturadas!</strong>`;
+            // Limpa os previews anteriores
+            previewContainer.innerHTML = '';
+            
+            if (qtd > 0) {
+                fileMsgMobile.innerHTML = `✅ <strong style='color: var(--cor-destaque);'>${qtd} foto(s) pronta(s) para envio!</strong>`;
+                
+                // Gera a miniatura para cada foto tirada
+                Array.from(arquivos).forEach(file => {
+                    if (file.type.startsWith('image/')) {
+                        const imgPreview = document.createElement('img');
+                        imgPreview.src = URL.createObjectURL(file);
+                        // Estilização inline da miniatura para manter o padrão Flexbox e não vazar da tela
+                        imgPreview.style.width = '70px';
+                        imgPreview.style.height = '70px';
+                        imgPreview.style.objectFit = 'cover';
+                        imgPreview.style.borderRadius = '8px';
+                        imgPreview.style.border = '1px solid #555';
+                        imgPreview.style.flexShrink = '0'; // Impede que a foto seja espremida
+                        
+                        previewContainer.appendChild(imgPreview);
+                    }
+                });
             } else {
                 fileMsgMobile.innerText = "Nenhuma foto tirada ainda.";
             }
