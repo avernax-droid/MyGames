@@ -1,0 +1,212 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/base_mobile.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Template Base e Design System (Mobile)
+  FUNÇÃO: Serve como o esqueleto principal para o fluxo de usuários em smartphones. 
+  Contém meta tags exclusivas de viewport para bloquear zoom acidental, 
+  adapta o stepper de navegação e os touch-targets (botões/modais) para telas 
+  menores, mantendo as variáveis do Design System original.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 04/06/2026: Criação baseada na estrutura do base.html, com otimização mobile.
+  ==============================================================================
+#}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e1e1e">
+    
+    <title>{% block title %}{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* SISTEMA DE DESIGN GLOBAL (Mantido idêntico para coerência) */
+        :root {
+            --bg-fundo: #1e1e1e;
+            --card-bg: #262626;
+            --cor-destaque: #00ff00;
+            --texto-br: #ffffff;
+            --texto-dim: #a0a0a0;
+            --borda-fina: 1px solid #333;
+        }
+
+        * { box-sizing: border-box; }
+        
+        /* Ajuste Mobile: Previne barra de rolagem horizontal (overflow-x) acidental */
+        body { 
+            background-color: var(--bg-fundo); 
+            color: var(--texto-br); 
+            margin: 0; 
+            font-family: 'Roboto', sans-serif; 
+            overflow-x: hidden; 
+            -webkit-tap-highlight-color: transparent; /* Remove aquele "piscar" azul chato ao tocar em links no celular */
+        }
+        
+        .logo-header { max-width: 100px; display: block; margin: 0 auto 10px auto; border-radius: 8px; }
+
+        /* COMPONENTES PADRÃO - Ajustados para Mobile */
+        .card-padrao {
+            background: var(--card-bg);
+            border: 2px solid var(--cor-destaque);
+            border-radius: 20px; /* Levemente menor no mobile */
+            padding: 20px 15px; /* Menos respiro lateral para aproveitar a tela */
+            width: 100%;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        /* Botões - Touch Targets Otimizados */
+        .btn-primary, .btn-secondary {
+            width: 100%; /* No mobile, botões principais costumam ocupar 100% da largura */
+            padding: 16px 20px; /* Altura ideal para o dedo */
+            border-radius: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px; 
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cor-destaque);
+            color: #000;
+            border: none;
+        }
+        .btn-primary:active { background: #00cc00; transform: scale(0.98); } /* Feedback visual instantâneo ao tocar */
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+        }
+        .btn-secondary:active { background: rgba(0, 255, 0, 0.1); transform: scale(0.98); }
+
+        /* ESTRUTURA DE FASES (STEPPER) - Otimizado para telas estreitas */
+        .fases-container { 
+            display: flex; 
+            justify-content: space-between; 
+            width: 100%; 
+            margin: 15px auto 20px auto; 
+            position: relative; 
+            padding: 0 5px; 
+        }
+        .fases-container::before { 
+            content: ""; 
+            position: absolute; 
+            top: 10px; 
+            left: 20px; 
+            right: 20px; 
+            height: 2px; 
+            background: #333; 
+            z-index: 1; 
+        }
+        .fase-item { flex: 1; display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative; }
+        .circulo-externo { width: 22px; height: 22px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+        .circulo-interno { width: 8px; height: 8px; background: transparent; border-radius: 50%; }
+        /* Texto reduzido no mobile para não encavalar */
+        .fase-nome { font-family: 'Rajdhani', sans-serif; font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;}
+        
+        .fase-item.concluida .circulo-externo { border-color: var(--cor-destaque); }
+        .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 6px var(--cor-destaque); }
+        .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
+
+        .container { width: 100%; padding: 0 15px; }
+
+        /* ============================================================================== */
+        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS - Ajustado para toque vertical */
+        /* ============================================================================== */
+        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 25px 15px; width: 92%; max-width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-icone-global { font-size: 40px; margin-bottom: 10px; line-height: 1; }
+        .modal-titulo-global { color: #ff4444; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 20px; line-height: 1.4; }
+        
+        /* No mobile, botões do modal ficam um em cima do outro para evitar toques errados */
+        .modal-botoes-global { display: flex; flex-direction: column; gap: 10px; }
+        .modal-botoes-global button { width: 100%; padding: 14px; font-size: 14px; cursor: pointer; border-radius: 8px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="text-align: center; margin-top: 15px; margin-bottom: 10px;">
+                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
+            </div>
+        </header>
+
+        <div class="fases-container">
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Cadastro</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Fim</span></div>
+        </div>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <div id="modal-confirmacao-global" class="modal-overlay-global" style="display: none;">
+        <div class="modal-box-global">
+            <div class="modal-icone-global">⚠️</div>
+            <h3 id="modal-titulo-global" class="modal-titulo-global">Atenção</h3>
+            <p id="modal-texto-global" class="modal-texto-global">Deseja realmente continuar?</p>
+            
+            <div class="modal-botoes-global">
+                <button id="modal-btn-confirmar-global" onclick="executarAcaoModal()" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                    CONFIRMAR
+                </button>
+                <button onclick="fecharModalConfirmacao()" class="btn-primary" style="background: #333; border-color: #555; color: var(--texto-br);">
+                    CANCELAR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/ux-helper.js') }}"></script>
+    
+    <script>
+        let modalConfirmacaoAcao = null;
+
+        function abrirModalConfirmacao(titulo, mensagem, textoBotao, acao) {
+            document.getElementById('modal-titulo-global').innerText = titulo;
+            document.getElementById('modal-texto-global').innerText = mensagem;
+            document.getElementById('modal-btn-confirmar-global').innerText = textoBotao;
+            modalConfirmacaoAcao = acao;
+            
+            const modal = document.getElementById('modal-confirmacao-global');
+            modal.style.display = 'flex';
+        }
+
+        function fecharModalConfirmacao() {
+            document.getElementById('modal-confirmacao-global').style.display = 'none';
+            modalConfirmacaoAcao = null;
+        }
+
+        function executarAcaoModal() {
+            if (typeof modalConfirmacaoAcao === 'function') {
+                modalConfirmacaoAcao();
+            } else if (typeof modalConfirmacaoAcao === 'string') {
+                const btn = document.getElementById('modal-btn-confirmar-global');
+                btn.innerText = "PROCESSANDO...";
+                btn.style.opacity = "0.7";
+                window.location.href = modalConfirmacaoAcao;
+            }
+            fecharModalConfirmacao();
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

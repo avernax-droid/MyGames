@@ -21,6 +21,7 @@
 # - 02/06/2026: Correção de UnboundLocalError na rota /cotar ao processar itens 'outro_cat_'.
 # - 03/06/2026: Atualização dos IDs chumbados nas rotas /pericia e /cotar para realinhar com a correção do banco de dados (Jogo=4, Acessório=3).
 # - 04/06/2026: Correção na rota /cotar para passar o parâmetro de quantidade à engine e remoção de multiplicação redundante.
+# - 04/06/2026: Implementação de roteamento dinâmico para mobile (render_smart_template) usando a biblioteca user-agents.
 # ==============================================================================
 
 import os
@@ -30,6 +31,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from user_agents import parse # NOVO: Biblioteca para detecção precisa do dispositivo
 
 # 1. Carrega variáveis de ambiente ANTES de importar o engine
 load_dotenv()
@@ -39,6 +41,26 @@ import engine
 
 app = Flask(__name__)
 app.secret_key = 'mygames_key_2026'
+
+# --- FUNÇÃO CORE DE ROTEAMENTO MOBILE ---
+def render_smart_template(template_name, **context):
+    """
+    Inspeciona o User-Agent. Se for mobile, tenta renderizar o template da pasta 'mobile/'.
+    Faz fallback automático para o template padrão caso a versão mobile não exista.
+    """
+    ua_string = request.headers.get('User-Agent', '')
+    user_agent = parse(ua_string)
+    
+    if user_agent.is_mobile:
+        mobile_template = f"mobile/{template_name}"
+        caminho_template = os.path.join(app.root_path, 'templates', 'mobile', template_name)
+        
+        # Só direciona se o arquivo HTML mobile realmente existir na pasta
+        if os.path.exists(caminho_template):
+            return render_template(mobile_template, **context)
+            
+    # Se for desktop ou se o template mobile não existir, carrega o original
+    return render_template(template_name, **context)
 
 # --- FILTROS CUSTOMIZADOS PARA O JINJA2 ---
 @app.template_filter('from_json')
@@ -67,7 +89,7 @@ def allowed_file(filename):
 def index():
     session.clear()
     canais_do_banco = engine.buscar_canais_aquisicao() 
-    return render_template('boas_vindas.html', canais=canais_do_banco)
+    return render_smart_template('boas_vindas.html', canais=canais_do_banco)
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():
@@ -85,7 +107,7 @@ def definir_regiao():
 def produto():
     if 'itens_avaliados' not in session:
         session['itens_avaliados'] = []
-    return render_template('produto.html', fase_atual=1)
+    return render_smart_template('produto.html', fase_atual=1)
 
 @app.route('/pericia/<produto_id>')
 def pericia(produto_id):
@@ -95,7 +117,6 @@ def pericia(produto_id):
         session['is_outros'] = str(produto_id).startswith('outro_cat_')
         
         if str(produto_id).startswith('cat_'):
-            # CORREÇÃO: Atualizado para o ID correto da categoria de Jogos (4)
             if str(categoria_id) == '4':
                 produto_nome = "Lote de Jogos"
                 categoria_nome = "Jogos"
@@ -114,7 +135,6 @@ def pericia(produto_id):
         id_oficial = produto['id']
         produto_nome = produto.get('nome_produto', 'Produto')
         
-        # CORREÇÃO: Atualizados os IDs 3 (Acessório) e 4 (Jogo) para o padrão do banco
         mapa_categorias = {
             '1': 'Console',
             '2': 'Controle',
@@ -130,7 +150,7 @@ def pericia(produto_id):
     
     token_sessao = str(uuid.uuid4())
     
-    return render_template(
+    return render_smart_template(
         'pericia.html', 
         opcoes=opcoes, 
         produto_id=id_oficial, 
@@ -203,7 +223,7 @@ def cotar():
         try:
             cat_id_int = int(categoria_id_str)
         except ValueError:
-            cat_id_int = 4 # CORREÇÃO: Alterado fallback de 3 para 4
+            cat_id_int = 4 
             
         if str(produto_id).startswith('cat_'):
             
@@ -215,7 +235,6 @@ def cotar():
             except ValueError:
                 est_id_int = 0
 
-            # A engine agora calcula e retorna o valor final já multiplicado pela quantidade
             resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo)
             
             if resultado_unitario and resultado_unitario.get('valor_final') is not None:
@@ -288,7 +307,7 @@ def cotar():
         session['itens_avaliados'] = lista_atual
         session['item_atual'] = novo_item 
         
-        return render_template('resultado.html', cotacao=resultado, fase_atual=2)
+        return render_smart_template('resultado.html', cotacao=resultado, fase_atual=2)
     
     return "Erro ao calcular cotação.", 500
 
@@ -300,7 +319,7 @@ def resumo():
         return redirect(url_for('produto'))
     
     total_lote = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
-    return render_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
+    return render_smart_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
 
 @app.route('/descartar-lote')
 def descartar_lote():
@@ -328,11 +347,10 @@ def termos_oferta():
     itens = session.get('itens_avaliados', [])
     if not itens:
         return redirect(url_for('produto'))
-    return render_template('termos_oferta.html', fase_atual=4)
+    return render_smart_template('termos_oferta.html', fase_atual=4)
 
 @app.route('/aceitar_termos', methods=['POST'])
 def aceitar_termos():
-    # Ao confirmar aceite, o usuário é direcionado para a tela de Identificação
     return redirect(url_for('identificacao'))
 
 @app.route('/descartar-lote-final', methods=['POST'])
@@ -342,15 +360,12 @@ def descartar_lote_final():
     
     itens = session.get('itens_avaliados', [])
     
-    # Captura o IP real, respeitando arquitetura de Proxy/Docker (Ngrok)
     ip_origem = request.headers.get('X-Forwarded-For', request.remote_addr)
-    # Se houver múltiplos IPs no X-Forwarded-For, pega o primeiro (origem real)
     if ip_origem and ',' in ip_origem:
         ip_origem = ip_origem.split(',')[0].strip()
 
     valor_oferta = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens) if itens else 0.0
     
-    # Prepara o objeto de dados para o UPSERT no Banco
     dados_feedback = {
         'sessao_uuid': str(uuid.uuid4()),
         'motivo_texto': motivo,
@@ -364,12 +379,10 @@ def descartar_lote_final():
     }
     
     try:
-        # A chamada ao banco vai persistir a rejeição
         engine.salvar_feedback_recusa(dados_feedback)
     except Exception as e:
         print(f"Erro ao salvar feedback de recusa: {e}")
         
-    # Limpa a sessão independentemente do sucesso do banco, garantindo o descarte
     session.pop('itens_avaliados', None)
     session.pop('item_atual', None)
     session.pop('produto_selecionado_id', None)
@@ -384,7 +397,7 @@ def identificacao():
     if not itens:
         return redirect(url_for('produto'))
     
-    return render_template('cadastro_complementar.html', fase_atual=5, cliente={})
+    return render_smart_template('cadastro_complementar.html', fase_atual=5, cliente={})
 
 @app.route('/finalizar-lote', methods=['POST'])
 def finalizar_lote():
@@ -467,7 +480,7 @@ def finalizar():
         
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
-        return render_template('sucesso.html', protocolo=res_protocolo['numero'], total_lote=total_pix, fase_atual=6)
+        return render_smart_template('sucesso.html', protocolo=res_protocolo['numero'], total_lote=total_pix, fase_atual=6)
     
     return "Erro ao finalizar agendamento.", 500
 
@@ -548,7 +561,7 @@ def api_buscar_cidades():
 
 @app.route('/upload-remoto/<token>', methods=['GET'])
 def tela_upload_mobile(token):
-    return render_template('upload_mobile.html', token=token)
+    return render_smart_template('upload_mobile.html', token=token)
 
 @app.route('/api/upload-mobile/<token>', methods=['POST'])
 def receber_fotos_mobile(token):

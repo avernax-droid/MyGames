@@ -1,0 +1,293 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/cadastro_complementar.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Finalização de Cadastro (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Destrói o layout de colunas da 
+  versão desktop para empilhar todos os inputs em 100% da largura (evitando que 
+  os campos fiquem "espremidos"). Adiciona atributos 'inputmode' e 'type' específicos 
+  para acionar o teclado numérico correto no iOS e Android em campos de telefone/CEP.
+  Mantém toda a lógica de viaCEP e Autocomplete por CPF do Desktop.
+  ==============================================================================
+#}
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Identificação{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-cadastro-container { padding: 5px 0 20px 0; }
+    
+    .titulo-etapa {
+        font-family: 'Rajdhani', sans-serif;
+        color: var(--cor-destaque);
+        text-align: center;
+        text-transform: uppercase;
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: 1px;
+    }
+    .subtitulo-etapa {
+        text-align: center;
+        color: var(--texto-dim);
+        font-size: 13px;
+        margin-top: 5px;
+        margin-bottom: 20px;
+        padding: 0 10px;
+    }
+
+    /* Formulário Mobile - Tudo Empilhado */
+    .mobile-form-group {
+        margin-bottom: 18px;
+    }
+    .mobile-label {
+        display: block;
+        color: var(--neon-blue);
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Inputs Otimizados para Toque e Antizoom */
+    .mobile-input {
+        width: 100%;
+        background: #111;
+        border: 1px solid #444;
+        color: #fff;
+        padding: 15px; /* Altura generosa para o dedo */
+        border-radius: 8px;
+        font-size: 16px; /* Evita zoom automático no iOS */
+        outline: none;
+        transition: border-color 0.3s;
+    }
+    .mobile-input:focus {
+        border-color: var(--cor-destaque);
+        box-shadow: 0 0 8px rgba(0, 255, 0, 0.2);
+    }
+    .mobile-input::placeholder { color: #555; }
+
+    /* Divisória sutil */
+    .mobile-divider {
+        border: 0;
+        border-top: 1px dashed #333;
+        margin: 25px 0;
+    }
+
+    /* Área do CPF com Feedback em tempo real */
+    .mobile-cpf-wrapper { position: relative; }
+    #feedbackCpf {
+        display: block;
+        font-size: 11px;
+        margin-top: 6px;
+        font-weight: bold;
+    }
+
+    /* Botões Finais */
+    .mobile-acoes-finais {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 30px;
+    }
+    .mobile-acoes-finais .btn-primary,
+    .mobile-acoes-finais .btn-secondary {
+        width: 100%;
+        text-align: center;
+        padding: 16px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-cadastro-container">
+    <div class="card-padrao">
+        
+        <header>
+            <h2 class="titulo-etapa">Identificação</h2>
+            <p class="subtitulo-etapa">Informe seu CPF. Se você já tem cadastro, preencheremos o resto.</p>
+        </header>
+
+        <form action="/finalizar-lote" method="POST" id="form-cadastro-mobile">
+            
+            <div class="mobile-form-group mobile-cpf-wrapper">
+                <label for="cpf" class="mobile-label">CPF *</label>
+                <input type="tel" id="cpf" name="cpf" value="{{ cliente.cpf or '' }}" class="mobile-input" placeholder="000.000.000-00" maxlength="14" required autocomplete="off">
+                <span id="feedbackCpf" style="display:none;"></span>
+            </div>
+
+            <div class="mobile-form-group">
+                <label for="nome" class="mobile-label">Nome Completo *</label>
+                <input type="text" id="nome" name="nome" value="{{ cliente.nome or '' }}" class="mobile-input" required autocomplete="name">
+            </div>
+
+            <div class="mobile-form-group">
+                <label for="whatsapp" class="mobile-label">WhatsApp *</label>
+                <input type="tel" id="whatsapp" name="whatsapp" value="{{ cliente.whatsapp or '' }}" class="mobile-input" placeholder="(00) 00000-0000" maxlength="15" required autocomplete="tel">
+            </div>
+
+            <div class="mobile-form-group">
+                <label for="email" class="mobile-label">E-mail *</label>
+                <input type="email" id="email" name="email" value="{{ cliente.email or '' }}" class="mobile-input" placeholder="seu@email.com" required autocomplete="email" inputmode="email">
+            </div>
+
+            <hr class="mobile-divider">
+
+            <div class="mobile-form-group">
+                <label for="cep" class="mobile-label">CEP *</label>
+                <input type="tel" id="cep" name="cep" value="{{ cliente.cep or '' }}" class="mobile-input" placeholder="00000-000" maxlength="9" required>
+            </div>
+
+            <div class="mobile-form-group">
+                <label for="endereco" class="mobile-label">Logradouro (Rua/Av) *</label>
+                <input type="text" id="endereco" name="endereco" value="{{ cliente.endereco or '' }}" class="mobile-input" required>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 18px;">
+                <div style="flex: 0 0 35%;">
+                    <label for="numero" class="mobile-label">Nº *</label>
+                    <input type="tel" id="numero" name="numero" value="{{ cliente.numero or '' }}" class="mobile-input" required>
+                </div>
+                <div style="flex: 1;">
+                    <label for="bairro" class="mobile-label">Bairro *</label>
+                    <input type="text" id="bairro" name="bairro" value="{{ cliente.bairro or '' }}" class="mobile-input" required>
+                </div>
+            </div>
+
+            <div class="mobile-form-group">
+                <label for="complemento" class="mobile-label">Complemento</label>
+                <input type="text" id="complemento" name="complemento" value="{{ cliente.complemento or '' }}" class="mobile-input" placeholder="Apto, Bloco, Referência...">
+            </div>
+
+            <hr class="mobile-divider">
+
+            <div class="mobile-form-group">
+                <label for="chave_pix" class="mobile-label" style="color: var(--cor-destaque);">CHAVE PIX *</label>
+                <input type="text" id="chave_pix" name="chave_pix" value="{{ cliente.chave_pix or '' }}" class="mobile-input" placeholder="CPF, Celular, E-mail..." required style="border-color: #333; border-bottom: 2px solid var(--cor-destaque);">
+            </div>
+
+            <input type="hidden" name="cadastro_completado" value="1">
+            <input type="hidden" id="cidade" name="cidade" value="{{ cliente.cidade or '' }}">
+            <input type="hidden" id="estado_uf" name="estado_uf" value="{{ cliente.estado_uf or '' }}">
+
+            <div class="mobile-acoes-finais">
+                <button type="submit" class="btn-primary" id="btn-submit-mobile">
+                    GERAR PROTOCOLO
+                </button>
+                <button type="button" onclick="history.back()" class="btn-secondary">
+                    VOLTAR
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Todo o seu JavaScript genial foi mantido, operando nos IDs corretos.
+    function limparCamposPorAlteracaoCPF() {
+        ['nome', 'email', 'numero', 'bairro', 'complemento', 'cidade', 'estado_uf', 'chave_pix', 'endereco', 'cep', 'whatsapp'].forEach(id => {
+            if(document.getElementById(id)) document.getElementById(id).value = '';
+        });
+    }
+
+    function aplicarMascara(valor, tipo) {
+        let val = valor.replace(/\D/g, '');
+        if (tipo === 'cpf') {
+            if (val.length > 9) return val.substring(0, 3) + '.' + val.substring(3, 6) + '.' + val.substring(6, 9) + '-' + val.substring(9, 11);
+            else if (val.length > 6) return val.substring(0, 3) + '.' + val.substring(3, 6) + '.' + val.substring(6, 9);
+            else if (val.length > 3) return val.substring(0, 3) + '.' + val.substring(3, 6);
+        } else if (tipo === 'cep') {
+            if (val.length > 5) return val.substring(0, 5) + '-' + val.substring(5, 8);
+        } else if (tipo === 'tel') {
+            if (val.length > 10) return '(' + val.substring(0, 2) + ') ' + val.substring(2, 7) + '-' + val.substring(7, 11);
+            else if (val.length > 6) return '(' + val.substring(0, 2) + ') ' + val.substring(2, 6) + '-' + val.substring(6, 10);
+            else if (val.length > 2) return '(' + val.substring(0, 2) + ') ' + val.substring(2);
+        }
+        return val;
+    }
+
+    // Máscaras Dinâmicas
+    document.getElementById('cpf').addEventListener('input', e => e.target.value = aplicarMascara(e.target.value, 'cpf'));
+    document.getElementById('cep').addEventListener('input', e => e.target.value = aplicarMascara(e.target.value, 'cep'));
+    document.getElementById('whatsapp').addEventListener('input', e => e.target.value = aplicarMascara(e.target.value, 'tel'));
+
+    // Autocomplete CPF (Sua lógica API preservada)
+    document.getElementById('cpf').addEventListener('blur', function() {
+        const cpfLimpo = this.value.replace(/\D/g, ''); 
+        const feedback = document.getElementById('feedbackCpf');
+        
+        if (cpfLimpo.length === 11) {
+            feedback.style.display = 'block';
+            feedback.style.color = '#ffaa00';
+            feedback.textContent = 'Buscando perfil...';
+            
+            fetch(`/api/obter_cliente_por_cpf?cpf=${cpfLimpo}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.sucesso && d.cliente) {
+                        const c = d.cliente;
+                        document.getElementById('nome').value = c.nome || c.nome_completo || '';
+                        document.getElementById('email').value = c.email || '';
+                        document.getElementById('numero').value = c.numero || '';
+                        document.getElementById('bairro').value = c.bairro || '';
+                        document.getElementById('complemento').value = c.complemento || '';
+                        document.getElementById('cidade').value = c.cidade || '';
+                        document.getElementById('estado_uf').value = c.estado_uf || c.uf || '';
+                        document.getElementById('chave_pix').value = c.chave_pix || '';
+                        document.getElementById('endereco').value = c.endereco || c.rua || '';
+                        if (c.cep) document.getElementById('cep').value = aplicarMascara(c.cep, 'cep');
+                        if (c.whatsapp) document.getElementById('whatsapp').value = aplicarMascara(c.whatsapp, 'tel');
+                        
+                        feedback.style.color = 'var(--cor-destaque)';
+                        feedback.textContent = '✓ Perfil recuperado com sucesso!';
+                    } else {
+                        limparCamposPorAlteracaoCPF();
+                        feedback.style.color = '#888';
+                        feedback.textContent = 'Novo perfil detectado. Preencha os dados abaixo.';
+                    }
+                });
+        } else {
+            limparCamposPorAlteracaoCPF();
+            feedback.style.display = 'none';
+        }
+    });
+
+    // ViaCEP
+    document.getElementById('cep').addEventListener('blur', function() {
+        const cepLimpo = this.value.replace(/\D/g, '');
+        if (cepLimpo.length === 8) {
+            document.getElementById('endereco').placeholder = "Buscando...";
+            fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+                .then(r => r.json())
+                .then(dados => {
+                    if (!dados.erro) {
+                        document.getElementById('endereco').value = dados.logradouro || '';
+                        document.getElementById('bairro').value = dados.bairro || '';
+                        document.getElementById('cidade').value = dados.localidade || '';
+                        document.getElementById('estado_uf').value = dados.uf || '';
+                        document.getElementById('endereco').placeholder = "";
+                        // Rola suavemente para o campo número e foca
+                        const campoNumero = document.getElementById('numero');
+                        campoNumero.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        campoNumero.focus();
+                    } else {
+                        document.getElementById('endereco').placeholder = "";
+                    }
+                });
+        }
+    });
+
+    // Feedback visual do Botão Submit (Spinner)
+    document.getElementById('form-cadastro-mobile').addEventListener('submit', function() {
+        const btnSubmit = document.getElementById('btn-submit-mobile');
+        btnSubmit.innerHTML = `PROCESSANDO...`;
+        btnSubmit.style.opacity = "0.7";
+        btnSubmit.style.pointerEvents = "none";
+    });
+</script>
+{% endblock %}

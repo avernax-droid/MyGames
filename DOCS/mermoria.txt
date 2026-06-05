@@ -688,3 +688,55 @@ Como o Ngrok já expõe a porta 5000, o túnel para a porta 5002 deve usar uma a
 -> Opção 3: Cloudflare Tunnel (Definitiva)
 - Requer instalação do 'cloudflared' e conta Cloudflare. Permite mapear as portas 5000 e 5002 simultaneamente 
 no mesmo serviço com máxima estabilidade e URLs fixas, ideal se a homologação durar vários dias.
+
+=======
+04/05
+
+📝 Histórico de Implementações (O que fizemos hoje)
+1. Motor de Roteamento Dinâmico (Back-end)
+
+Implementamos a biblioteca user-agents no server.py.
+
+Criamos a função render_smart_template, que intercepta a requisição, detecta se o usuário está em um smartphone e 
+busca as telas dentro da nova pasta /mobile.
+
+Garantimos um sistema de Fallback Seguro: se a tela mobile não existir (como no caso do boas_vindas.html), o sistema 
+entrega a versão desktop original sem quebrar (Erro 500).
+
+Atualizamos o requirements.txt e executamos o ./deploy_homo.sh, consolidando a infraestrutura no contêiner Docker.
+
+2. Arquitetura Front-end (Módulo /mobile)
+
+base_mobile.html: Criamos o template mestre com a tag viewport rigorosa (maximum-scale=1.0) para impedir zoom acidental
+no iOS/Android, ajustamos o stepper e alargamos os botões para otimizar os toques (touch targets).
+
+produto.html: Destruímos a grade (grid) de 110px e criamos uma lista vertical (List-View) com foco em legibilidade e 
+facilidade de clique.
+
+pericia.html (O Coração da Conversão): Removemos a mecânica de pareamento via QR Code (Handoff) e inserimos o botão 
+com atributo HTML5 capture="environment", permitindo abrir a câmera traseira do celular de forma nativa e direta.
+
+resultado.html & resumo_lote.html: Substituímos a tabela estática, que quebrava telas estreitas, por "Cards" de itens 
+individuais. Empilhamos os botões de ação final na vertical para proteger a conversão contra "cliques acidentais".
+
+termos_oferta.html: Trocamos os minúsculos checkboxes por grandes painéis clicáveis (Cards de Seleção verdes e 
+vermelhos).
+
+cadastro_complementar.html: Removemos as colunas laterais (campos espremidos), fazendo os inputs ocuparem 100% da 
+tela, e adicionamos atributos como type="tel" para invocar o teclado numérico automaticamente nos campos de CPF, CEP e 
+WhatsApp.
+
+sucesso.html: Implementamos a quebra forçada de palavra (word-break) para impedir que o longo código do protocolo 
+deformasse a tela.
+
+🎯 Próximos Passos (O que temos de fazer)
+1. Acertos e Refinamentos nos Templates Mobile
+
+Auditoria de Interface: Revisar como o CSS global (style.css) está se comportando em conjunto com as novas classes
+mobile que criamos hoje.
+
+Ajustes Finos (Pixel Perfect): Corrigir margens, espaçamentos internos (paddings), tamanho das fontes e sobreposições 
+de elementos nas telas novas para garantir um visual impecável.
+
+Teste de Fluxo Real: Fazer uma jornada de ponta a ponta pelo smartphone para verificar se o teclado virtual não está 
+cobrindo botões essenciais na hora de preencher os formulários.

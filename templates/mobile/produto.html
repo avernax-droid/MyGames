@@ -1,0 +1,279 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/produto.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Seleção e Busca de Produtos (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Transforma a grade de produtos do 
+  desktop em uma lista vertical fluida (List-View), maximizando a área de toque 
+  para evitar cliques acidentais e melhorando a leitura durante a busca com o 
+  teclado virtual aberto.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Seleção de Produto{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-busca-container { padding: 5px 0; }
+    
+    .titulo-etapa {
+        color: var(--texto-br);
+        text-transform: uppercase;
+        font-size: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        font-family: 'Rajdhani', sans-serif;
+    }
+
+    /* Categorias em 2 colunas para focar no clique rápido */
+    .mobile-grid-categorias { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 15px; 
+    }
+    .mobile-card-categoria {
+        background: var(--card-bg); 
+        border: 2px solid #333; 
+        border-radius: 16px; 
+        padding: 25px 10px;
+        text-align: center; 
+        transition: 0.2s; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center;
+    }
+    .mobile-card-categoria:active { 
+        border-color: var(--cor-destaque); 
+        background: rgba(0, 255, 0, 0.05); 
+        transform: scale(0.95); 
+    }
+    .mobile-card-categoria h3 { color: var(--texto-br); margin: 0; font-size: 18px; }
+
+    /* Barra de busca fixa no topo ao rolar (opcional, melhora UX) */
+    .mobile-busca-wrapper {
+        position: sticky;
+        top: 0;
+        background: var(--bg-fundo);
+        padding: 10px 0;
+        z-index: 10;
+        display: flex;
+        gap: 10px;
+    }
+
+    .input-busca-mobile {
+        flex: 1;
+        height: 52px;
+        padding: 0 15px;
+        background: var(--card-bg); 
+        border: 2px solid #333; 
+        border-radius: 12px;
+        color: var(--texto-br); 
+        font-size: 16px; /* Impede o zoom nativo do iOS */
+        outline: none;
+    }
+    .input-busca-mobile:focus { border-color: var(--cor-destaque); }
+
+    .btn-voltar-icon {
+        width: 52px;
+        height: 52px;
+        background: transparent;
+        border: 2px solid #333;
+        border-radius: 12px;
+        color: var(--texto-dim);
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .btn-voltar-icon:active { background: #333; }
+
+    /* Mudança Crítica: Lista Vertical de Produtos em vez de Grade */
+    .mobile-lista-produtos { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 12px; 
+        margin-top: 15px;
+        padding-bottom: 30px;
+    }
+    .mobile-item-produto { 
+        background: var(--card-bg); 
+        border: 1px solid #333; 
+        border-radius: 12px; 
+        padding: 12px; 
+        display: flex; 
+        align-items: center; 
+        gap: 15px;
+        transition: 0.2s;
+    }
+    .mobile-item-produto:active { 
+        border-color: var(--cor-destaque); 
+        background: rgba(0, 255, 0, 0.05); 
+    }
+    
+    .item-img-wrapper { 
+        width: 60px; 
+        height: 60px; 
+        flex-shrink: 0; 
+        background: rgba(0,0,0,0.2); 
+        border-radius: 8px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+    }
+    .item-img-wrapper img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    
+    .item-info { flex: 1; display: flex; flex-direction: column; gap: 5px; justify-content: center;}
+    .item-info h4 { font-size: 14px; margin: 0; color: var(--texto-br); line-height: 1.2; }
+    .plataforma-badge { 
+        background: #333; 
+        color: var(--cor-destaque); 
+        padding: 3px 8px; 
+        border-radius: 12px; 
+        font-size: 10px; 
+        font-weight: bold; 
+        align-self: flex-start;
+        text-transform: uppercase;
+    }
+
+    .item-outro { border-style: dashed; border-color: #666; justify-content: center; text-align: center; padding: 20px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-busca-container">
+    <h2 id="tituloEtapa" class="titulo-etapa">Selecione a categoria</h2>
+
+    <div id="stepCategorias" class="mobile-grid-categorias">
+        <div class="mobile-card-categoria" onclick="selecionarCategoria(1, 'Console')">
+            <span style="font-size: 30px; margin-bottom: 8px;">🎮</span>
+            <h3>Console</h3>
+        </div>
+        <div class="mobile-card-categoria" onclick="selecionarCategoria(2, 'Controle')">
+            <span style="font-size: 30px; margin-bottom: 8px;">🕹️</span>
+            <h3>Controle</h3>
+        </div>
+        <div class="mobile-card-categoria" onclick="selecionarCategoria(4, 'Jogo')">
+            <span style="font-size: 30px; margin-bottom: 8px;">💿</span>
+            <h3>Jogo</h3>
+        </div>
+        <div class="mobile-card-categoria" onclick="selecionarCategoria(3, 'Acessório')">
+            <span style="font-size: 30px; margin-bottom: 8px;">🎧</span>
+            <h3>Acessório</h3>
+        </div>
+    </div>
+
+    <div id="stepProdutos" style="display: none;">
+        <div class="mobile-busca-wrapper">
+            <button class="btn-voltar-icon" onclick="voltarCategorias()">
+                ⬅
+            </button>
+            <input type="text" id="inputBusca" class="input-busca-mobile" placeholder="Buscar..." oninput="filtrarProdutos()" autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+
+        <div id="listaProdutos" class="mobile-lista-produtos">
+            </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let produtosDaCategoria = [];
+    let categoriaAtualId = null;
+
+    async function selecionarCategoria(catId, catNome) {
+        document.getElementById('stepCategorias').style.display = 'none';
+        document.getElementById('stepProdutos').style.display = 'block';
+        document.getElementById('tituloEtapa').innerText = catNome;
+        document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
+        
+        carregarProdutos(catId);
+    }
+
+    function voltarCategorias() {
+        document.getElementById('stepProdutos').style.display = 'none';
+        document.getElementById('stepCategorias').style.display = 'grid';
+        document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
+        document.getElementById('inputBusca').value = '';
+        document.getElementById('listaProdutos').innerHTML = '';
+    }
+
+    async function carregarProdutos(catId) {
+        categoriaAtualId = catId;
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--texto-dim);">Carregando catálogo...</div>'; 
+        document.getElementById('inputBusca').value = ''; 
+
+        try {
+            const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
+            produtosDaCategoria = await response.json();
+            // Inicia a renderização vazia aguardando a digitação
+            container.innerHTML = '';
+            filtrarProdutos(); // Chama o filtro para exibir o botão "Outros" de imediato
+        } catch (error) {
+            console.error("Erro na busca:", error);
+            container.innerHTML = '<p style="color: #ff4444; text-align: center;">Erro ao conectar com o banco.</p>';
+        }
+    }
+
+    function filtrarProdutos() {
+        const termo = document.getElementById('inputBusca').value.toLowerCase().trim();
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = ''; 
+
+        if (termo !== '') {
+            // 1. Filtra
+            const produtosFiltrados = produtosDaCategoria.filter(p => 
+                p.nome_produto.toLowerCase().includes(termo)
+            );
+
+            // 2. Ordena (Priorizando prefixo)
+            produtosFiltrados.sort((a, b) => {
+                const nomeA = a.nome_produto.toLowerCase();
+                const nomeB = b.nome_produto.toLowerCase();
+                const aComecaComTermo = nomeA.startsWith(termo);
+                const bComecaComTermo = nomeB.startsWith(termo);
+
+                if (aComecaComTermo && !bComecaComTermo) return -1;
+                if (!aComecaComTermo && bComecaComTermo) return 1;
+                
+                return nomeA.localeCompare(nomeB);
+            });
+
+            // 3. Renderiza o DOM (Novo Layout em Lista)
+            produtosFiltrados.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'mobile-item-produto';
+                item.onclick = () => window.location.href = `/pericia/${p.id}`;
+                
+                item.innerHTML = `
+                    <div class="item-img-wrapper">
+                        <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
+                    </div>
+                    <div class="item-info">
+                        <h4>${p.nome_produto}</h4>
+                        <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Opção "Outros" sempre disponível no fim da lista
+        const itemOutro = document.createElement('div');
+        itemOutro.className = 'mobile-item-produto item-outro';
+        itemOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
+        itemOutro.innerHTML = `
+            <div style="font-size: 24px; color: var(--cor-destaque); margin-right: 10px;">➕</div>
+            <div class="item-info">
+                <h4>Produto não listado?</h4>
+                <span style="font-size: 12px; color: var(--texto-dim);">Avaliar manualmente</span>
+            </div>
+        `;
+        container.appendChild(itemOutro);
+    }
+</script>
+{% endblock %}

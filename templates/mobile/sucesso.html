@@ -1,0 +1,176 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/sucesso.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Tela de Conclusão e Protocolo (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Otimiza a exibição do código longo 
+  do protocolo para que não quebre o layout horizontal do celular (word-break). 
+  Extrai os estilos inline para classes limpas e ajusta o dimensionamento do 
+  alerta de pendência e do botão final para encerramento de sessão.
+  ==============================================================================
+#}
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Agendamento Concluído{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-sucesso-container {
+        padding: 10px 0;
+        text-align: center;
+    }
+
+    .icone-sucesso {
+        font-size: 50px;
+        color: var(--cor-destaque);
+        margin-bottom: 5px;
+        line-height: 1;
+    }
+
+    .titulo-sucesso {
+        font-family: 'Rajdhani', sans-serif;
+        color: var(--texto-br);
+        text-transform: uppercase;
+        font-size: 26px;
+        margin: 0 0 10px 0;
+    }
+
+    .texto-informativo {
+        color: var(--texto-dim);
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 20px;
+        padding: 0 10px;
+    }
+
+    /* Caixa do Protocolo (Proteção contra quebra de layout) */
+    .mobile-protocolo-box {
+        background: rgba(0,0,0,0.3);
+        padding: 20px 15px;
+        border-radius: 12px;
+        border: 1px dashed var(--cor-destaque);
+        margin-bottom: 20px;
+        word-break: break-all; /* Essencial: Impede que o protocolo vaze da tela */
+    }
+    .mobile-protocolo-label {
+        display: block;
+        font-size: 11px;
+        color: var(--cor-destaque);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+    .mobile-protocolo-codigo {
+        font-size: 22px;
+        letter-spacing: 2px;
+        color: var(--texto-br);
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+    }
+
+    /* Alertas e Resumo */
+    .mobile-alerta-pendente {
+        background: rgba(255, 170, 0, 0.1);
+        border: 1px dashed #ffaa00;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        text-align: left;
+    }
+    .mobile-alerta-pendente h4 {
+        color: #ffaa00;
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+    }
+    .mobile-alerta-pendente p {
+        color: var(--texto-br);
+        font-size: 13px;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .mobile-resumo-final {
+        text-align: left;
+        background: rgba(255,255,255,0.03);
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        border-left: 4px solid var(--cor-destaque);
+    }
+    .mobile-resumo-final p { margin: 8px 0; color: var(--texto-dim); font-size: 14px; }
+    .mobile-resumo-final strong { color: var(--texto-br); }
+    .mobile-valor-destaque {
+        color: var(--cor-destaque);
+        font-weight: bold;
+        font-size: 20px;
+        font-family: monospace;
+        display: block;
+        margin-top: 5px;
+    }
+
+    .btn-mobile-encerrar {
+        width: 100%;
+        padding: 18px 0;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set tem_pendentes = false %}
+{% for item in session.get('itens_avaliados', []) %}
+    {% if item.is_outros %}
+        {% set tem_pendentes = true %}
+    {% endif %}
+{% endfor %}
+
+<div class="mobile-sucesso-container">
+    <div class="card-padrao">
+        
+        <header>
+            <div class="icone-sucesso">✓</div>
+            <h2 class="titulo-sucesso">Protocolo Gerado!</h2>
+            <p class="texto-informativo">
+                O resumo detalhado foi enviado para <br>
+                <strong style="color: var(--texto-br);">{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
+            </p>
+        </header>
+
+        <div class="mobile-protocolo-box">
+            <span class="mobile-protocolo-label">Código de Protocolo</span>
+            <span class="mobile-protocolo-codigo">
+                {{ protocolo if protocolo else session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
+            </span>
+        </div>
+
+        {% if tem_pendentes %}
+        <div class="mobile-alerta-pendente">
+            <h4>⚠️ ANÁLISE PENDENTE</h4>
+            <p>Seu lote contém itens para avaliação manual. Nossa equipe enviará a oferta final em até 24 horas úteis.</p>
+        </div>
+        {% endif %}
+
+        <div class="mobile-resumo-final">
+            <p><strong>Total de Itens:</strong> <span style="color: var(--texto-br);">{{ session.get('itens_avaliados', [])|length }}</span></p>
+            
+            <p>
+                <strong>{{ 'Valor Parcial da Proposta:' if tem_pendentes else 'Valor Total da Proposta:' }}</strong> 
+                <span class="mobile-valor-destaque">
+                    R$ {{ "%.2f"|format(total_lote) }}{{ '*' if tem_pendentes else '' }}
+                </span>
+            </p>
+        </div>
+
+        <a href="{{ url_for('sair') }}" class="btn-primary btn-mobile-encerrar">
+            ENCERRAR SESSÃO
+        </a>
+        <p style="font-size: 11px; color: #555; margin-top: 15px;">
+            Sessão segura vinculada a {{ session.get('player_nome', 'Jogador') }}
+        </p>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,231 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/resultado.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Exibição de Oferta e Revisão (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Apresenta o resultado da cotação 
+  otimizando o tamanho da fonte do preço para telas menores e, o mais importante, 
+  reorganizando os botões de ação final (Avançar, Adicionar Mais, Descartar) 
+  em uma pilha vertical para evitar toques acidentais e melhorar a fluidez da UX.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Sua Oferta{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-resultado-container {
+        padding: 10px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* O Card ocupa quase toda a largura para dar respiro aos textos */
+    .mobile-card-oferta {
+        background: var(--card-bg);
+        border: 2px solid var(--cor-destaque);
+        border-radius: 20px;
+        padding: 25px 20px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0, 255, 0, 0.1);
+    }
+
+    /* Header do Produto */
+    .mobile-thumb-wrapper {
+        width: 80px; 
+        height: 80px; 
+        margin: 0 auto 15px auto;
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.2); 
+        border: 1px solid #333;
+        border-radius: 12px; 
+        padding: 5px;
+    }
+    .mobile-produto-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+    .mobile-produto-nome { color: var(--texto-br); text-transform: uppercase; font-size: 18px; font-weight: bold; line-height: 1.2; }
+
+    /* Exibição do Valor */
+    .mobile-valor-box { margin: 15px 0 20px 0; }
+    .mobile-simbolo { color: var(--cor-destaque); font-size: 18px; vertical-align: top; font-weight: bold; }
+    .mobile-valor-pix { color: var(--cor-destaque); font-size: 42px; font-weight: bold; line-height: 1; font-family: 'Rajdhani', sans-serif; text-shadow: 0 0 10px rgba(0,255,0,0.3); }
+
+    .mobile-badge-estado {
+        display: inline-block; 
+        background: rgba(0, 255, 0, 0.08);
+        border: 1px solid var(--cor-destaque); 
+        color: var(--cor-destaque);
+        padding: 6px 14px; 
+        border-radius: 8px;
+        font-weight: bold; 
+        font-size: 12px; 
+        text-transform: uppercase;
+        margin-bottom: 20px;
+    }
+
+    /* Área "Sob Consulta" */
+    .mobile-box-consulta {
+        border: 1px dashed var(--cor-destaque); 
+        background: rgba(0, 255, 0, 0.05); 
+        padding: 15px; 
+        border-radius: 12px; 
+        margin: 20px 0; 
+        text-align: center;
+    }
+    .mobile-box-consulta h3 { color: var(--cor-destaque); margin-top: 0; font-size: 16px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; }
+    .mobile-box-consulta p { color: var(--texto-dim); font-size: 13px; margin: 5px 0 0 0; line-height: 1.4; }
+
+    /* Revisão de Fotos e Comentários */
+    .mobile-revisao-box { 
+        background: rgba(0,0,0,0.3); 
+        border-radius: 12px; 
+        padding: 15px; 
+        margin-bottom: 20px; 
+        text-align: left; 
+        border: 1px solid #333;
+    }
+    .mobile-label-mini { color: var(--texto-dim); font-size: 12px; text-transform: uppercase; margin-bottom: 8px; font-weight: bold;}
+    .mobile-fotos-grid { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+    .mobile-thumb-revisao { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #444; }
+    .mobile-texto-comentario { color: var(--texto-dim); font-size: 13px; font-style: italic; margin: 0; line-height: 1.4;}
+
+    /* Feedback de Descarte */
+    .mobile-feedback-descarte {
+        padding: 20px 15px; 
+        margin-bottom: 20px;
+        border: 1px dashed #ff4444; 
+        border-radius: 12px;
+        background: rgba(255, 68, 68, 0.05);
+        text-align: center;
+    }
+    .mobile-feedback-descarte h3 { color: #ff4444; margin: 10px 0 5px 0; font-size: 16px; text-transform: uppercase; }
+    .mobile-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 13px; }
+
+    /* Ações Finais (Empilhadas para Mobile) */
+    .mobile-acoes-finais {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 10px;
+    }
+    
+    .btn-mobile-danger {
+        background: transparent;
+        border: 1px solid #ff4444;
+        color: #ff4444;
+        padding: 14px 20px;
+        border-radius: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    .btn-mobile-danger:active { background: rgba(255, 68, 68, 0.1); transform: scale(0.98); }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-resultado-container">
+    
+    <div class="mobile-card-oferta">
+        <div id="dados-avaliacao-container">
+            
+            <header>
+                <div class="mobile-thumb-wrapper">
+                    <img src="{{ cotacao.foto_url or 'https://via.placeholder.com/150' }}" alt="{{ cotacao.produto }}" class="mobile-produto-foto">
+                </div>
+                <div class="mobile-produto-nome">{{ cotacao.produto }}</div>
+            </header>
+            
+            {% if session.get('is_outros') %}
+            <div class="mobile-box-consulta">
+                <h3>ℹ️ Avaliação Sob Consulta</h3>
+                <p>Este item será avaliado manualmente. Entraremos em contato em até <strong>24 horas úteis</strong> pelo seu WhatsApp ou E-mail para concluir a oferta.</p>
+            </div>
+            {% else %}
+            <div class="mobile-valor-box">
+                <span class="mobile-simbolo">R$</span>
+                <span class="mobile-valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
+            </div>
+            {% endif %}
+            
+            <div>
+                <span class="mobile-badge-estado">{{ cotacao.descricao }}</span>
+            </div>
+
+            <div class="mobile-revisao-box">
+                {% if session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]' %}
+                <div style="margin-bottom: 15px;">
+                    <p class="mobile-label-mini">Fotos enviadas:</p>
+                    <div class="mobile-fotos-grid">
+                        {% for foto in session['item_atual']['fotos_json']|from_json %}
+                        <img src="{{ url_for('static', filename='uploads/pericia/' + foto) }}" class="mobile-thumb-revisao">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if session['item_atual']['comentarios'] %}
+                <div>
+                    <p class="mobile-label-mini">Observações:</p>
+                    <p class="mobile-texto-comentario">"{{ session['item_atual']['comentarios'] }}"</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="feedback-descarte" class="mobile-feedback-descarte" style="display: none;">
+            <div style="font-size: 35px;">🗑️</div>
+            <h3>Avaliação Descartada!</h3>
+            <p>Este item foi ejetado e não fará parte do lote.</p>
+        </div>
+
+        <div class="mobile-acoes-finais">
+            <a href="{{ url_for('resumo') }}" class="btn-primary" id="btn-avancar">
+                FECHAR LOTE (AVANÇAR)
+            </a>
+
+            <a href="{{ url_for('produto') }}" class="btn-secondary" id="btn-mais">
+                AVALIAR MAIS PRODUTOS
+            </a>
+
+            <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-mobile-danger">
+                DESCARTAR AVALIAÇÃO
+            </button>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Aproveitamos a mesma lógica inteligente da versão desktop
+    function executarDescarteIndividualAjax() {
+        fetch('/descartar-atual')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'sucesso') {
+                    // Oculta os dados e o botão de descarte
+                    document.getElementById('dados-avaliacao-container').style.display = 'none';
+                    document.getElementById('btn-descarte-acao').style.display = 'none'; 
+                    
+                    // Exibe a mensagem de sucesso
+                    document.getElementById('feedback-descarte').style.display = 'block';
+
+                    // Muda sutilmente o texto do botão principal para fazer sentido
+                    document.getElementById('btn-avancar').innerText = 'VOLTAR AO CARRINHO';
+                }
+            })
+            .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
+    }
+</script>
+{% endblock %}

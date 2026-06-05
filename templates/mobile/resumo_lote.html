@@ -1,0 +1,261 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/resumo_lote.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Resumo e Revisão do Lote (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Elimina a estrutura de tabela (<table>)
+  que prejudica a leitura em telas estreitas, substituindo-a por uma lista de Cards 
+  fluidos (List-View). Reorganiza a exibição de quantidade e preço, e empilha os 
+  botões de ação final para proteger a conversão e evitar cliques indesejados.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Resumo do Lote{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-resumo-container {
+        padding: 5px 0;
+    }
+    .titulo-etapa {
+        color: var(--texto-br);
+        text-transform: uppercase;
+        font-size: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        font-family: 'Rajdhani', sans-serif;
+    }
+
+    /* Cards de Produtos (Substituindo a Tabela) */
+    .mobile-lista-lote {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .mobile-item-card {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        gap: 12px;
+    }
+    
+    /* Foto do Item */
+    .mobile-foto-thumb {
+        width: 65px;
+        height: 65px;
+        background: #000;
+        border: 1px solid #333;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .mobile-foto-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    
+    /* Dados do Item */
+    .mobile-item-dados {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .mobile-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .mobile-produto-nome {
+        color: var(--texto-br);
+        font-weight: bold;
+        font-size: 14px;
+        text-transform: uppercase;
+        line-height: 1.2;
+    }
+    .mobile-item-qtd {
+        background: #333;
+        color: var(--texto-br);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: bold;
+    }
+    
+    .mobile-badge-estado {
+        color: var(--cor-destaque);
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 10px;
+        margin-top: 4px;
+        display: inline-block;
+    }
+    
+    .mobile-item-obs {
+        color: #888;
+        font-size: 11px;
+        margin-top: 4px;
+        font-style: italic;
+        line-height: 1.3;
+    }
+
+    .mobile-item-valor {
+        text-align: right;
+        margin-top: 8px;
+    }
+    .mobile-valor-txt {
+        color: var(--cor-destaque);
+        font-family: monospace;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .mobile-badge-consulta {
+        color: #ffaa00;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: bold;
+        border: 1px dashed #ffaa00;
+        padding: 3px 6px;
+        border-radius: 4px;
+    }
+
+    /* Caixa do Total Geral */
+    .mobile-total-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 15px;
+        background: rgba(0, 255, 0, 0.05);
+        border-radius: 12px;
+        border: 1px dashed var(--cor-destaque);
+        margin-bottom: 25px;
+    }
+    .mobile-total-box span {
+        color: var(--texto-br);
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .mobile-total-box strong {
+        color: var(--cor-destaque);
+        font-size: 24px;
+        font-family: 'Rajdhani', sans-serif;
+    }
+
+    /* Botões Empilhados */
+    .mobile-acoes-finais {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .btn-mobile-danger {
+        background: transparent;
+        border: 1px solid #ff4444;
+        color: #ff4444;
+        padding: 14px 20px;
+        border-radius: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+        text-align: center;
+        transition: 0.2s;
+    }
+    .btn-mobile-danger:active { background: rgba(255, 68, 68, 0.1); transform: scale(0.98); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-resumo-container">
+    <div class="card-padrao">
+        <header>
+            <h2 class="titulo-etapa">Seu Lote</h2>
+        </header>
+        
+        <div class="mobile-lista-lote">
+            {% for item in itens %}
+            <div class="mobile-item-card">
+                
+                <div class="mobile-foto-thumb">
+                    {% if item.foto_url and item.foto_url != 'None' and item.foto_url != '' %}
+                        <img src="{{ item.foto_url }}" alt="{{ item.produto_nome }}">
+                    {% elif item.fotos_json and item.fotos_json != '[]' %}
+                        {% set lista_fotos = item.fotos_json | from_json %}
+                        {% if lista_fotos %}
+                            <img src="/media/pericia/{{ lista_fotos[0] }}" alt="Foto enviada">
+                        {% else %}
+                            <span style="font-size: 24px;">🎮</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="font-size: 24px;">🎮</span>
+                    {% endif %}
+                </div>
+                
+                <div class="mobile-item-dados">
+                    <div>
+                        <div class="mobile-item-header">
+                            <span class="mobile-produto-nome">{{ item.produto_nome }}</span>
+                            <span class="mobile-item-qtd">x{{ item.quantidade }}</span>
+                        </div>
+                        
+                        <span class="mobile-badge-estado">{{ item.estado_descricao or 'Estado Geral' }}</span>
+                        
+                        {% if item.comentarios %}
+                            <div class="mobile-item-obs">"{{ item.comentarios }}"</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mobile-item-valor">
+                        {% if item.is_outros %}
+                            <span class="mobile-badge-consulta">Sob Consulta</span>
+                        {% else %}
+                            <span class="mobile-valor-txt">R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mobile-total-box">
+            <span>TOTAL:</span>
+            <strong>R$ {{ "%.2f"|format(total_lote) }}</strong>
+        </div>
+        
+        <div class="mobile-acoes-finais">
+            <a href="{{ url_for('termos_oferta') }}" class="btn-primary">
+                AVANÇAR
+            </a>
+
+            <a href="{{ url_for('produto') }}" class="btn-secondary" style="text-align: center;">
+                ADICIONAR MAIS
+            </a>
+            
+            <button onclick="abrirModalConfirmacao('Descartar Lote Inteiro', 'Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?', 'SIM, DESCARTAR LOTE', executarDescarteLote)" class="btn-mobile-danger">
+                DESCARTAR LOTE
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function executarDescarteLote() {
+        // Altera o visual do botão de perigo enquanto redireciona
+        const btn = document.querySelector('.btn-mobile-danger');
+        if(btn) {
+            btn.innerText = 'DESCARTANDO...';
+            btn.style.opacity = '0.5';
+        }
+        window.location.href = "/descartar-lote";
+    }
+</script>
+{% endblock %}

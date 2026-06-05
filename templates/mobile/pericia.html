@@ -1,0 +1,369 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/pericia.html
+  DATA DE CRIAÇÃO: 04/06/2026
+  TÍTULO: Avaliação Técnica e Conservação (Mobile)
+  FUNÇÃO: Versão exclusiva para smartphones. Otimiza os botões de opção (radio) 
+  para toques largos, adapta os formulários de perguntas extras (quantidade/original)
+  e remove a lógica complexa de QR Code (Handoff), substituindo-a por um botão 
+  nativo de acionamento direto da câmera do dispositivo.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Avaliação Técnica{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mobile-header-pericia {
+        text-align: center;
+        margin-bottom: 25px;
+        padding-top: 10px;
+    }
+    .titulo-etapa {
+        color: var(--cor-destaque);
+        font-size: 24px;
+        margin: 0 0 15px 0;
+        font-family: 'Rajdhani', sans-serif;
+        text-transform: uppercase;
+    }
+
+    .produto-contexto-mobile {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    .badge-categoria-mobile {
+        background-color: var(--cor-destaque);
+        color: #000;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .nome-produto-mobile {
+        color: var(--texto-br);
+        font-weight: 700;
+        font-size: 16px;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    /* ESTADO DE CONSERVAÇÃO - Ajustado para o Dedo */
+    .label-secao-mobile {
+        color: var(--neon-blue);
+        font-size: 13px;
+        margin: 0 0 10px 0;
+        text-transform: uppercase;
+        font-weight: bold;
+        display: block;
+    }
+    .opcoes-wrapper-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 25px;
+    }
+    .radio-label-mobile input[type="radio"] { display: none; }
+    .opcao-card-mobile {
+        display: flex;
+        align-items: center;
+        background: var(--bg-fundo);
+        border: 2px solid #333;
+        border-radius: 12px;
+        padding: 18px 15px; /* Alvo generoso para toque */
+        transition: 0.2s;
+    }
+    .opcao-card-mobile:active { transform: scale(0.98); }
+    .radio-label-mobile input[type="radio"]:checked + .opcao-card-mobile {
+        border-color: var(--cor-destaque);
+        background: rgba(0, 255, 0, 0.05);
+    }
+    .check-indicator-mobile {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #555;
+        border-radius: 50%;
+        margin-right: 15px;
+        position: relative;
+    }
+    .radio-label-mobile input[type="radio"]:checked + .opcao-card-mobile .check-indicator-mobile {
+        border-color: var(--cor-destaque);
+        background: var(--cor-destaque);
+        box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+    }
+    .opcao-texto-mobile {
+        font-size: 14px;
+        font-weight: bold;
+        color: var(--texto-br);
+    }
+
+    /* PERGUNTAS EXTRAS - Layout Verticalizado */
+    .pergunta-extra-wrapper-mobile {
+        background: #151515;
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 25px;
+    }
+    .radio-group-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .radio-extra-mobile {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--bg-fundo);
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        font-size: 14px;
+    }
+    .radio-extra-mobile input[type="radio"] {
+        accent-color: var(--cor-destaque);
+        width: 20px;
+        height: 20px;
+    }
+    .qtd-row-mobile {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--bg-fundo);
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }
+    .qtd-row-mobile span { font-size: 13px; font-weight: bold; }
+    .input-qtd-mobile {
+        width: 60px;
+        height: 40px;
+        background: #111;
+        border: 1px solid #555;
+        border-radius: 6px;
+        color: #fff;
+        text-align: center;
+        font-size: 16px; /* Evita Zoom */
+    }
+    .input-qtd-mobile:focus { border-color: var(--cor-destaque); outline: none; }
+
+    /* CÂMERA E UPLOAD NATIVO */
+    .camera-upload-wrapper {
+        margin-bottom: 25px;
+        background: #151515;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+    }
+    .btn-camera-nativo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        padding: 18px;
+        background: rgba(0, 255, 0, 0.1);
+        border: 2px dashed var(--cor-destaque);
+        border-radius: 12px;
+        color: var(--cor-destaque);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 18px;
+        font-weight: bold;
+        text-transform: uppercase;
+        overflow: hidden;
+    }
+    /* O input file invisível cobre o botão inteiro */
+    .file-input-mobile {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        opacity: 0;
+    }
+    .file-feedback-mobile {
+        display: block;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--texto-dim);
+    }
+
+    /* OBSERVAÇÕES */
+    .text-obs-mobile {
+        width: 100%;
+        height: 100px;
+        background: var(--bg-fundo);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 15px;
+        color: var(--texto-br);
+        font-family: inherit;
+        font-size: 16px; /* Evita Zoom no iOS */
+        resize: none;
+        margin-bottom: 25px;
+    }
+    .text-obs-mobile:focus { border-color: var(--cor-destaque); outline: none; }
+
+    .botoes-acao-mobile {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    /* No celular, o botão primário domina a tela */
+    .botoes-acao-mobile .btn-secondary { flex: 1; padding: 16px 0; text-align: center;}
+    .botoes-acao-mobile .btn-primary { flex: 2; padding: 16px 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card-padrao">
+    <header class="mobile-header-pericia">
+        <h2 class="titulo-etapa">Avaliação</h2>
+        
+        <div class="produto-contexto-mobile">
+            <span class="badge-categoria-mobile">{{ categoria_nome }}</span>
+            <span class="nome-produto-mobile">{{ produto_nome }}</span>
+        </div>
+    </header>
+
+    <form action="/cotar" method="POST" enctype="multipart/form-data" id="form-pericia-mobile">
+        
+        {% if session.get('is_outros') %}
+        <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 12px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
+            <p style="color: var(--cor-destaque); margin: 0; font-weight: bold; font-size: 13px;">ℹ️ AVALIAÇÃO MANUAL</p>
+            <p style="color: var(--texto-dim); font-size: 11px; margin: 5px 0 0 0;">Detalhe bem o item para que nossa equipe faça a melhor oferta.</p>
+        </div>
+        {% endif %}
+
+        <div class="opcoes-wrapper-mobile">
+            <span class="label-secao-mobile">Estado do item:</span>
+            {% if opcoes %}
+                {% for opcao in opcoes %}
+                <label class="radio-label-mobile">
+                    <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
+                    <div class="opcao-card-mobile">
+                        <div class="check-indicator-mobile"></div>
+                        <span class="opcao-texto-mobile">{{ opcao.descricao }}</span>
+                    </div>
+                </label>
+                {% endfor %}
+            {% else %}
+                <div style="color: #ff4444; padding: 15px; border: 1px dashed #ff4444; border-radius: 8px; text-align: center; font-size: 12px;">
+                    Nenhuma opção de estado configurada.
+                </div>
+            {% endif %}
+        </div>
+
+        {% if categoria_id %}
+        <div class="pergunta-extra-wrapper-mobile">
+            
+            {% if categoria_id|string == '1' %}
+                <span class="label-secao-mobile">Original e Bloqueado?</span>
+                <div class="radio-group-vertical">
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Não, o produto foi desbloqueado." required> Desbloqueado</label>
+                </div>
+                
+            {% elif categoria_id|string == '2' %}
+                <span class="label-secao-mobile">Controle Original?</span>
+                <div class="radio-group-vertical">
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Não, é controle pirata." required> Não (Paralelo)</label>
+                </div>
+                
+            {% elif categoria_id|string == '4' %}
+                <span class="label-secao-mobile">Formato (Mídia):</span>
+                <div class="qtd-row-mobile">
+                    <span>Física (CD/Cartucho):</span>
+                    <input type="number" name="qtd_fisica" min="1" value="0" class="input-qtd-mobile" required 
+                           oninvalid="this.setCustomValidity('Informe pelo menos 1 jogo físico.')" 
+                           oninput="this.setCustomValidity('')">
+                </div>
+                <div class="qtd-row-mobile" style="margin-bottom: 0;">
+                    <span>Digital (Conta):</span>
+                    <input type="number" name="qtd_digital" min="0" value="0" class="input-qtd-mobile">
+                </div>
+                
+            {% elif categoria_id|string == '3' %}
+                <span class="label-secao-mobile">Acessório Original?</span>
+                <div class="radio-group-vertical">
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-extra-mobile"><input type="radio" name="pergunta_extra" value="Não, o acessório é pirata." required> Não (Paralelo)</label>
+                </div>
+            {% endif %}
+            
+        </div>
+        {% endif %}
+
+        <div class="camera-upload-wrapper">
+            <span class="label-secao-mobile">Fotos do Produto (Opcional):</span>
+            
+            <div class="btn-camera-nativo">
+                📸 TIRAR FOTOS
+                <input type="file" name="fotos" id="file-input-mobile" class="file-input-mobile" accept="image/*" capture="environment" multiple>
+            </div>
+            <span class="file-feedback-mobile" id="file-msg-mobile">Nenhuma foto tirada ainda.</span>
+        </div>
+
+        <span class="label-secao-mobile">Observações:</span>
+        <textarea name="comentarios" id="campo-comentarios-mobile" class="text-obs-mobile" placeholder="Caixa original? Algum detalhe?"></textarea>
+
+        <div class="botoes-acao-mobile">
+            <a href="/produto" class="btn-secondary">VOLTAR</a>
+            <button type="submit" class="btn-primary">AVALIAR</button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Lógica de tornar o comentário obrigatório baseada na opção escolhida
+        const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
+        const campoComentarios = document.getElementById('campo-comentarios-mobile');
+
+        radiosOpcoes.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
+                
+                if (textoOpcao.includes('especifique nos comentários') || textoOpcao.includes('especifique')) {
+                    campoComentarios.setAttribute('required', 'required');
+                    campoComentarios.placeholder = "OBRIGATÓRIO: Especifique os detalhes aqui...";
+                    campoComentarios.style.borderColor = "#ffaa00"; 
+                } else {
+                    campoComentarios.removeAttribute('required');
+                    campoComentarios.placeholder = "Caixa original? Algum detalhe?";
+                    campoComentarios.style.borderColor = "#333";
+                }
+            });
+        });
+
+        // Feedback visual imediato ao tirar a foto nativa
+        const fileInputMobile = document.getElementById('file-input-mobile');
+        const fileMsgMobile = document.getElementById('file-msg-mobile');
+
+        fileInputMobile.addEventListener('change', function() {
+            const qtd = this.files.length;
+            
+            if (qtd === 1) {
+                fileMsgMobile.innerHTML = "✅ <strong style='color: var(--cor-destaque);'>1 foto capturada!</strong>";
+            } else if (qtd > 1) {
+                fileMsgMobile.innerHTML = `✅ <strong style='color: var(--cor-destaque);'>${qtd} fotos capturadas!</strong>`;
+            } else {
+                fileMsgMobile.innerText = "Nenhuma foto tirada ainda.";
+            }
+        });
+    });
+</script>
+{% endblock %}
