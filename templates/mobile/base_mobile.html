@@ -11,6 +11,8 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 04/06/2026: Criação baseada na estrutura do base.html, com otimização mobile.
+  - 05/06/2026: Inclusão do CSS (flexbox) para alinhamento horizontal das categorias.
+  - 05/06/2026: Correção no motor do Jinja2 com a inclusão do bloco extra_css no head para permitir injeção de estilos dos templates filhos.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -134,7 +136,55 @@
         /* No mobile, botões do modal ficam um em cima do outro para evitar toques errados */
         .modal-botoes-global { display: flex; flex-direction: column; gap: 10px; }
         .modal-botoes-global button { width: 100%; padding: 14px; font-size: 14px; cursor: pointer; border-radius: 8px;}
+
+        /* ============================================================================== */
+        /* CSS DE CATEGORIAS (AJUSTE MOBILE: ÍCONE E TEXTO NA MESMA LINHA) */
+        /* ============================================================================== */
+        .categorias-lista-mobile {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .categoria-card-linha {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            background: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px 20px;
+            width: 100%;
+            text-decoration: none;
+            color: var(--texto-br);
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .categoria-card-linha:active {
+            background: rgba(0, 255, 0, 0.05);
+            border-color: var(--cor-destaque);
+        }
+
+        .categoria-icone-mobile {
+            font-size: 24px;
+            margin-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .categoria-texto-mobile {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
     </style>
+
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="container">

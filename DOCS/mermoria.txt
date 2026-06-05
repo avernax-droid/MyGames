@@ -740,3 +740,35 @@ de elementos nas telas novas para garantir um visual impecável.
 
 Teste de Fluxo Real: Fazer uma jornada de ponta a ponta pelo smartphone para verificar se o teclado virtual não está 
 cobrindo botões essenciais na hora de preencher os formulários.
+
+========
+05/05
+
+📋 Resumo das Implementações (Front-end Mobile)
+Hoje o foco foi aplicar a nossa metodologia Design First para lapidar a interface da versão mobile do MyGames, garantindo usabilidade e pixel perfect.
+
+Refatoração das Categorias: Transformamos a seleção de categorias (Console, Controle, Jogo, Acessório). Antes empilhadas em uma grade que prejudicava a legibilidade, agora as opções utilizam uma estrutura Flexbox (flex-direction: row), colocando o ícone e o texto perfeitamente alinhados na mesma linha. Isso maximizou a área de toque para o usuário no smartphone.
+
+Blindagem de Imagens (Flexbox): Corrigimos o vazamento visual onde as imagens dos produtos da busca estavam estourando na tela do celular. Aplicamos uma trava absoluta no CSS (!important, min-width, max-height) forçando as imagens a ficarem rigorosamente contidas em um formato de 60x60px, independentemente da resolução original vinda do banco.
+
+Correção do Motor Jinja2: Identificamos que o arquivo mestre (base_mobile.html) estava bloqueando o envio de estilos das páginas filhas. Inserimos a tag {% block extra_css %}{% endblock %} no <head>, permitindo que o Flask injetasse o CSS corrigido diretamente no celular.
+
+⚡ Fluxo de Trabalho em Tempo Real (A "Rota Rápida" com Ngrok)
+Para não engessar o desenvolvimento com a recriação de contêineres Docker a cada vírgula alterada no CSS, estabelecemos um fluxo de teste em tempo real:
+
+Servidor Local: O server.py está rodando direto no terminal nativo do seu ambiente virtual no VS Code (porta 5000).
+
+Túnel Ngrok: Abrimos uma segunda aba no terminal e iniciamos o Ngrok apontando para essa porta (ngrok http 5000).
+
+Teste no Smartphone: Você acessa o link HTTPS gerado pelo Ngrok diretamente no navegador do seu celular (usando uma Aba Anônima para evitar o cache agressivo do mobile).
+
+Resultado: A cada Ctrl+S no VS Code, basta puxar a tela do celular para baixo para ver o novo front-end atualizado no mesmo segundo, sem precisar rodar o script ./deploy_homo.sh.
+
+🎯 Próximos Passos (Para a próxima sessão)
+Quando você retornar, continuaremos a nossa Auditoria de Interface nas próximas telas do fluxo do usuário. Os alvos serão:
+
+O Formulário de Perícia (pericia.html): Testar na prática se o acionamento da câmera traseira nativa (capture="environment") está fluido e se os botões de upload estão bem dimensionados.
+
+Cards de Conversão (resultado.html e resumo_lote.html): Validar os espaçamentos, o tamanho das fontes e garantir que os botões de aceite da oferta não fiquem escondidos pelo teclado virtual.
+
+Consolidação: Assim que fecharmos a lapidação do fluxo inteiro via Ngrok, faremos o teste final rodando o ./deploy_homo.sh para empacotar todo esse novo visual no seu ambiente Docker de homologação.
