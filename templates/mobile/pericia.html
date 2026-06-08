@@ -12,6 +12,8 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 05/06/2026: Adição do contêiner e implementação de lógica JavaScript 
     para renderização de miniaturas (thumbnails) dinâmicas das fotos capturadas.
+  - 07/06/2026: Implementação do objeto DataTransfer para acumular múltiplas 
+    fotos tiradas nativamente sem sobrescrever as anteriores.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -354,23 +356,36 @@
             });
         });
 
-        // Feedback visual imediato ao tirar a foto nativa (Com Miniaturas)
+        // Feedback visual imediato e ACUMULADOR DE FOTOS
         const fileInputMobile = document.getElementById('file-input-mobile');
         const fileMsgMobile = document.getElementById('file-msg-mobile');
         const previewContainer = document.getElementById('preview-fotos-mobile');
 
+        // A MÁGICA: O DataTransfer atua como nosso "Cesto" persistente na memória da página
+        const acumuladorFotos = new DataTransfer();
+
         fileInputMobile.addEventListener('change', function() {
-            const arquivos = this.files;
-            const qtd = arquivos.length;
+            const novosArquivos = this.files;
             
-            // Limpa os previews anteriores
+            // 1. Adiciona cada arquivo recém-tirado da câmera ao nosso cesto
+            for (let i = 0; i < novosArquivos.length; i++) {
+                acumuladorFotos.items.add(novosArquivos[i]);
+            }
+            
+            // 2. Devolve o cesto cheio para o input do HTML. 
+            // Isso garante que o submit do formulário envie TODAS as fotos juntas.
+            this.files = acumuladorFotos.files;
+            
+            const qtdTotal = this.files.length;
+            
+            // 3. Limpa os previews antigos da tela para re-renderizar a lista atualizada
             previewContainer.innerHTML = '';
             
-            if (qtd > 0) {
-                fileMsgMobile.innerHTML = `✅ <strong style='color: var(--cor-destaque);'>${qtd} foto(s) pronta(s) para envio!</strong>`;
+            if (qtdTotal > 0) {
+                fileMsgMobile.innerHTML = `✅ <strong style='color: var(--cor-destaque);'>${qtdTotal} foto(s) pronta(s) para envio!</strong>`;
                 
-                // Gera a miniatura para cada foto tirada
-                Array.from(arquivos).forEach(file => {
+                // 4. Gera a miniatura lendo do total acumulado
+                Array.from(this.files).forEach(file => {
                     if (file.type.startsWith('image/')) {
                         const imgPreview = document.createElement('img');
                         imgPreview.src = URL.createObjectURL(file);

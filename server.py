@@ -22,6 +22,7 @@
 # - 03/06/2026: Atualização dos IDs chumbados nas rotas /pericia e /cotar para realinhar com a correção do banco de dados (Jogo=4, Acessório=3).
 # - 04/06/2026: Correção na rota /cotar para passar o parâmetro de quantidade à engine e remoção de multiplicação redundante.
 # - 04/06/2026: Implementação de roteamento dinâmico para mobile (render_smart_template) usando a biblioteca user-agents.
+# - 07/06/2026: Correção de colisão de nomes de arquivos em uploads simultâneos via mobile (uso de enumerate na rota /cotar).
 # ==============================================================================
 
 import os
@@ -183,13 +184,15 @@ def cotar():
 
     fotos_salvas = []
     
+    # === AQUI ESTÁ A CORREÇÃO PRINCIPAL: Uso do enumerate(files) ===
     if 'fotos' in request.files:
         files = request.files.getlist('fotos')
-        for file in files:
+        for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
                 ts = datetime.now().strftime("%H%M%S")
                 cli_prefix = session.get('cliente_id', 'anon')
-                filename = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_{file.filename}")
+                # O parâmetro {idx} garante unicidade mesmo com o mesmo timestamp e nome nativo
+                filename = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_{idx}_{file.filename}")
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 fotos_salvas.append(filename)
 
@@ -197,11 +200,12 @@ def cotar():
     if token_sessao:
         pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token_sessao)
         if os.path.exists(pasta_token):
-            for file_name in os.listdir(pasta_token):
+            # Correção preventiva aplicada também ao upload remoto/handoff
+            for idx, file_name in enumerate(os.listdir(pasta_token)):
                 if allowed_file(file_name):
                     ts = datetime.now().strftime("%H%M%S")
                     cli_prefix = session.get('cliente_id', 'anon')
-                    novo_nome = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_mobile_{file_name}")
+                    novo_nome = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_mobile_{idx}_{file_name}")
                     
                     caminho_antigo = os.path.join(pasta_token, file_name)
                     caminho_novo = os.path.join(app.config['UPLOAD_FOLDER'], novo_nome)

@@ -1,0 +1,9 @@
+- na tela termos da oferta o icone tiket da opção "conocordo com os termos..." é menor que o icone tiket da
+opção "Não concordo com os termos..." os icones tikets devem ser do mesmo tamanho.
+- alinhar o texto "Não concordo com os termos..." na mesma linha do icone tiket.
+- quando usuario selecionar o botão "avançar para a identificação" e tiket "conocordo com os termos..." não estiver setado,
+o sistema deve emitir um aviso.
+- na tela de identificação, quando o usuario selecionar o botão "gerar protocolo" o sistema deve mostrar algum icone, alguma coisa,
+que mostre para o usuario que o sistema não travou...
+- quando a origem do acesso é um desktop, note, na tela estado de conservação, quando o usuario seleciona usar camera do celular,
+verificar porque quando o usuario tenta ler o QR code da erro "não é possivel acessar esse site"
