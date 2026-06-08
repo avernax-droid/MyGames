@@ -13,6 +13,8 @@
   - 04/06/2026: Ajuste na tabela de itens para exibir a coluna "Subtotal".
   - 07/06/2026: Implementação de Modal (Lightbox) via CSS/JS para ampliação 
                 fluida das fotos de perícia na mesma tela.
+  - 08/06/2026: Adição de formatação visual (máscara) dinâmica via JS para 
+                o número de WhatsApp do cliente.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -122,7 +124,7 @@
     <div class="card-admin info-section">
         <h3>Dados do Cliente</h3>
         <div class="info-row"><strong>Nome:</strong> {{ protocolo.cliente_nome }}</div>
-        <div class="info-row"><strong>WhatsApp:</strong> {{ protocolo.cliente_whatsapp | default('Não informado') }}</div>
+        <div class="info-row"><strong>WhatsApp:</strong> <span class="mascara-telefone">{{ protocolo.cliente_whatsapp | default('Não informado') }}</span></div>
         <div class="info-row"><strong>Status:</strong> {{ protocolo.status }}</div>
     </div>
 
@@ -219,6 +221,25 @@
         if(event.key === "Escape"){
             fecharModalLightbox();
         }
+    });
+
+    // Formatação de Máscara de Telefone Dinâmica
+    document.addEventListener('DOMContentLoaded', function() {
+        const telefones = document.querySelectorAll('.mascara-telefone');
+        
+        telefones.forEach(el => {
+            // Se o conteúdo for "Não informado" ou vazio, ele ignora sem dar erro
+            let texto = el.textContent;
+            let tel = texto.replace(/\D/g, ''); 
+            
+            if (tel.length === 11) {
+                // Máscara Celular: (11) 98888-7777
+                el.textContent = `(${tel.substring(0,2)}) ${tel.substring(2,7)}-${tel.substring(7,11)}`;
+            } else if (tel.length === 10) {
+                // Máscara Fixo: (11) 3333-4444
+                el.textContent = `(${tel.substring(0,2)}) ${tel.substring(2,6)}-${tel.substring(6,10)}`;
+            }
+        });
     });
 </script>
 {% endblock %}
