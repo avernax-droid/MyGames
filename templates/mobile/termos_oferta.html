@@ -8,6 +8,11 @@
   e recusa em "Cards Acionáveis", permitindo que o usuário toque em qualquer 
   parte da caixa para selecionar a opção. Otimiza a tipografia da lista de 
   políticas para evitar fadiga visual e empilha os botões de ação final.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 08/06/2026: Correção do tamanho dos checkboxes (flex-shrink: 0), ajuste de 
+    alinhamento na mesma linha no card de recusa e inclusão de trava de validação 
+    com alerta (alert) no botão "Avançar".
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -79,6 +84,7 @@
     .mobile-card-opcao input[type="checkbox"] {
         width: 24px;
         height: 24px;
+        flex-shrink: 0; /* Garante que o ícone nunca mude de tamanho */
         pointer-events: none; /* Deixa o card inteiro lidar com o clique */
     }
     .mobile-card-opcao label {
@@ -86,6 +92,7 @@
         font-size: 14px;
         line-height: 1.3;
         pointer-events: none;
+        margin: 0;
     }
 
     /* Estado Verde (Aceitar) */
@@ -134,10 +141,6 @@
         flex-direction: column;
         gap: 12px;
         margin-top: 20px;
-    }
-    .btn-mobile-disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
     }
     .btn-mobile-danger {
         background: #ff4444;
@@ -191,9 +194,11 @@
                 <label>Concordo com os Termos e Política de Recompra</label>
             </div>
 
-            <div class="mobile-card-opcao card-recusar desativado" id="card-recusa" style="flex-wrap: wrap;">
-                <input type="checkbox" id="check-recusa" style="accent-color: #ff4444;">
-                <label>Não concordo com os Termos da Oferta</label>
+            <div class="mobile-card-opcao card-recusar desativado" id="card-recusa" style="flex-direction: column; align-items: flex-start;">
+                <div style="display: flex; align-items: center; width: 100%; gap: 15px;">
+                    <input type="checkbox" id="check-recusa" style="accent-color: #ff4444;">
+                    <label>Não concordo com os Termos da Oferta</label>
+                </div>
 
                 <div id="area-motivo-recusa" class="mobile-area-motivo" style="display: none;">
                     <p>Conte-nos o motivo (Opcional):</p>
@@ -202,7 +207,7 @@
             </div>
 
             <div class="mobile-acoes-finais">
-                <button type="submit" id="btn-continuar" class="btn-primary btn-mobile-disabled" disabled>
+                <button type="submit" id="btn-continuar" class="btn-primary">
                     AVANÇAR PARA IDENTIFICAÇÃO
                 </button>
 
@@ -219,16 +224,25 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const formTermos = document.getElementById('form-termos-mobile');
+        
         const cardAceite = document.getElementById('card-aceite');
         const cardRecusa = document.getElementById('card-recusa');
         const checkAceite = document.getElementById('check-aceite');
         const checkRecusa = document.getElementById('check-recusa');
         
-        const btnContinuar = document.getElementById('btn-continuar');
         const btnDescartar = document.getElementById('btn-descartar');
         
         const areaMotivo = document.getElementById('area-motivo-recusa');
         const inputMotivo = document.getElementById('motivo_recusa_inline');
+
+        // Validação no Envio: Dispara o alerta se tentar avançar sem concordar
+        formTermos.addEventListener('submit', (e) => {
+            if (!checkAceite.checked) {
+                e.preventDefault(); // Impede que o form seja enviado
+                alert('Por favor, confirme que concorda com os termos para poder avançar.');
+            }
+        });
 
         // Lógica de Toque nos Cards Inteiros
         cardAceite.addEventListener('click', () => {
@@ -240,10 +254,7 @@
             cardRecusa.classList.add('desativado');
             areaMotivo.style.display = 'none';
 
-            // Botões Finais
-            btnContinuar.disabled = false;
-            btnContinuar.classList.remove('btn-mobile-disabled');
-            
+            // Oculta o botão de descarte se estiver concordando
             btnDescartar.style.display = 'none';
         });
 
@@ -259,10 +270,7 @@
             cardAceite.classList.add('desativado');
             areaMotivo.style.display = 'block';
 
-            // Botões Finais
-            btnContinuar.disabled = true;
-            btnContinuar.classList.add('btn-mobile-disabled');
-            
+            // Exibe o botão de descarte
             btnDescartar.style.display = 'block';
         });
 

@@ -9,6 +9,11 @@
   os campos fiquem "espremidos"). Adiciona atributos 'inputmode' e 'type' específicos 
   para acionar o teclado numérico correto no iOS e Android em campos de telefone/CEP.
   Mantém toda a lógica de viaCEP e Autocomplete por CPF do Desktop.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 08/06/2026: Inclusão de estado de carregamento dinâmico (CSS Spinner) no botão
+    "GERAR PROTOCOLO" para fornecer feedback visual de processamento ao usuário 
+    e prevenção contra duplo clique.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -85,7 +90,7 @@
         font-weight: bold;
     }
 
-    /* Botões Finais */
+    /* Botões Finais e Elementos de Loading */
     .mobile-acoes-finais {
         display: flex;
         flex-direction: column;
@@ -97,6 +102,30 @@
         width: 100%;
         text-align: center;
         padding: 16px 0;
+        position: relative;
+    }
+    
+    /* CSS Puro para o Spinner de Carregamento */
+    .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        vertical-align: middle;
+        margin-right: 8px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Estrutura interna do botão de envio */
+    .btn-content-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>
 {% endblock %}
@@ -174,7 +203,10 @@
 
             <div class="mobile-acoes-finais">
                 <button type="submit" class="btn-primary" id="btn-submit-mobile">
-                    GERAR PROTOCOLO
+                    <span id="btn-text-default">GERAR PROTOCOLO</span>
+                    <span id="btn-text-loading" class="btn-content-loading" style="display: none;">
+                        <div class="spinner"></div> PROCESSANDO...
+                    </span>
                 </button>
                 <button type="button" onclick="history.back()" class="btn-secondary">
                     VOLTAR
@@ -188,7 +220,6 @@
 
 {% block scripts %}
 <script>
-    // Todo o seu JavaScript genial foi mantido, operando nos IDs corretos.
     function limparCamposPorAlteracaoCPF() {
         ['nome', 'email', 'numero', 'bairro', 'complemento', 'cidade', 'estado_uf', 'chave_pix', 'endereco', 'cep', 'whatsapp'].forEach(id => {
             if(document.getElementById(id)) document.getElementById(id).value = '';
@@ -216,7 +247,7 @@
     document.getElementById('cep').addEventListener('input', e => e.target.value = aplicarMascara(e.target.value, 'cep'));
     document.getElementById('whatsapp').addEventListener('input', e => e.target.value = aplicarMascara(e.target.value, 'tel'));
 
-    // Autocomplete CPF (Sua lógica API preservada)
+    // Autocomplete CPF
     document.getElementById('cpf').addEventListener('blur', function() {
         const cpfLimpo = this.value.replace(/\D/g, ''); 
         const feedback = document.getElementById('feedbackCpf');
@@ -271,7 +302,7 @@
                         document.getElementById('cidade').value = dados.localidade || '';
                         document.getElementById('estado_uf').value = dados.uf || '';
                         document.getElementById('endereco').placeholder = "";
-                        // Rola suavemente para o campo número e foca
+                        
                         const campoNumero = document.getElementById('numero');
                         campoNumero.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         campoNumero.focus();
@@ -285,9 +316,16 @@
     // Feedback visual do Botão Submit (Spinner)
     document.getElementById('form-cadastro-mobile').addEventListener('submit', function() {
         const btnSubmit = document.getElementById('btn-submit-mobile');
-        btnSubmit.innerHTML = `PROCESSANDO...`;
-        btnSubmit.style.opacity = "0.7";
-        btnSubmit.style.pointerEvents = "none";
+        
+        // Esconde o texto padrão e exibe a estrutura do Spinner
+        document.getElementById('btn-text-default').style.display = 'none';
+        document.getElementById('btn-text-loading').style.display = 'flex';
+        
+        // Desativa o botão mantendo uma leve opacidade para feedback de ação
+        setTimeout(() => {
+            btnSubmit.disabled = true;
+            btnSubmit.style.opacity = "0.8";
+        }, 50); // Delay mínimo para garantir o envio do form antes de travar o botão
     });
 </script>
 {% endblock %}

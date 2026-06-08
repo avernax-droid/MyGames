@@ -5,5 +5,5 @@ opção "Não concordo com os termos..." os icones tikets devem ser do mesmo tam
 o sistema deve emitir um aviso.
 - na tela de identificação, quando o usuario selecionar o botão "gerar protocolo" o sistema deve mostrar algum icone, alguma coisa,
 que mostre para o usuario que o sistema não travou...
-- quando a origem do acesso é um desktop, note, na tela estado de conservação, quando o usuario seleciona usar camera do celular,
-verificar porque quando o usuario tenta ler o QR code da erro "não é possivel acessar esse site"
+- mo aplicativo admin/backoffice na opção protocolos/detalhe o numero do telefone está sendo mostrado sem mascara, precisa ajustat
+
