@@ -10,8 +10,9 @@
   - 30/05/2026: Adição do botão de retorno padrão alinhado à direita.
   - 01/06/2026: Implementação do suporte a fotos_validadas, renderizando
                 alertas visuais para arquivos físicos ausentes na pasta uploads.
-  - 04/06/2026: Ajuste na tabela de itens para exibir a coluna "Subtotal", 
-                multiplicando o valor unitário pela quantidade.
+  - 04/06/2026: Ajuste na tabela de itens para exibir a coluna "Subtotal".
+  - 07/06/2026: Implementação de Modal (Lightbox) via CSS/JS para ampliação 
+                fluida das fotos de perícia na mesma tela.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -34,14 +35,11 @@
     .table-itens th { background-color: #151515; padding: 12px; text-align: left; font-size: 12px; color: var(--texto-dim); }
     .table-itens td { padding: 12px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
     
-    /* Container para alinhar o botão à direita */
     .btn-container {
         display: flex;
         justify-content: flex-end;
         margin-top: 20px;
     }
-
-    /* Botão com tamanho ajustado ao conteúdo */
     .btn-voltar {
         display: inline-block;
         padding: 10px 20px;
@@ -58,15 +56,66 @@
 
     /* Galeria e Cards */
     .galeria-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
-    .foto-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; }
-    .foto-card img { max-width: 100%; border-radius: 4px; margin-bottom: 8px; }
+    .foto-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; transition: transform 0.2s; }
+    .foto-card:hover { transform: scale(1.02); border-color: var(--cor-destaque); }
+    .foto-card img { max-width: 100%; border-radius: 4px; margin-bottom: 8px; cursor: zoom-in; }
     .foto-legenda { font-size: 12px; color: var(--texto-dim); margin-top: auto; padding-top: 8px; }
 
-    /* Estilização para imagens que constam no banco mas não na pasta */
     .foto-erro { border: 1px dashed #ff4444; background-color: rgba(255, 68, 68, 0.05); border-radius: 4px; padding: 20px 5px; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; }
     .foto-erro-icone { font-size: 20px; margin-bottom: 5px; }
     .foto-erro-titulo { font-size: 11px; color: #ff4444; font-weight: bold; margin-bottom: 5px; }
     .foto-erro-arquivo { font-size: 9px; color: var(--texto-dim); word-break: break-all; }
+
+    /* CSS DO MODAL DE AMPLIAÇÃO (LIGHTBOX) */
+    .modal-lightbox {
+        display: none; 
+        position: fixed; 
+        z-index: 9999; 
+        padding-top: 60px; 
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        overflow: auto; 
+        background-color: rgba(0,0,0,0.9); 
+        backdrop-filter: blur(5px);
+    }
+    .modal-lightbox-conteudo {
+        margin: auto;
+        display: block;
+        max-width: 90%;
+        max-height: 80vh;
+        border: 2px solid var(--cor-destaque);
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+    }
+    .modal-lightbox-fechar {
+        position: absolute;
+        top: 20px;
+        right: 40px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        transition: 0.3s;
+        cursor: pointer;
+    }
+    .modal-lightbox-fechar:hover, .modal-lightbox-fechar:focus {
+        color: var(--cor-destaque);
+        text-decoration: none;
+        cursor: pointer;
+    }
+    #legenda-modal {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 700px;
+        text-align: center;
+        color: var(--cor-destaque);
+        padding: 15px 0;
+        font-size: 16px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
 </style>
 
 <div class="grid-detalhes">
@@ -105,14 +154,14 @@
 </div>
 
 <div class="card-admin info-section">
-    <h3>Galeria de Inspeção (Handoff Mobile)</h3>
+    <h3>Galeria de Inspeção</h3>
     <div class="galeria-fotos">
         {% for item in itens %}
             {% for foto in item.fotos_validadas %}
             <div class="foto-card">
                 
                 {% if foto.existe_no_disco %}
-                    <img src="{{ foto.url_estatica }}" alt="Foto">
+                    <img src="{{ foto.url_estatica }}" alt="Foto do Produto" onclick="abrirModalLightbox('{{ foto.url_estatica }}', '{{ item.nome_produto }}')">
                 {% else %}
                     <div class="foto-erro">
                         <span class="foto-erro-icone">⚠️</span>
@@ -130,9 +179,46 @@
     </div>
 
     <div class="btn-container">
-        <a href="/protocolos" class="btn-voltar">
-            Voltar
-        </a>
+        <a href="/protocolos" class="btn-voltar">Voltar</a>
     </div>
 </div>
+
+<div id="modalFotosLightbox" class="modal-lightbox">
+    <span class="modal-lightbox-fechar" onclick="fecharModalLightbox()">&times;</span>
+    <img class="modal-lightbox-conteudo" id="imgModalAmpliada">
+    <div id="legenda-modal"></div>
+</div>
+
+<script>
+    const modal = document.getElementById("modalFotosLightbox");
+    const imgAmpliada = document.getElementById("imgModalAmpliada");
+    const legendaModal = document.getElementById("legenda-modal");
+
+    function abrirModalLightbox(src, legenda) {
+        modal.style.display = "block";
+        imgAmpliada.src = src;
+        legendaModal.innerHTML = legenda;
+        // Impede a rolagem do fundo enquanto o modal está aberto
+        document.body.style.overflow = "hidden";
+    }
+
+    function fecharModalLightbox() {
+        modal.style.display = "none";
+        document.body.style.overflow = "auto";
+    }
+
+    // Fecha o modal se clicar fora da imagem
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            fecharModalLightbox();
+        }
+    }
+
+    // Fecha o modal se apertar ESC
+    document.addEventListener('keydown', function(event){
+        if(event.key === "Escape"){
+            fecharModalLightbox();
+        }
+    });
+</script>
 {% endblock %}
