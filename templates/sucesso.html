@@ -11,6 +11,7 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 10/06/2026: Adição do painel de exibição de Logística Reversa (e-ticket e rastreio).
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -42,6 +43,34 @@
             {{ protocolo if protocolo else session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
         </strong>
     </div>
+
+    {% if e_ticket or codigo_rastreio %}
+    <div style="background: rgba(0, 170, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--cor-destaque); margin-bottom: 15px; text-align: left;">
+        <h3 style="font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 15px 0; font-size: 1.1rem; letter-spacing: 0.5px;">
+            📦 Logística Reversa (Envio Correios)
+        </h3>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px;">
+            {% if e_ticket %}
+            <div style="flex: 1; min-width: 200px;">
+                <span style="display: block; font-size: 0.75rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Código de Postagem (E-Ticket)</span>
+                <strong style="font-size: 1.3rem; color: var(--texto-br); font-family: 'Courier New', monospace;">{{ e_ticket }}</strong>
+            </div>
+            {% endif %}
+            
+            {% if codigo_rastreio %}
+            <div style="flex: 1; min-width: 200px;">
+                <span style="display: block; font-size: 0.75rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Código de Rastreio</span>
+                <strong style="font-size: 1.3rem; color: var(--texto-br); font-family: 'Courier New', monospace;">{{ codigo_rastreio }}</strong>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div style="font-size: 0.85rem; color: var(--texto-dim); border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; line-height: 1.4;">
+            <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança, dirija-se a qualquer agência dos Correios e informe o Código de Postagem (E-Ticket) ao atendente. O frete já está totalmente pago pelo contrato comercial da MyGames.
+        </div>
+    </div>
+    {% endif %}
 
     {% if tem_pendentes %}
     <div style="background: rgba(255, 170, 0, 0.1); border: 1px dashed #ffaa00; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: left;">

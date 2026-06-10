@@ -18,6 +18,8 @@
   - 02/06/2026: Ajuste de layout dos botões de ação (Voltar/Avaliar).
   - 02/06/2026: Bloqueio do input de quantidade física para exigir valor maior que zero.
   - 03/06/2026: Realinhamento das condicionais do Jinja2 para exibir os formulários extras corretos de Jogos (ID 4) e Acessórios (ID 3).
+  - 10/06/2026: Correção de UX no feedback do upload local para exibir "Alterar Seleção" em vez de termos restritivos de substituição de foto única.
+  - 10/06/2026: Hotfix - Remoção da função 'Math' inválida no Jinja2 na condicional da categoria 2.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -248,12 +250,12 @@
                 fileMsgPc.innerText = "1 foto selecionada";
                 fileMsgPc.style.color = "var(--cor-destaque)";
                 fileMsgPc.style.fontWeight = "bold";
-                fakeBtn.innerText = "Trocar Foto";
+                fakeBtn.innerText = "Alterar Seleção";
             } else if (qtd > 1) {
                 fileMsgPc.innerText = `${qtd} fotos selecionadas`;
                 fileMsgPc.style.color = "var(--cor-destaque)";
                 fileMsgPc.style.fontWeight = "bold";
-                fakeBtn.innerText = "Trocar Fotos";
+                fakeBtn.innerText = "Alterar Seleção";
             } else {
                 fileMsgPc.innerText = "ou arraste as imagens aqui";
                 fileMsgPc.style.color = "#888";

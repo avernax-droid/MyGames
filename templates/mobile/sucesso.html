@@ -8,6 +8,10 @@
   do protocolo para que não quebre o layout horizontal do celular (word-break). 
   Extrai os estilos inline para classes limpas e ajusta o dimensionamento do 
   alerta de pendência e do botão final para encerramento de sessão.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 04/06/2026: Inclusão do cabeçalho padrão de documentação e layout mobile base.
+  - 10/06/2026: Implementação do Card Fluido de Logística Reversa para exibição do e-ticket e rastreio.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -70,6 +74,56 @@
         font-weight: bold;
     }
 
+    /* Card de Logística Reversa (Correios) */
+    .mobile-correios-box {
+        background: rgba(0, 170, 255, 0.05);
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid var(--cor-destaque);
+        margin-bottom: 20px;
+        text-align: left;
+    }
+    .mobile-correios-titulo {
+        color: var(--cor-destaque);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 15px;
+        text-transform: uppercase;
+        font-weight: bold;
+        margin: 0 0 12px 0;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .mobile-correios-item {
+        margin-bottom: 10px;
+    }
+    .mobile-correios-item:last-of-type {
+        margin-bottom: 0;
+    }
+    .mobile-correios-label {
+        display: block;
+        font-size: 11px;
+        color: var(--texto-dim);
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    .mobile-correios-valor {
+        font-size: 18px;
+        color: var(--texto-br);
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        word-break: break-all;
+    }
+    .mobile-correios-instrucao {
+        font-size: 12px;
+        color: var(--texto-dim);
+        line-height: 1.4;
+        margin-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        padding-top: 8px;
+    }
+
     /* Alertas e Resumo */
     .mobile-alerta-pendente {
         background: rgba(255, 170, 0, 0.1);
@@ -115,6 +169,9 @@
         width: 100%;
         padding: 18px 0;
         font-size: 16px;
+        display: block;
+        text-decoration: none;
+        box-sizing: border-box;
     }
 </style>
 {% endblock %}
@@ -146,10 +203,34 @@
             </span>
         </div>
 
+        {% if e_ticket or codigo_rastreio %}
+        <div class="mobile-correios-box">
+            <h3 class="mobile-correios-titulo">📦 Logística Reversa</h3>
+            
+            {% if e_ticket %}
+            <div class="mobile-correios-item">
+                <span class="mobile-correios-label">Código de Postagem (E-Ticket)</span>
+                <span class="mobile-correios-valor">{{ e_ticket }}</span>
+            </div>
+            {% endif %}
+
+            {% if codigo_rastreio %}
+            <div class="mobile-correios-item">
+                <span class="mobile-correios-label">Código de Rastreio</span>
+                <span class="mobile-correios-valor">{{ codigo_rastreio }}</span>
+            </div>
+            {% endif %}
+
+            <div class="mobile-correios-instrucao">
+                <strong>Instruções de Postagem:</strong> Dirija-se a uma agência dos Correios com os itens embalados e informe o Código de Postagem acima. O envio é 100% gratuito.
+            </div>
+        </div>
+        {% endif %}
+
         {% if tem_pendentes %}
         <div class="mobile-alerta-pendente">
             <h4>⚠️ ANÁLISE PENDENTE</h4>
-            <p>Seu lote contém itens para avaliação manual. Nossa equipe enviará a oferta final em até 24 horas úteis.</p>
+            <p>Seu lote contém itens para avaliação manual. Nossa equipe enviará a oferta final em até 24 hours úteis.</p>
         </div>
         {% endif %}
 

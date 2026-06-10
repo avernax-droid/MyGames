@@ -772,3 +772,267 @@ O Formulário de Perícia (pericia.html): Testar na prática se o acionamento da
 Cards de Conversão (resultado.html e resumo_lote.html): Validar os espaçamentos, o tamanho das fontes e garantir que os botões de aceite da oferta não fiquem escondidos pelo teclado virtual.
 
 Consolidação: Assim que fecharmos a lapidação do fluxo inteiro via Ngrok, faremos o teste final rodando o ./deploy_homo.sh para empacotar todo esse novo visual no seu ambiente Docker de homologação.
+
+=============
+08/06
+
+Guia Técnico: Integração API Correios (Logística Reversa)
+Projeto: MyGames
+Módulo Central: engine.py
+Objetivo: Automatizar a geração de e-tickets (autorização de postagem) e códigos de rastreio para clientes que finalizam protocolos de venda de consoles/jogos no site, integrando diretamente com o portal CWS (Correios Web Services).
+
+1. Credenciais e Configurações Globais (.env)
+Para que a comunicação ocorra de forma segura e autenticada, a empresa precisará fornecer os dados do seu contrato 
+comercial com os Correios. Essas chaves ficarão blindadas no arquivo .env do servidor:
+
+Snippet de código
+# --- INTEGRAÇÃO CORREIOS (LOGÍSTICA REVERSA) ---
+CORREIOS_CNPJ=00.000.000/0000-00
+CORREIOS_CONTRATO=9992345678
+CORREIOS_CARTAO_POSTAGEM=0012345678
+CORREIOS_USUARIO=usuario_api_fornecido_pelos_correios
+CORREIOS_SENHA=senha_api_fornecida_pelos_correios
+2. Estrutura no Banco de Dados (MySQL)
+Seguindo a metodologia Design First, antes de processar qualquer dado, a tabela protocolos_recompra precisará ser 
+expandida para armazenar as informações logísticas retornadas pela API.
+
+Campos a serem adicionados na tabela:
+
+e_ticket (VARCHAR): Armazena o código numérico de autorização que o cliente ditará na agência (ex: 123456789).
+
+codigo_rastreio (VARCHAR): Armazena o código de acompanhamento (ex: QQ123456789BR).
+
+status_logistica (VARCHAR): Controla a etapa da entrega física (ex: "Aguardando Postagem", "Em Trânsito", "Recebido no 
+Laboratório").
+
+3. Arquitetura de Software e Fluxo no engine.py
+Toda a lógica de chamadas HTTP será concentrada no módulo engine.py para isolar a regra de negócio do arquivo de rotas 
+server.py. O fluxo acontecerá em duas fases:
+
+Fase A: Autenticação (Gerando o Token)
+A API dos Correios exige autenticação OAuth2. O sistema fará um POST enviando CORREIOS_USUARIO e CORREIOS_SENHA para o 
+endpoint de autenticação. Os Correios retornarão um Bearer Token (crachá de acesso virtual) que tem validade de algumas horas.
+
+Fase B: O Payload de Logística Reversa
+Com o Token em mãos, o engine.py montará um arquivo JSON (Payload) contendo os dados do protocolo para solicitar o 
+e-ticket.
+
+Estrutura do Payload enviado aos Correios:
+
+Dados do Contrato: CNPJ, número do contrato e cartão de postagem.
+
+Destinatário (MyGames): Endereço físico do laboratório de perícia da empresa.
+
+Remetente (Cliente): Resgatado do banco de dados (Nome, CEP, Rua, Número, Cidade, UF).
+
+Objeto: O serviço contratado (ex: SEDEX Reverso ou PAC Reverso) e o peso/dimensões estimadas da caixa 
+(ex: console + controles = ~3kg).
+
+4. O Ciclo de Vida da Integração (Passo a Passo)
+Ação do Usuário: No site-cliente, o usuário clica no botão "Finalizar Protocolo". O spinner de carregamento é ativado 
+na tela.
+
+Geração Local: O engine.py cria o protocolo no banco de dados MySQL e reserva o ID (ex: Protocolo #1050).
+
+Chamada Externa: O engine.py dispara a requisição JSON silenciosamente para os servidores dos Correios.
+
+Resposta dos Correios: A API retorna Status 201 (Created) com o número do e-ticket e o código de rastreamento.
+
+Gravação e Retorno: O engine.py faz um UPDATE no Protocolo #1050 salvando esses dois códigos no MySQL.
+
+Tela de Sucesso: O spinner para de girar. O site exibe a tela de confirmação verde informando: "Tudo certo! Vá até uma 
+agência dos Correios em até 7 dias e apresente o código de postagem: 123456789. O envio é por nossa conta!"
+
+5. Exibição no Admin (Backoffice)
+As informações capturadas alimentarão o Painel Administrativo que os operadores utilizam:
+
+Tabela de Protocolos: Passará a exibir as colunas "Rastreio" e "Status Logístico" para acompanhamento rápido.
+
+Detalhes do Protocolo (detalhes_protocolo.html): Ganhará um novo bloco ("Card") dedicado à Logística, mostrando o 
+endereço de origem do cliente, o e-ticket gerado, o código de rastreio clicável (linkando para o site dos Correios) e 
+a situação atual da caixa.
+
+6. Tratamento de Erros (Fallbacks)
+A internet ou a API dos Correios podem apresentar instabilidade. O engine.py deverá conter uma estrutura de try/except 
+robusta:
+
+Se a API falhar: O sistema não deve impedir o cliente de finalizar o protocolo. O protocolo será salvo no MySQL com a 
+coluna e_ticket nula.
+
+Interface do Cliente: A tela de sucesso informará: "Seu protocolo foi gerado! Em breve, nossa equipe enviará o código 
+de postagem gratuita para o seu WhatsApp/E-mail."
+
+Ação no Admin: O Backoffice mostrará um alerta visual (ex: botão vermelho "Gerar Rastreio Manualmente") para que o 
+operador aperte e force o engine.py a tentar a conexão com os Correios novamente em um momento posterior.
+
+
+Wagner, vejo duas interfaces entre os aplicativos:
+  - uma interface é quando o usuario acessa diretamento o site, o site não possui um cadastro de produtos, então deve acessar
+    e obter as informações do produto na base da IA (robot).
+  - outra interface é quando o usuario acessa a IA (robot) via whatsapp, nesse caso o robot, após a cotação, deve direcionar
+    esse usuario para o site para se identificar e gerar um protocolo de fechamento.
+
+ Quanto a primeira interface ainda não está claro pra mim alguns pontos, vou precisar falar com o Fabio.
+ Quanto a segunda interface, comno eu penso que deveria ser implementado:
+
+ -o agente IA, após a cotação, envia essas informações através de um POST (JSON) para o site.
+- o site recebe essa mensagem e responde um HTTP contendo um ID.
+- o agente IA recebe essa mensagem e direciona o usuário via um link (site) contendo esse ID. Esse ID é necessario para 
+  o site recuperar as informações que vieram na mensagem (POST) 
+
+  ==================
+  08/06 final
+
+  Guia de Retomada: Integração Logística Reversa (Site-Cliente)
+Objetivo: Automatizar a geração de e-tickets e códigos de rastreio no momento da finalização do protocolo no 
+site-cliente.
+
+1. Credenciais (Configuração no .env do site-cliente)
+Snippet de código
+# --- INTEGRAÇÃO CORREIOS (LOGÍSTICA REVERSA) ---
+CORREIOS_CNPJ=29322164000117
+CORREIOS_CONTRATO=21011923
+CORREIOS_CARTAO_POSTAGEM=76088456
+CORREIOS_USER=enzo2409
+CORREIOS_PASS=l5y86
+CORREIOS_AMBIENTE=homologacao
+2. Fluxo da Implementação (Plano de Ação)
+Fase 1 (Codificação): Criar a função de comunicação no engine.py do projeto site-cliente.
+
+Fase 2 (Validação): Validar o sucesso da conexão e a recepção dos dados (e_ticket, rastreio) via log no terminal 
+(sem salvar no banco ainda).
+
+Fase 3 (Persistência): Após o sucesso confirmado, realizar o ALTER TABLE no MySQL e gravar os dados retornados pela API.
+
+3. Sequência de Chamada (Diagrama Lógico)
+Resumo para o próximo chat:
+"Vamos retomar a implementação da API dos Correios no MyGames Site-Cliente. O gatilho para a API ocorre no botão 
+'Gerar Protocolo'. Temos as credenciais (21011923, 76088456, enzo2409, l5y86). O plano é: primeiro codificar a função 
+no engine.py do site-cliente e validar o retorno via log. Só depois de confirmar o funcionamento, alteraremos o banco 
+de dados."
+
+Estou com o contexto totalmente atualizado. Quando você retornar, é só darmos o "start" no código!
+
+==================
+09/06
+
+Relatório de Status: Integração da API dos Correios🛠️ 
+O que estamos fazendo?
+Estamos automatizando a Logística Reversa do sistema MyGames dentro do módulo core engine.py.  
+O objetivo principal é fazer com que, no exato momento em que um usuário finaliza um lote de venda de jogos ou 
+consoles no site, a aplicação se comunique de forma silenciosa com os servidores dos Correios.  
+Essa comunicação serve para gerar automaticamente um e-ticket (autorização de postagem gratuita) e um código de 
+rastreio.Desta forma, o cliente recebe o código diretamente na tela de sucesso, bastando ir a uma agência postar o 
+produto sem custo algum.📑 O que já foi feito e conquistado?Módulo Core Prepared: A função estrutural 
+gerar_logistica_reversa foi codificada com sucesso no módulo principal engine.py.  
+Script de Teste Criado: Desenvolvemos o arquivo isolado teste_correios.py para validar a comunicação e as respostas da 
+API sem poluir o banco de dados.Segurança Desvendada: Deciframos a dinâmica de autenticação do portal CWS dos Correios, 
+descobrindo que o sistema exige um Código de Acesso (Access Key) de 40 caracteres em vez da senha comum do portal.Chave 
+Mestre Gerada: 
+Você acessou o ambiente de produção e gerou com sucesso essa chave de acesso de longo prazo.Fase A (Autenticação) 
+Validada: Criamos um teste puro via Python que bateu nos servidores oficiais de produção dos Correios e retornou 
+Status 200, gerando o Bearer Token temporário com sucesso. Isso provou que o seu usuário e a sua nova chave estão 
+funcionando perfeitamente.🛑 
+O gargalo atual (O que travou o último teste?)
+O script principal teste_correios.py retornou o erro TOK-003: Cartão de postagem não localizado: 76088456.
+O motivo: O arquivo .env estava configurado para apontar para o ambiente de produção, mas os números de CNPJ, 
+Contrato e Cartão de Postagem usados ainda eram os dados padrão de teste fornecidos na documentação pública dos 
+Correios.  
+A consequência: O servidor real de produção procurou por esse cartão de testes na base de dados real e rejeitou a 
+requisição.📋 
+O que falta fazer em detalhes? (Próximos Passos)
+Fase 1: Configuração do Ambiente RealSubstituir no arquivo .env as credenciais fictícias de teste pelos dados 
+comerciais reais do contrato do seu cliente.  
+Rodar novamente o comando python teste_correios.py no terminal e validar no log se a Fase B respondeu com sucesso, 
+imprimindo o e-ticket e o código de rastreio reais gerados pelos Correios.
+Fase 2: Banco de Dados e Persistência (Metodologia Design First)Executar um ALTER TABLE no MySQL para expandir a 
+tabela protocolos_recompra, adicionando três novas colunas logísticas: e_ticket, codigo_rastreio e status_logistica.  
+Atualizar a função de finalização no engine.py para fazer o UPDATE e persistir esses dois códigos retornados pela API
+no registro do protocolo correspondente.  
+Fase 3: Ajuste de Interface (UX/UI do Cliente)Atualizar o template da tela de finalização (sucesso.html) para exibir o 
+código do e-ticket em destaque e as instruções amigáveis de postagem.  
+Implementar o Tratamento de Erros (Fallback) no engine.py para que, se a API dos Correios apresentar instabilidade, o 
+sistema salve o protocolo com o e-ticket nulo normalmente para não travar o cliente.  
+Fase 4: Backoffice Administrativo (Admin / Painel)Atualizar o painel que os operadores usam para exibir as colunas de 
+"Rastreio" e "Status Logístico" na listagem geral.
+Criar um bloco dedicado à Logística na tela de detalhes do protocolo e adicionar um botão de contingência para gerar o 
+rastreio manualmente se a API falhar no momento do cadastro.
+
+=========
+09/05
+Guia Técnico: Integração API Correios (Logística Reversa)
+Projeto: MyGames
+Módulo Central: engine.py
+
+Objetivo: Automatizar a geração de e-tickets (autorização de postagem) e códigos de rastreio para clientes que finalizam protocolos de venda de consoles/jogos no site, integrando diretamente com o portal CWS (Correios Web Services).
+
+Detalhamento do status atual e o plano de execução para implementarmos essa simulação de forma limpa, 
+sem destruir o código real que já construímos.
+
+1. O que já está pronto (Status da Integração)Neste momento, a arquitetura de comunicação com os Correios está 
+estruturalmente finalizada:
+
+O Coração do Sistema: 
+A função gerar_logistica_reversa já está perfeitamente implementada dentro do módulo core engine.py, pronta para 
+orquestrar essa lógica externa.  
+
+Gestão de Credenciais: 
+A leitura de todas as variáveis do arquivo .env (CNPJ, Contrato, Cartão de Postagem, Usuário e Senha) está funcional e 
+mapeada.  
+
+Requisições HTTP: 
+O código que dispara o POST para gerar o Token OAuth2 (Fase A) e o payload de Logística Reversa (Fase B) está pronto e 
+com a estrutura de dicionários JSON correta.
+
+Monitoramento e Logs: 
+A biblioteca de logging foi configurada e já provou estar capturando com precisão cirúrgica as respostas e os erros 
+(como vimos no diagnóstico do erro TOK-016).
+
+Ambiente de Teste: 
+O script isolado teste_correios.py está pronto para validar as chamadas diretamente no terminal, sem poluir a aplicação 
+web.
+2. Como executar o Mock (Passo a Passo)
+A forma mais elegante de simular essa resposta sem apagar o código que já fizemos é criar um "desvio" (bypass) baseado 
+em uma nova palavra-chave no arquivo de ambiente.
+
+Passo 1: Ajuste no arquivo .env
+Abra o seu arquivo .env e altere a variável que define o ambiente. Vamos trocar o valor de produção por uma 
+palavra-chave específica para o nosso mock.
+Altere CORREIOS_AMBIENTE=producao para CORREIOS_AMBIENTE=fake.
+
+Passo 2: Inserir o desvio no engine.py
+No seu VS Code, acesse o módulo engine.py. Nós vamos adicionar um bloco if logo após a leitura das variáveis de 
+ambiente na função gerar_logistica_reversa.  
+Insira este trecho de código imediatamente abaixo da linha ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao'):
+
+ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
+    
+    # ==========================================
+    # MOCK (SIMULAÇÃO DE RESPOSTA)
+    # ==========================================
+    if ambiente == "fake":
+        logging.info("MODO FAKE ATIVADO: Simulando resposta da API dos Correios...")
+        e_ticket_fake = "888888888"
+        rastreio_fake = "BR987654321BR"
+        logging.info(f"SUCESSO (FAKE)! E-ticket: {e_ticket_fake} | Rastreio: {rastreio_fake}")
+        return e_ticket_fake, rastreio_fake
+    
+    # Roteamento de ambiente real...
+    base_url = "https://apihom.correios.com.br" if ambiente == "homologacao" else "https://api.correios.com.br"
+
+Passo 3: Validação no Terminal
+Abra o seu terminal integrado do Ubuntu  e execute o script de teste:
+python teste_correios.py  
+O script baterá na condição fake e retornará imediatamente a tupla com os números inventados, provando que a função 
+está pronta para devolver dados para o resto do sistema.
+
+Passo 4: Continuidade do Projeto (Desbloqueio)Com a função retornando o e-ticket e o rastreio simulados, você agora 
+está livre para:
+
+Avançar para a Fase 2: 
+Conectar-se ao banco mygames_dev e rodar o ALTER TABLE na tabela protocolos_recompra  para criar as colunas 
+e_ticket e codigo_rastreio.  
+
+Avançar para a Fase 3: 
+Atualizar a função de salvar no banco e testar a exibição dessas variáveis no front-end, editando o arquivo 
+sucesso.html  para mostrar o código de postagem para o usuário final.  

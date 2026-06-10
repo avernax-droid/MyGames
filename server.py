@@ -23,6 +23,8 @@
 # - 04/06/2026: Correção na rota /cotar para passar o parâmetro de quantidade à engine e remoção de multiplicação redundante.
 # - 04/06/2026: Implementação de roteamento dinâmico para mobile (render_smart_template) usando a biblioteca user-agents.
 # - 07/06/2026: Correção de colisão de nomes de arquivos em uploads simultâneos via mobile (uso de enumerate na rota /cotar).
+# - 10/06/2026: Recebimento e repasse dos dados de logística reversa (e-ticket e rastreio) na rota /finalizar.
+# - 10/06/2026: Inclusão dos campos e_ticket e codigo_rastreio no dicionário dados_email para envio por e-mail.
 # ==============================================================================
 
 import os
@@ -184,14 +186,12 @@ def cotar():
 
     fotos_salvas = []
     
-    # === AQUI ESTÁ A CORREÇÃO PRINCIPAL: Uso do enumerate(files) ===
     if 'fotos' in request.files:
         files = request.files.getlist('fotos')
         for idx, file in enumerate(files):
             if file and allowed_file(file.filename):
                 ts = datetime.now().strftime("%H%M%S")
                 cli_prefix = session.get('cliente_id', 'anon')
-                # O parâmetro {idx} garante unicidade mesmo com o mesmo timestamp e nome nativo
                 filename = secure_filename(f"cli{cli_prefix}_prod{produto_id}_{ts}_{idx}_{file.filename}")
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 fotos_salvas.append(filename)
@@ -200,7 +200,6 @@ def cotar():
     if token_sessao:
         pasta_token = os.path.join(app.config['UPLOAD_FOLDER'], token_sessao)
         if os.path.exists(pasta_token):
-            # Correção preventiva aplicada também ao upload remoto/handoff
             for idx, file_name in enumerate(os.listdir(pasta_token)):
                 if allowed_file(file_name):
                     ts = datetime.now().strftime("%H%M%S")
@@ -476,15 +475,28 @@ def finalizar():
             
             engine.registrar_item_periciado(res_protocolo['id'], item)
         
+        e_ticket = res_protocolo.get('e_ticket')
+        codigo_rastreio = res_protocolo.get('codigo_rastreio')
+
+        # Mapeamento estendido das chaves para entrega no e-mail
         dados_email = {
             'protocolo': res_protocolo['numero'],
             'quantidade_itens': len(itens),
-            'total_pix': total_pix
+            'total_pix': total_pix,
+            'e_ticket': e_ticket,
+            'codigo_rastreio': codigo_rastreio
         }
         
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
-        return render_smart_template('sucesso.html', protocolo=res_protocolo['numero'], total_lote=total_pix, fase_atual=6)
+        return render_smart_template(
+            'sucesso.html', 
+            protocolo=res_protocolo['numero'], 
+            total_lote=total_pix, 
+            fase_atual=6,
+            e_ticket=e_ticket,
+            codigo_rastreio=codigo_rastreio
+        )
     
     return "Erro ao finalizar agendamento.", 500
 

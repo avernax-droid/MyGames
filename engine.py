@@ -18,6 +18,10 @@
 # - 02/06/2026: Adição da função salvar_feedback_recusa para o fluxo V2.9.
 # - 02/06/2026: Inclusão do valor total do lote no início do corpo do e-mail (enviar_email_resumo).
 # - 04/06/2026: Inclusão do parâmetro quantidade na função calcular_cotacao_final para multiplicação correta de múltiplos itens.
+# - 09/06/2026: Implementação da função de integração com API dos Correios (Logística Reversa) para validação via log.
+# - 10/06/2026: Inclusão do interceptador Mock 'fake' e integração automática da logística reversa na criação do protocolo.
+# - 10/06/2026: Hotfix na função calcular_cotacao_final para corrigir digitação no nome da coluna (fator_depreciacao).
+# - 10/06/2026: Formatação e inserção dos dados de logística reversa (e-ticket e rastreio) no corpo do e-mail de resumo.
 # ==============================================================================
 
 import mysql.connector
@@ -27,12 +31,16 @@ import datetime
 import smtplib
 import json
 import requests
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configuração de log focada na validação da API dos Correios via terminal
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS] %(levelname)s - %(message)s')
 
 def conectar_bd():
     try:
@@ -159,6 +167,7 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         produto = obter_produto_por_id(produto_id)
         if not produto: return None
         
+        # HOTFIX: Corrigido de factor_depreciacao para fator_depreciacao
         cursor.execute("SELECT fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
         
@@ -203,6 +212,20 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         corpo += f"Protocolo: {dados_email['protocolo']}\n"
         corpo += f"Valor Total do Lote (PIX): R$ {dados_email.get('total_pix', 0.0):.2f}\n\n"
         
+        # INCLUSÃO DA SEÇÃO DE LOGÍSTICA REVERSA NO CORPO DO E-MAIL
+        if dados_email.get('e_ticket') or dados_email.get('codigo_rastreio'):
+            corpo += "--------------------------------------------------------\n"
+            corpo += "📦 DADOS DE POSTAGEM (LOGÍSTICA REVERSA):\n"
+            if dados_email.get('e_ticket'):
+                corpo += f" Código de Postagem (E-Ticket): {dados_email['e_ticket']}\n"
+            if dados_email.get('codigo_rastreio'):
+                corpo += f" Código de Rastreio dos Correios: {dados_email['codigo_rastreio']}\n"
+            corpo += "\n Instruções: Embale os itens com segurança, dirija-se\n"
+            corpo += " a uma agência dos Correios e informe o E-Ticket acima.\n"
+            corpo += " O envio é faturado diretamente para a conta comercial\n"
+            corpo += " da MyGames, sendo 100% gratuito para você.\n"
+            corpo += "--------------------------------------------------------\n\n"
+
         tem_analise_manual = False
         
         for item in itens_avaliados:
@@ -252,13 +275,46 @@ def finalizar_proposta(dados_proposta):
         
         canal_id = dados_proposta.get('canal_aquisicao_id')
         
-        sql = "INSERT INTO protocolos_recompra (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id) VALUES (%s, %s, 'Aberto', %s, %s, NOW(), %s)"
+        cliente = obter_cliente(dados_proposta['cliente_id'])
         
-        cursor.execute(sql, (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred'], canal_id))
+        dados_remetente = {
+            "nome": cliente.get('nome_completo', ''),
+            "cep": cliente.get('cep', ''),
+            "logradouro": cliente.get('endereco', ''),
+            "numero": cliente.get('numero', ''),
+            "complemento": cliente.get('complemento', ''),
+            "bairro": cliente.get('bairro', ''),
+            "cidade": cliente.get('cidade', ''),
+            "uf": cliente.get('estado_uf', ''),
+            "ddd": "11",  
+            "telefone": cliente.get('whatsapp', '')
+        }
+        
+        e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente)
+        
+        sql = """INSERT INTO protocolos_recompra 
+                 (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
+                 VALUES (%s, %s, 'Aberto', %s, %s, NOW(), %s, %s, %s)"""
+        
+        cursor.execute(sql, (
+            dados_proposta['cliente_id'], 
+            protocolo, 
+            dados_proposta['total_pix'], 
+            dados_proposta['total_cred'], 
+            canal_id,
+            e_ticket,
+            codigo_rastreio
+        ))
         
         p_id = cursor.lastrowid
         db.commit()
-        return {"id": p_id, "numero": protocolo}
+        
+        return {
+            "id": p_id, 
+            "numero": protocolo,
+            "e_ticket": e_ticket,
+            "codigo_rastreio": codigo_rastreio
+        }
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
@@ -350,3 +406,102 @@ def buscar_canais_aquisicao():
         return cursor.fetchall()
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
+
+# --- INTEGRAÇÃO CORREIOS ---
+
+def gerar_logistica_reversa(dados_remetente):
+    cnpj = os.getenv('CORREIOS_CNPJ')
+    contrato = os.getenv('CORREIOS_CONTRATO')
+    cartao = os.getenv('CORREIOS_CARTAO_POSTAGEM')
+    usuario = os.getenv('CORREIOS_USER')
+    senha = os.getenv('CORREIOS_PASS')
+    ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
+    
+    # ==========================================
+    # MOCK (SIMULAÇÃO DE RESPOSTA)
+    # ==========================================
+    if ambiente == "fake":
+        logging.info("MODO FAKE ATIVADO: Simulando resposta da API dos Correios...")
+        e_ticket_fake = "888888888"
+        rastreio_fake = "BR987654321BR"
+        logging.info(f"SUCESSO (FAKE)! E-ticket: {e_ticket_fake} | Rastreio: {rastreio_fake}")
+        return e_ticket_fake, rastreio_fake
+
+    base_url = "https://apihom.correios.com.br" if ambiente == "homologacao" else "https://api.correios.com.br"
+    
+    # ==========================================
+    # FASE A: Autenticação (Gerando o Token)
+    # ==========================================
+    logging.info("Solicitando Token de Autenticação OAuth2...")
+    token_url = f"{base_url}/token/v1/autentica/cartaopostagem"
+    
+    try:
+        auth = (usuario, senha)
+        payload_auth = {"numero": cartao}
+        
+        resp_auth = requests.post(token_url, json=payload_auth, auth=auth)
+        resp_auth.raise_for_status()
+        
+        token = resp_auth.json().get('token')
+        logging.info("Token de acesso gerado com sucesso.")
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Falha na autenticação: {e}")
+        if e.response is not None:
+             logging.error(f"Detalhe: {e.response.text}")
+        return None, None
+
+    # ==========================================
+    # FASE B: Disparo do Payload de Logística
+    # ==========================================
+    logging.info("Montando e enviando payload de autorização de postagem...")
+    reversa_url = f"{base_url}/logistica-reversa/v1/reversas"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "contrato": contrato,
+        "cartaoPostagem": cartao,
+        "destinatario": {
+            "cnpj": cnpj,
+            "nome": "MyGames - Laboratório de Perícia",
+            "ddd": "11",
+            "telefone": "999999999", 
+            "cep": "02042010", 
+            "logradouro": "Av Leoncio de Magalhaes",
+            "numero": "179",
+            "complemento": "Galpão",
+            "bairro": "Jardim Sao Paulo",
+            "cidade": "São Paulo",
+            "uf": "SP"
+        },
+        "remetente": dados_remetente,
+        "coletas_solicitadas": [
+            {
+                "tipo": "A", 
+                "servico": "PAC", 
+                "peso": "3000" 
+            }
+        ]
+    }
+    
+    try:
+        resp_reversa = requests.post(reversa_url, headers=headers, json=payload)
+        resp_reversa.raise_for_status()
+        
+        dados_retorno = resp_reversa.json()
+        
+        e_ticket = dados_retorno.get('autorizacao_postagem')
+        codigo_rastreio = dados_retorno.get('codigo_rastreio')
+        
+        logging.info(f"SUCESSO! E-ticket: {e_ticket} | Rastreio: {codigo_rastreio}")
+        return e_ticket, codigo_rastreio
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Falha na geração da Logística Reversa: {e}")
+        if e.response is not None:
+             logging.error(f"Resposta dos Correios: {e.response.text}")
+        return None, None
