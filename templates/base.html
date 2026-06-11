@@ -8,6 +8,8 @@
   - 30/05/2026: Criação do layout inicial com Sidebar fixa em Dark Mode.
   - 30/05/2026: Implementação de lógica condicional RBAC.
   - 01/06/2026: Correção de roteamento via url_for para eliminar erros 404.
+  - 10/06/2026: Inclusão do atalho 'Fila de Trabalho' (Esteira) no menu lateral.
+  - 10/06/2026: Correção do atributo href no atalho da Fila de Trabalho para habilitar navegação global.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -79,6 +81,10 @@
             
             <a href="{{ url_for('listar_protocolos') }}" class="menu-item {% if request.endpoint == 'listar_protocolos' %}active{% endif %}">
                 <i class="fas fa-file-invoice-dollar"></i> Protocolos
+            </a>
+
+            <a href="{{ url_for('esteira_protocolos') }}" class="menu-item {% if request.endpoint == 'esteira_protocolos' %}active{% endif %}">
+                <i class="fas fa-tasks"></i> Fila de Trabalho
             </a>
 
             <a href="{{ url_for('listar_catalogo') }}" class="menu-item {% if request.endpoint == 'listar_catalogo' %}active{% endif %}">

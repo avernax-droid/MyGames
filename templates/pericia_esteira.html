@@ -1,0 +1,272 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: pericia_esteira.html
+  DATA DE CRIAÇÃO: 10/06/2026
+  HISTÓRICO DE ALTERAÇÕES:
+  - 11/06/2026: Refatoração da UI: Implementação de Acordeão para itens do lote.
+  - 11/06/2026: UX/UI: Implementação de botão toggle para Laudo Técnico e lógica 
+                "Dirty Form" para habilitar/desabilitar o botão Salvar.
+  - 11/06/2026: Ajustes visuais: Alteração da cor de destaque do Laudo para verde, 
+                agrupamento dos botões Salvar/Voltar na mesma linha via Flexbox
+                e padronização da classe .btn-voltar com o tema global.
+  - 11/06/2026: UX Fluxo: O botão 'Voltar' agora usa history.back() para retornar à
+                lista exata anterior. Salvamento migrado para AJAX p/ display discreto.
+  ==============================================================================
+#}
+{% extends 'base.html' %}
+
+{% block title %}Perícia #{{ protocolo.numero_protocolo }} - MyGames Admin{% endblock %}
+
+{% block page_title %}Realizar Perícia - Protocolo #{{ protocolo.numero_protocolo }}{% endblock %}
+
+{% block content %}
+<style>
+    .grid-pericia { display: grid; grid-template-columns: 3fr 2fr; gap: 25px; }
+    .painel-leitura, .painel-acao { background: var(--bg-card); border: 1px solid #333; border-radius: 12px; padding: 25px; }
+    .titulo-painel { color: var(--cor-destaque); font-size: 16px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+
+    /* Estilos do Acordeão Nativo (Details/Summary) */
+    .acordeao-item { background: #151515; border: 1px solid #333; border-radius: 8px; margin-bottom: 15px; overflow: hidden; }
+    .acordeao-header { padding: 15px; cursor: pointer; color: var(--cor-destaque); font-size: 15px; font-weight: bold; background: #1a1a1a; transition: background 0.2s; list-style: none; }
+    .acordeao-header::-webkit-details-marker { display: none; }
+    .acordeao-header:hover { background: #222; }
+    .acordeao-header::after { content: '\25BC'; float: right; font-size: 12px; color: #666; transition: transform 0.3s; }
+    details[open] .acordeao-header::after { transform: rotate(180deg); }
+    .acordeao-body { padding: 15px; border-top: 1px solid #333; }
+
+    /* Formulário */
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; margin-bottom: 8px; color: var(--texto-dim); font-size: 13px; font-weight: bold; }
+    .form-control { width: 100%; padding: 12px; background: #121212; border: 1px solid #444; color: white; border-radius: 6px; font-size: 14px; }
+    .form-control:focus { border-color: var(--cor-destaque); outline: none; }
+    
+    .btn-salvar { padding: 15px; background: var(--cor-destaque); color: #000; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: 0.3s; text-transform: uppercase; }
+    .btn-salvar:hover:not(:disabled) { filter: brightness(0.9); }
+    
+    /* Botão Voltar padronizado com o visual secundário do painel */
+    .btn-voltar { padding: 10px 20px; background: transparent; color: var(--texto-dim); border: 1px solid var(--texto-dim); border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.3s; display: inline-block; cursor: pointer; }
+    .btn-voltar:hover { background: var(--texto-dim); color: var(--bg-fundo); }
+
+    .btn-laudo { padding: 8px 15px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 10px; transition: 0.2s; }
+    .btn-laudo:hover { background: #333; }
+
+    /* Estilo ajustado para a caixa de laudo com o tom verde da interface */
+    #caixa-laudo { display: none; background: rgba(0, 230, 118, 0.05); border: 1px solid var(--cor-destaque); padding: 15px; border-radius: 6px; }
+    #caixa-laudo .form-label { color: var(--cor-destaque); }
+</style>
+
+<div class="grid-pericia">
+    
+    <div class="painel-leitura">
+        <h3 class="titulo-painel"><i class="fas fa-box-open"></i> Lote do Cliente: {{ protocolo.cliente_nome }}</h3>
+        
+        {% set total_pix = namespace(value=0) %}
+        <div class="lista-itens" style="max-height: 550px; overflow-y: auto; padding-right: 10px;">
+            {% for item in itens %}
+                {% set valor_calc = (item.valor_pix_unitario or 0) * (item.quantidade or 1) %}
+                {% set total_pix.value = total_pix.value + valor_calc %}
+                
+                <details class="acordeao-item">
+                    <summary class="acordeao-header">
+                        {{ item.quantidade | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
+                        <span style="color: #4CAF50; float: right; margin-right: 15px;">R$ {{ "%.2f"|format(valor_calc) }}</span>
+                    </summary>
+                    <div class="acordeao-body">
+                        <p style="font-size: 13px; color: #aaa; margin-bottom: 5px;">
+                            <strong style="color: #ccc;">Observações/Estado:</strong> 
+                            <span style="color: #ffc107;">{{ item.descricao_estado | default('Nenhuma observação informada.', true) }}</span>
+                        </p>
+                        
+                        <div class="mt-3">
+                            <strong style="font-size: 12px; color: #888; display: block; margin-bottom: 8px;">FOTOS DO PRODUTO:</strong>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                {% if item.fotos %}
+                                    {% for foto in item.fotos %}
+                                        <img src="/uploads/pericia/{{ foto }}" alt="Foto" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #444; background: #000;">
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="font-size: 12px; color: #555; font-style: italic;">Nenhuma foto anexada.</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            {% else %}
+                <p style="color: #666; font-size: 14px; font-style: italic;">Nenhum item listado para este protocolo.</p>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: #151515; border-radius: 6px; border: 1px dashed #444; text-align: right;">
+            <p style="font-size: 13px; color: var(--texto-dim); margin-bottom: 5px;">Total Original Esperado (Referência):</p>
+            <h3 style="color: #666; margin: 0;" id="total_original" data-valor="{{ total_pix.value }}">R$ {{ "%.2f"|format(total_pix.value) }}</h3>
+        </div>
+    </div>
+
+    <div class="painel-acao">
+        <h3 class="titulo-painel"><i class="fas fa-gavel"></i> Decisão Técnica e Financeira</h3>
+        
+        <form id="form-pericia" action="/esteira/salvar_pericia/{{ protocolo.id }}" method="POST">
+            
+            <div class="form-group" style="background: #1a1a1a; padding: 15px; border-radius: 6px; border: 1px solid #333;">
+                <label class="form-label" style="color: var(--cor-destaque); font-size: 14px;">Valor Final Avaliado do Lote (R$)</label>
+                <input type="number" step="0.01" min="0" name="valor_avaliado" id="valor_avaliado" class="form-control check-dirty" style="font-size: 20px; font-weight: bold; color: #4CAF50;" value="{{ "%.2f"|format(protocolo.valor_avaliado if protocolo.valor_avaliado else total_pix.value) }}" required>
+                <p style="font-size: 11px; color: #888; margin-top: 5px; margin-bottom: 0;">Se rejeitar o lote inteiro, digite 0.00</p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Novo Status (Próxima Etapa)</label>
+                <select name="status_id" id="status_id" class="form-control check-dirty" required>
+                    <option value="">-- Selecione uma decisão --</option>
+                    {% for s in lista_status %}
+                        <option value="{{ s.id }}" {% if protocolo.status_id == s.id %}selected{% endif %}>
+                            {{ s.nome_exibicao }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="button" class="btn-laudo" id="btnToggleLaudo">
+                <i class="fas fa-file-alt"></i> Laudo Técnico
+            </button>
+
+            <div id="caixa-laudo" class="form-group">
+                <label class="form-label"><i class="fas fa-exclamation-triangle"></i> Descritivo Técnico</label>
+                <textarea name="laudo_tecnico" id="laudo_tecnico" class="form-control check-dirty" rows="5" placeholder="Digite o laudo técnico ou justificativa...">{{ protocolo.laudo_tecnico if protocolo.laudo_tecnico else '' }}</textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
+                <a href="javascript:void(0);" onclick="if(document.referrer) { history.back(); } else { window.location.href='{{ url_for('esteira_protocolos', status_id=protocolo.status_id) }}'; }" class="btn-voltar">Voltar</a>
+                <button type="submit" class="btn-salvar" id="btn-salvar" disabled style="width: auto; padding-left: 40px; padding-right: 40px; opacity: 0.5; cursor: not-allowed;">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const formPericia = document.getElementById('form-pericia');
+        const selectStatus = document.getElementById('status_id');
+        const inputValor = document.getElementById('valor_avaliado');
+        const campoLaudo = document.getElementById('laudo_tecnico');
+        const caixaLaudo = document.getElementById('caixa-laudo');
+        const btnSalvar = document.getElementById('btn-salvar');
+        const btnToggleLaudo = document.getElementById('btnToggleLaudo');
+        const totalOriginal = parseFloat(document.getElementById('total_original').dataset.valor);
+
+        // Captura o estado inicial dos campos para comparar depois
+        const estadoInicial = {
+            status: selectStatus.value,
+            valor: inputValor.value,
+            laudo: campoLaudo.value
+        };
+
+        // Função de controle de abertura/fechamento do laudo
+        btnToggleLaudo.addEventListener('click', function() {
+            if (caixaLaudo.style.display === 'block') {
+                if (!campoLaudo.required) {
+                    caixaLaudo.style.display = 'none';
+                }
+            } else {
+                caixaLaudo.style.display = 'block';
+            }
+        });
+
+        if (estadoInicial.laudo.trim() !== '') {
+            caixaLaudo.style.display = 'block';
+        }
+
+        function verificarRegrasEModificacoes() {
+            const textoSelecionado = selectStatus.options[selectStatus.selectedIndex]?.text.toLowerCase() || "";
+            const valorAtual = parseFloat(inputValor.value) || 0;
+            
+            let exigeLaudo = false;
+            if (textoSelecionado.includes('negado') || textoSelecionado.includes('parcial') || textoSelecionado.includes('recusado') || textoSelecionado.includes('rejeitado')) {
+                exigeLaudo = true;
+            }
+            if (valorAtual < totalOriginal) {
+                exigeLaudo = true;
+            }
+
+            if (exigeLaudo) {
+                caixaLaudo.style.display = 'block';
+                campoLaudo.required = true;
+            } else {
+                campoLaudo.required = false;
+            }
+
+            const formAlterado = (
+                selectStatus.value !== estadoInicial.status ||
+                inputValor.value !== estadoInicial.valor ||
+                campoLaudo.value !== estadoInicial.laudo
+            );
+
+            // Só altera visualmente se o botão não estiver no estado de "salvando"
+            if (btnSalvar.textContent === "Salvar") {
+                if (formAlterado) {
+                    btnSalvar.disabled = false;
+                    btnSalvar.style.opacity = '1';
+                    btnSalvar.style.cursor = 'pointer';
+                } else {
+                    btnSalvar.disabled = true;
+                    btnSalvar.style.opacity = '0.5';
+                    btnSalvar.style.cursor = 'not-allowed';
+                }
+            }
+        }
+
+        document.querySelectorAll('.check-dirty').forEach(item => {
+            item.addEventListener('change', verificarRegrasEModificacoes);
+            item.addEventListener('input', verificarRegrasEModificacoes);
+        });
+
+        verificarRegrasEModificacoes();
+
+        // NOVO: Hijack do formulário para envio via AJAX
+        formPericia.addEventListener('submit', function(e) {
+            e.preventDefault(); // Impede o recarregamento da tela
+            
+            const formData = new FormData(this);
+            btnSalvar.textContent = "Salvando...";
+            btnSalvar.disabled = true;
+
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.sucesso) {
+                    // Feedback visual discreto direto no botão
+                    btnSalvar.textContent = "✔ Salvo!";
+                    btnSalvar.style.backgroundColor = "#00e676"; // Cor de sucesso
+                    btnSalvar.style.color = "#000";
+
+                    // Atualiza o estado da memória para bloquear o botão novamente
+                    estadoInicial.status = selectStatus.value;
+                    estadoInicial.valor = inputValor.value;
+                    estadoInicial.laudo = campoLaudo.value;
+
+                    // Após 2.5s, restaura o visual do botão
+                    setTimeout(() => {
+                        btnSalvar.textContent = "Salvar";
+                        btnSalvar.style.backgroundColor = "var(--cor-destaque)";
+                        verificarRegrasEModificacoes();
+                    }, 2500);
+                } else {
+                    alert("Erro ao salvar: " + (data.mensagem || "Verifique os dados."));
+                    btnSalvar.textContent = "Salvar";
+                    verificarRegrasEModificacoes();
+                }
+            })
+            .catch(error => {
+                console.error("Erro no envio:", error);
+                alert("Erro de comunicação com o servidor.");
+                btnSalvar.textContent = "Salvar";
+                verificarRegrasEModificacoes();
+            });
+        });
+    });
+</script>
+{% endblock %}

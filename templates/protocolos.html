@@ -10,6 +10,9 @@
   - 30/05/2026: Criação da listagem inicial em Dark Mode.
   - 01/06/2026: Inclusão da coluna Telefone, definição de widths para as colunas e ajuste de colspan.
   - 01/06/2026: Aplicação de máscara de formatação (DDD + Número) para a coluna telefone via Jinja2.
+  - 10/06/2026: Integração da coluna Status com a nova tabela status_protocolos.
+                Aplicação de Truncamento Inteligente via CSS e Tooltip nativo
+                para proteção de layout e renderização dinâmica das cores de badge.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -26,6 +29,8 @@
         border-collapse: collapse;
         margin-top: 15px;
         color: var(--texto-br);
+        /* Previne que a tabela estoure a largura da tela */
+        table-layout: fixed; 
     }
 
     .table-admin th {
@@ -43,22 +48,39 @@
         border-bottom: 1px solid #2a2a2a;
         font-size: 14px;
         vertical-align: middle;
+        /* Limita o conteúdo da célula para não quebrar linha */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .table-admin tr:hover {
         background-color: rgba(255, 255, 255, 0.02);
     }
 
-    /* Badges de Status */
-    .status-badge {
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: bold;
+    /* Novas Badges de Status Dinâmicas (Alinhadas com detalhes_protocolo.html) */
+    .badge-status { 
+        display: inline-block; 
+        padding: 6px 12px; 
+        border-radius: 4px; 
+        font-weight: bold; 
+        font-size: 11px; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px;
+        max-width: 100%;
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis;
+        vertical-align: bottom;
+        box-sizing: border-box;
     }
-    .status-aberto { background: rgba(255, 193, 7, 0.1); color: #ffc107; border: 1px solid #ffc107; }
-    .status-recebido { background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid #00e676; }
-    .status-cancelado { background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid #ff4444; }
+    .badge-info { background-color: #0dcaf0; color: #000; }
+    .badge-primary { background-color: #0d6efd; color: #fff; }
+    .badge-warning { background-color: #ffc107; color: #000; }
+    .badge-success { background-color: #198754; color: #fff; }
+    .badge-dark { background-color: #212529; color: #fff; border: 1px solid #444; }
+    .badge-danger { background-color: #dc3545; color: #fff; }
+    .badge-secondary { background-color: #6c757d; color: #fff; }
 
     .btn-action {
         background: #333;
@@ -80,16 +102,16 @@
                 <th width="23%">Cliente</th>
                 <th width="15%">Telefone</th>
                 <th width="15%">Data</th>
-                <th width="15%">Valor (PIX)</th>
-                <th width="10%">Status</th>
+                <th width="10%">Valor (PIX)</th>
+                <th width="15%">Status</th>
                 <th width="10%" style="text-align: center;">Ações</th>
             </tr>
         </thead>
         <tbody>
             {% for prot in protocolos %}
             <tr>
-                <td><strong>#{{ prot.numero_protocolo }}</strong></td>
-                <td>{{ prot.cliente_nome }}</td>
+                <td title="#{{ prot.numero_protocolo }}"><strong>#{{ prot.numero_protocolo }}</strong></td>
+                <td title="{{ prot.cliente_nome }}">{{ prot.cliente_nome }}</td>
                 <td style="color: #ccc; font-family: monospace; font-size: 15px;">
                     {% if prot.cliente_telefone %}
                         {% set tel = prot.cliente_telefone | string %}
@@ -106,14 +128,13 @@
                 </td>
                 <td>{{ prot.data_criacao.strftime('%d/%m/%Y %H:%M') if prot.data_criacao else '--' }}</td>
                 <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format(prot.valor_total_pix) }}</td>
-                <td>
-                    <span class="status-badge 
-                        {% if prot.status == 'Aberto' %}status-aberto
-                        {% elif prot.status == 'Recebido' or prot.status == 'Pago' %}status-recebido
-                        {% else %}status-cancelado{% endif %}">
-                        {{ prot.status }}
+                
+                <td title="{{ prot.status_nome | default(prot.status) }}">
+                    <span class="badge-status badge-{{ prot.cor_badge | default('secondary') }}">
+                        {{ prot.status_nome | default(prot.status) }}
                     </span>
                 </td>
+                
                 <td style="text-align: center;">
                     <a href="/protocolos/{{ prot.id }}" class="btn-action"><i class="fas fa-eye"></i> Detalhes</a>
                 </td>

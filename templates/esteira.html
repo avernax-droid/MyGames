@@ -1,0 +1,176 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames - Backoffice
+  MÓDULO: esteira.html
+  DATA DE CRIAÇÃO: 10/06/2026
+  HISTÓRICO DE ALTERAÇÕES:
+  - 11/06/2026: Refatoração da UX - Substituição das "gavetas" por um Dropdown Select.
+  - 11/06/2026: Refinamento de UI - Ajuste de textos no label, remoção de option 
+                vazio e limpeza do cabeçalho da tabela de dados.
+  ==============================================================================
+#}
+{% extends 'base.html' %}
+
+{% block title %}Fila de Trabalho - MyGames Admin{% endblock %}
+
+{% block page_title %}Esteira de Gestão{% endblock %}
+
+{% block content %}
+<style>
+    /* Estilização do Seletor Dark Mode */
+    .esteira-seletor-container {
+        margin-bottom: 25px;
+        background: var(--bg-card);
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #333;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .esteira-seletor-container label {
+        font-size: 14px;
+        color: var(--texto-dim);
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
+        white-space: nowrap;
+    }
+
+    .select-status {
+        width: 100%;
+        max-width: 500px;
+        background-color: #151515;
+        color: var(--cor-destaque);
+        border: 1px solid #333;
+        padding: 12px 15px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.3s ease;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300E676%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
+        background-repeat: no-repeat;
+        background-position: right 15px top 50%;
+        background-size: 12px auto;
+    }
+
+    .select-status:hover, .select-status:focus {
+        border-color: var(--cor-destaque);
+        box-shadow: 0 0 10px rgba(0, 230, 118, 0.1);
+    }
+
+    .table-esteira {
+        width: 100%;
+        border-collapse: collapse;
+        color: var(--texto-br);
+    }
+
+    .table-esteira th {
+        background-color: #151515;
+        padding: 15px;
+        text-align: left;
+        font-size: 12px;
+        color: var(--texto-dim);
+        text-transform: uppercase;
+        border-bottom: 2px solid #333;
+    }
+
+    .table-esteira td {
+        padding: 15px;
+        border-bottom: 1px solid #2a2a2a;
+        font-size: 14px;
+    }
+
+    .btn-pericia {
+        background: var(--cor-destaque);
+        color: #000;
+        padding: 8px 15px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .btn-pericia:hover {
+        filter: brightness(0.8);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 50px;
+        color: var(--texto-dim);
+    }
+</style>
+
+<div class="esteira-seletor-container">
+    <label for="statusSelect"><i class="fas fa-filter"></i> Selecione o status:</label>
+    <select id="statusSelect" class="select-status" onchange="if(this.value) window.location.href=this.value;">
+        {% if not status_selecionado %}
+            <option value="" disabled selected>Selecione uma fase de trabalho abaixo</option>
+        {% endif %}
+        {% for s in resumo_status %}
+            <option value="{{ url_for('esteira_protocolos', status_id=s.id) }}" 
+                    {% if status_selecionado == s.id %}selected{% endif %}>
+                {{ s.nome_exibicao }} - {{ s.total }}
+            </option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="card-admin">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 16px; text-transform: uppercase; color: var(--cor-destaque);">
+            {% if status_selecionado %}
+                {{ protocolos[0].status_nome if protocolos else 'Lista Vazia' }}
+            {% else %}
+                Nenhum status selecionado
+            {% endif %}
+        </h3>
+        <span style="font-size: 12px; color: var(--texto-dim);">
+            <i class="fas fa-list"></i> {{ protocolos | length }} protocolo(s) listado(s)
+        </span>
+    </div>
+
+    <table class="table-esteira">
+        <thead>
+            <tr>
+                <th>Protocolo</th>
+                <th>Cliente</th>
+                <th>Data Entrada</th>
+                <th>Valor Ref.</th>
+                <th style="text-align: center;">Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in protocolos %}
+            <tr>
+                <td><strong>#{{ p.numero_protocolo }}</strong></td>
+                <td>{{ p.cliente_nome }}</td>
+                {% set data_str = p.data_criacao | string %}
+                <td>{{ data_str[8:10] }}/{{ data_str[5:7] }}/{{ data_str[0:4] }} {{ data_str[11:16] }}</td>
+                <td style="color: var(--texto-dim);">R$ {{ "%.2f"|format(p.valor_total_pix or 0) }}</td>
+                <td style="text-align: center;">
+                    <a href="/esteira/periciar/{{ p.id }}" class="btn-pericia">
+                        <i class="fas fa-search"></i> Periciar
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5">
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle" style="font-size: 40px; margin-bottom: 15px; display: block; color: var(--cor-destaque);"></i>
+                        Parabéns! Fila limpa e sem pendências.
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

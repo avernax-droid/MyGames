@@ -14,6 +14,16 @@
 # - 04/06/2026: Ajuste na rota /regioes/salvar para suportar requisições AJAX com retorno JSON.
 # - 04/06/2026: Adição da rota /catalogo/salvar com upload seguro físico de fotos_oficiais (Werkzeug).
 # - 04/06/2026: Adição da rota interna /api/buscar_produtos_nome para auto-completar de produtos.
+# - 10/06/2026: Atualização da query de listagem de protocolos para suportar LEFT JOIN de status.
+# - 10/06/2026: Injeção da lista dinâmica de status na rota de detalhes do protocolo.
+# - 10/06/2026: Criação da rota POST /protocolos/atualizar_status/<id> para a esteira de gestão.
+# - 10/06/2026: Criação da rota GET /esteira para exibir a Fila de Trabalho por gavetas.
+# - 10/06/2026: Criação da rota GET /esteira/periciar/<id> para o Cockpit de Ação.
+# - 10/06/2026: Criação da rota POST /esteira/salvar_pericia/<id> com redirecionamento de fluxo.
+# - 11/06/2026: Atualização da rota POST /esteira/salvar_pericia/<id> para capturar o campo valor_avaliado.
+# - 11/06/2026: Ajuste no app.run para host='0.0.0.0' visando suporte externo (Docker/Cloudflare).
+# - 11/06/2026: Inserção de laço de conversão JSON -> Lista para fotos na rota /esteira/periciar.
+# - 11/06/2026: Refatoração da rota /esteira/salvar_pericia/<id> para suportar requisições AJAX (UX silenciosa).
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -105,16 +115,91 @@ def listar_protocolos():
     db = conectar_bd()
     cursor = db.cursor(dictionary=True)
     query = """
-        SELECT p.id, p.numero_protocolo, p.status, p.valor_total_pix, p.data_criacao,
-               c.nome_completo as cliente_nome, c.whatsapp as cliente_telefone
+        SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.valor_total_pix, p.data_criacao,
+               c.nome_completo as cliente_nome, c.whatsapp as cliente_telefone,
+               s.nome_exibicao as status_nome, s.cor_badge
         FROM protocolos_recompra p 
         JOIN clientes_usuarios c ON p.cliente_id = c.id 
+        LEFT JOIN status_protocolos s ON p.status_id = s.id
         ORDER BY p.data_criacao DESC
     """
     cursor.execute(query)
     lista_protocolos = cursor.fetchall()
     db.close()
     return render_template('protocolos.html', protocolos=lista_protocolos)
+
+# --- NOVA ROTA: FILA DE TRABALHO (ESTEIRA) ---
+@app.route('/esteira')
+@app.route('/esteira/<int:status_id>')
+@requer_permissao('protocolos', 'read')
+def esteira_protocolos(status_id=None):
+    resumo_status = admin_engine.obter_resumo_esteira()
+    
+    protocolos_filtrados = []
+    if status_id:
+        protocolos_filtrados = admin_engine.obter_protocolos_por_status(status_id)
+        
+    return render_template('esteira.html', 
+                           resumo_status=resumo_status, 
+                           protocolos=protocolos_filtrados, 
+                           status_selecionado=status_id)
+
+# --- ROTA: TELA DE PERÍCIA FOCADA (COCKPIT) ---
+@app.route('/esteira/periciar/<int:protocolo_id>')
+@requer_permissao('protocolos', 'update')
+def periciar_na_esteira(protocolo_id):
+    dados_protocolo = admin_engine.obter_cabecalho_protocolo(protocolo_id)
+    if not dados_protocolo:
+        flash('Protocolo não encontrado.', 'error')
+        return redirect(url_for('esteira_protocolos'))
+    
+    itens_protocolo = admin_engine.obter_itens_protocolo(protocolo_id)
+    
+    for item in itens_protocolo:
+        item['fotos'] = []
+        if item.get('fotos_json'):
+            try:
+                fotos_lista = json.loads(item['fotos_json'])
+                if isinstance(fotos_lista, list):
+                    item['fotos'] = fotos_lista
+            except json.JSONDecodeError:
+                pass
+                
+    lista_status = admin_engine.buscar_status_ativos()
+    
+    return render_template('pericia_esteira.html', 
+                           protocolo=dados_protocolo, 
+                           itens=itens_protocolo, 
+                           lista_status=lista_status)
+
+# --- ROTA: SALVAR DECISÃO (COM SUPORTE AJAX) ---
+@app.route('/esteira/salvar_pericia/<int:protocolo_id>', methods=['POST'])
+@requer_permissao('protocolos', 'update')
+def salvar_pericia_esteira(protocolo_id):
+    status_id = request.form.get('status_id')
+    laudo_tecnico = request.form.get('laudo_tecnico')
+    valor_avaliado = request.form.get('valor_avaliado')
+
+    # Verifica se o JS disparou a requisição
+    is_ajax = request.headers.get('Accept') == 'application/json'
+
+    if not status_id or not valor_avaliado:
+        if is_ajax:
+            return jsonify({'sucesso': False, 'mensagem': 'Status e Valor Avaliado são obrigatórios.'})
+        flash('Status e Valor Avaliado são obrigatórios.', 'error')
+        return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
+
+    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado)
+
+    # Se for AJAX, apenas retorna o status invisível
+    if is_ajax:
+        return jsonify({'sucesso': sucesso})
+
+    # Fallback normal (caso o JS não funcione)
+    if not sucesso:
+        flash('Erro interno ao salvar a perícia.', 'error')
+        
+    return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
 @app.route('/protocolos/<int:protocolo_id>')
 @requer_permissao('protocolos', 'read')
@@ -125,7 +210,6 @@ def detalhes_protocolo(protocolo_id):
         return redirect(url_for('listar_protocolos'))
     
     itens_protocolo = admin_engine.obter_itens_protocolo(protocolo_id)
-    
     diretorio_uploads = os.getenv("DIRETORIO_UPLOADS_PERICIA", "")
     
     for item in itens_protocolo:
@@ -146,7 +230,27 @@ def detalhes_protocolo(protocolo_id):
             except json.JSONDecodeError:
                 pass
                 
-    return render_template('detalhes_protocolo.html', protocolo=dados_protocolo, itens=itens_protocolo)
+    lista_status = admin_engine.buscar_status_ativos()
+    return render_template('detalhes_protocolo.html', protocolo=dados_protocolo, itens=itens_protocolo, lista_status=lista_status)
+
+@app.route('/protocolos/atualizar_status/<int:protocolo_id>', methods=['POST'])
+@requer_permissao('protocolos', 'update')
+def atualizar_status_protocolo(protocolo_id):
+    status_id = request.form.get('status_id')
+    laudo_tecnico = request.form.get('laudo_tecnico')
+
+    if not status_id:
+        flash('Status inválido. Selecione uma etapa válida da esteira.', 'error')
+        return redirect(url_for('detalhes_protocolo', protocolo_id=protocolo_id))
+
+    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico)
+
+    if sucesso:
+        flash('Status do protocolo atualizado com sucesso!', 'success')
+    else:
+        flash('Erro interno ao atualizar o status do protocolo.', 'error')
+
+    return redirect(url_for('detalhes_protocolo', protocolo_id=protocolo_id))
 
 @app.route('/catalogo')
 @requer_permissao('catalogo', 'read')
@@ -155,7 +259,6 @@ def listar_catalogo():
     categorias = admin_engine.obter_categorias()
     return render_template('catalogo.html', produtos=produtos, categorias=categorias)
 
-# --- ROTAS DE BUSCA E SALVAMENTO DO CATÁLOGO ---
 @app.route('/api/buscar_produtos_nome')
 @requer_permissao('catalogo', 'read')
 def api_buscar_produtos_nome():
@@ -278,4 +381,4 @@ def servir_midia_externa(filename):
     return send_from_directory(diretorio_fotos, filename)
 
 if __name__ == '__main__':
-    app.run(debug=(os.getenv("FLASK_DEBUG") == "1"), port=int(os.getenv("PORTA_FLASK", 5002)))
+    app.run(host='0.0.0.0', debug=(os.getenv("FLASK_DEBUG") == "1"), port=int(os.getenv("PORTA_FLASK", 5002)))
