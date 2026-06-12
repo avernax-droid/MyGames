@@ -2,6 +2,7 @@
 # PROJETO: MyGames - Backoffice
 # MÓDULO: admin_engine.py
 # DATA DE CRIAÇÃO: 30/05/2026
+# TÍTULO: Motor de Regras e Integração de Banco de Dados
 # FUNÇÃO: Motor de persistência e regras de negócio do painel administrativo.
 # Centraliza a execução de queries SQL complexas e o isolamento da camada de dados.
 #
@@ -21,6 +22,7 @@
 # - 11/06/2026: Inclusão do campo valor_avaliado na query de obter_cabecalho_protocolo.
 # - 11/06/2026: Correção em obter_protocolos_por_status (LEFT JOIN clientes_usuarios) para evitar sumiço de dados.
 # - 11/06/2026: Adição de obter_todos_protocolos_listagem para integrar com template de listagem.
+# - 12/06/2026: Implementação de filtro em obter_todos_protocolos_listagem para ocultar protocolos encerrados (ID 9).
 # ==============================================================================
 
 import mysql.connector
@@ -76,6 +78,7 @@ def obter_todos_protocolos_listagem():
             FROM protocolos_recompra p 
             LEFT JOIN clientes_usuarios c ON p.cliente_id = c.id 
             LEFT JOIN status_protocolos s ON p.status_id = s.id
+            WHERE p.status_id IS NULL OR p.status_id <> 9
             ORDER BY p.data_criacao DESC
         """
         cursor.execute(query)

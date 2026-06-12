@@ -2,6 +2,7 @@
 # PROJETO: MyGames - Backoffice
 # MÓDULO: admin_server.py
 # DATA DE CRIAÇÃO: 30/05/2026
+# TÍTULO: Servidor Web e Roteamento Flask
 # FUNÇÃO: Servidor Controller principal do painel administrativo.
 # Gerencia a autenticação via identidade do usuário, sessão e permissões RBAC.
 #
