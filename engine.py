@@ -22,6 +22,7 @@
 # - 10/06/2026: Inclusão do interceptador Mock 'fake' e integração automática da logística reversa na criação do protocolo.
 # - 10/06/2026: Hotfix na função calcular_cotacao_final para corrigir digitação no nome da coluna (fator_depreciacao).
 # - 10/06/2026: Formatação e inserção dos dados de logística reversa (e-ticket e rastreio) no corpo do e-mail de resumo.
+# - 11/06/2026: Inclusão de status_id = 1 na função finalizar_proposta.
 # ==============================================================================
 
 import mysql.connector
@@ -292,9 +293,10 @@ def finalizar_proposta(dados_proposta):
         
         e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente)
         
+        # SQL ALTERADO PARA INCLUIR status_id = 1
         sql = """INSERT INTO protocolos_recompra 
-                 (cliente_id, numero_protocolo, status, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
-                 VALUES (%s, %s, 'Aberto', %s, %s, NOW(), %s, %s, %s)"""
+                  (cliente_id, numero_protocolo, status, status_id, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
+                  VALUES (%s, %s, 'Aberto', 1, %s, %s, NOW(), %s, %s, %s)"""
         
         cursor.execute(sql, (
             dados_proposta['cliente_id'], 
@@ -326,9 +328,9 @@ def salvar_feedback_recusa(dados):
     try:
         cursor = db.cursor()
         sql = """INSERT INTO feedbacks_recusa 
-                 (sessao_uuid, motivo_texto, cidade_informada, estado_uf, canal_aquisicao, 
-                  valor_oferta_recusada, itens_carrinho_json, user_agent, ip_origem, data_recusa) 
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())"""
+                  (sessao_uuid, motivo_texto, cidade_informada, estado_uf, canal_aquisicao, 
+                   valor_oferta_recusada, itens_carrinho_json, user_agent, ip_origem, data_recusa) 
+                  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())"""
         
         valores = (
             dados.get('sessao_uuid'),

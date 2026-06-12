@@ -1036,3 +1036,142 @@ e_ticket e codigo_rastreio.
 Avançar para a Fase 3: 
 Atualizar a função de salvar no banco e testar a exibição dessas variáveis no front-end, editando o arquivo 
 sucesso.html  para mostrar o código de postagem para o usuário final.  
+
+======
+10/06
+
+DOCUMENTAÇÃO TÉCNICA: INTEGRAÇÃO DE LOGÍSTICA REVERSA (CORREIOS)
+Projeto: MyGames
+Data de Implementação: 10/06/2026
+Branch: feature/mobile-otimizado
+Status: Fase de Simulação (Mock/Fake) Concluída e Integrada de Ponta a Ponta
+1. MODELAGEM E ESTRUTURA DO BANCO DE DADOS (MySQL)
+Para suportar o armazenamento dos dados retornados pela API dos Correios, a tabela principal de transações foi expandida, garantindo consistência histórica e rastreabilidade:
+
+Tabela Alterada: protocolos_recompra
+
+Novas Colunas Adicionadas:
+
+e_ticket (varchar(20), NULL): Armazena o código de autorização de postagem gerado para o cliente usar na agência.
+
+codigo_rastreio (varchar(50), NULL): Armazena o código de rastreamento do objeto para acompanhamento do frete de retorno.
+
+Regra de Consistência: Ambas as colunas aceitam valores nulos (YES), o que blinda o sistema. Se a API externa falhar ou atrasar, o protocolo de recompra do cliente é gerado e salvo normalmente, sem interromper a experiência do usuário.
+
+2. PARAMETRIZAÇÃO E SEGURANÇA DE AMBIENTE (.env)
+A arquitetura foi isolada utilizando variáveis de ambiente para garantir que credenciais sensíveis nunca sejam expostas e para permitir a alternância de ambientes sem mexer no código core:
+
+Configuração Atual no .env:
+
+CORREIOS_AMBIENTE=fake
+
+Funcionamento: Quando o valor está definido como fake, o sistema ativa o interceptador interno (Mock). Para migrar para o ambiente oficial de testes dos Correios, basta alterar para homologacao, e para colocar no ar definitivamente, altera-se para producao.
+
+3. MOTOR DE REGRAS E PERSISTÊNCIA (engine.py)
+O módulo core da aplicação centralizou toda a lógica de negócio e integração da logística reversa, dividida em três pilares:
+
+Interceptador Mock (Função gerar_logistica_reversa):
+
+Implementação de um bloco condicional imediatamente após a leitura do ambiente.
+
+Se CORREIOS_AMBIENTE == "fake", a função aborta o disparo de requisições HTTP reais (Fase A - Token OAuth2 e Fase B - Envio do Payload), gravando um alerta informativo no log e retornando instantaneamente uma tupla simulada de sucesso: ("888888888", "BR987654321BR").
+
+Orquestração do Fluxo (Função finalizar_proposta):
+
+A função foi reestruturada para atuar como o gatilho automático da logística reversa.
+
+Passo 1: Busca os dados cadastrais completos do cliente via obter_cliente().
+
+Passo 2: Monta dinamicamente o dicionário dados_remetente no padrão estrito exigido pelo schema dos Correios (Nome, CEP, Endereço, Número, Bairro, Cidade, UF e Telefone).
+
+Passo 3: Invoca gerar_logistica_reversa(dados_remetente) para obter o e-ticket e o rastreio.
+
+Passo 4: Atualiza a query de INSERT INTO protocolos_recompra para persistir estes códigos de forma unificada no MySQL.
+
+Comunicação Automatizada (Função enviar_email_resumo):
+
+O corpo do e-mail em texto plano enviado ao cliente foi expandido.
+
+Adição de um bloco condicional que detecta a existência de dados de logística reversa e injeta de forma organizada o Código de Postagem (E-Ticket), o Código de Rastreio e um guia de instruções com o passo a passo sobre como o cliente deve proceder para realizar a postagem gratuita na agência.
+
+4. CAMADA CONTROLADORA / ROTEAMENTO (server.py)
+O servidor Flask foi adaptado de forma cirúrgica para garantir o tráfego correto das novas variáveis entre o modelo de dados e a interface visual:
+
+Rota Atualizada: /finalizar
+
+Implementação:
+
+O retorno da função engine.finalizar_proposta() foi expandido para capturar o dicionário contendo as chaves e_ticket e codigo_rastreio.
+
+Esses códigos são injetados no dicionário dados_email (enviado para o motor de e-mail da engine).
+
+Por fim, as variáveis são passadas explicitamente como argumentos nomeados dentro da função render_smart_template('sucesso.html', ...), disponibilizando os dados para renderização no front-end.
+
+5. INTERFACES VISUAIS (Views / Templates)
+Seguindo a metodologia Design First, os componentes visuais foram projetados para garantir legibilidade técnica e uma excelente experiência de usuário em qualquer tamanho de tela:
+
+Template Desktop (templates/sucesso.html):
+
+Inclusão de um container estilizado em destaque com as cores do projeto.
+
+Uso de sistema flexível de colunas (display: flex) para exibir o E-Ticket e o Rastreio lado a lado de forma simétrica em monitores, acompanhado do bloco informativo de instruções de envio.
+
+Template Mobile (templates/mobile/sucesso.html):
+
+Versão exclusiva e otimizada para smartphones.
+
+Apresenta as informações em um formato de card fluido com empilhamento vertical.
+
+Aplicação da propriedade CSS word-break: break-all na exibição dos códigos. Isso blinda o layout do smartphone, impedindo que strings longas quebrem ou vazem horizontalmente para fora da tela do dispositivo.
+
+6. REPOSITÓRIO E CONTROLE DE VERSÃO (Git)
+Todo o pacote de alterações descritos acima foi auditado localmente e commitado sob os padrões de boas práticas de desenvolvimento:
+
+Comando de Stage: git add . (Modificações e novos arquivos rastreados com sucesso).
+
+Mensagem de Commit: Padronizada detalhando as alterações por módulo (feat: Integração Logística Reversa Correios (Mock) e ajustes de UX).
+
+Push Remoto: Enviado com sucesso para a branch de trabalho ativa: git push origin feature/mobile-otimizado.
+
+Status Atual: Árvore de trabalho limpa (working tree clean), sem pendências locais e totalmente sincronizada com o GitHub.
+
+========
+10/06 final
+
+PROJETO MYGAMES BACKOFFICE: SITUAÇÃO ATUAL E PENDÊNCIAS
+1. O QUE FOI REALIZADO (FUNDAÇÃO)
+Banco de Dados: Estruturação da tabela status_protocolos e migração de dados dos protocolos existentes para a nova chave status_id.
+
+Interface (UI/UX): Implementação de padrão visual "Dark Mode" com badges coloridos (Status) e Tooltips inteligentes.
+
+Módulo de Gestão (Esteira): Criada a tela esteira.html com filtros dinâmicos ("gavetas") que contabilizam o volume de trabalho por etapa.
+
+Módulo de Perícia (Cockpit): Criada a interface pericia_esteira.html para ação direta do operador, incluindo a obrigatoriedade lógica de laudo técnico para status de recusa.
+
+Lógica de Servidor: Roteamento (admin_server.py) e persistência (admin_engine.py) atualizados para suportar o novo fluxo de estados e a persistência de laudos.
+
+2. O QUE FALTA (AJUSTES DE INTEGRAÇÃO)
+Para que o módulo de perícia funcione e a fila de trabalho feche o ciclo sem erros, é preciso garantir que o servidor envie todos os dados que a tela solicita.
+
+A) Ajuste Crítico no admin_server.py:
+Na rota /esteira/periciar/<protocolo_id>, você deve garantir que a função busque todos os dados necessários (itens + itens periciados + cabeçalho completo) e envie para o template. O erro anterior ocorreu porque a função não estava enviando o campo valor_total_pix para a view.
+
+B) Ajuste Crítico no pericia_esteira.html:
+Como você decidiu não alterar o arquivo atual, a versão final que corrige o botão "Salvar Perícia", o estilo "Voltar" alinhado à direita e a exibição correta dos itens, deve ser consolidada com os seguintes blocos:
+
+Grade de Itens: Deve percorrer a lista de itens recebida do engine e renderizar o subtotal de cada item.
+
+Lógica JS: O script de detecção do botão deve ser mantido para que a transição de texto ("Salvar Decisão" vs "Salvar Perícia") funcione conforme a mudança de status.
+
+Estilização do Voltar: O botão <a> com a classe .btn-voltar deve estar contido em um container flex alinhado à direita (justify-content: flex-end) dentro do formulário.
+
+3. ROTEIRO DE CORREÇÃO FINAL
+Caso decida retomar o projeto, a ordem de correção para zerar os erros de servidor é:
+
+Reforçar o Engine: Verificar se obter_cabecalho_protocolo no admin_engine.py está retornando valor_total_pix (chave primária de custo do protocolo).
+
+Sincronizar a View: O pericia_esteira.html depende desse dicionário. Se o admin_server.py chamar a função correta do engine, o erro de UndefinedError desaparecerá automaticamente.
+
+Fluxo de Saída: O redirecionamento final da rota salvar_pericia_esteira deve apontar para url_for('esteira_protocolos'), garantindo que o operador sempre volte para a tela de triagem após processar um item.
+
+Este descritivo consolida o estado lógico do sistema. O projeto está estruturado em uma arquitetura de esteira funcional, bastando a finalização da integração de dados nas rotas mencionadas.
