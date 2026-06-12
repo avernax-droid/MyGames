@@ -24,6 +24,7 @@
 # - 11/06/2026: Ajuste no app.run para host='0.0.0.0' visando suporte externo (Docker/Cloudflare).
 # - 11/06/2026: Inserção de laço de conversão JSON -> Lista para fotos na rota /esteira/periciar.
 # - 11/06/2026: Refatoração da rota /esteira/salvar_pericia/<id> para suportar requisições AJAX (UX silenciosa).
+# - 11/06/2026: Refatoração da rota /protocolos para uso da função admin_engine.obter_todos_protocolos_listagem.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -112,23 +113,10 @@ def dashboard():
 @app.route('/protocolos')
 @requer_permissao('protocolos', 'read')
 def listar_protocolos():
-    db = conectar_bd()
-    cursor = db.cursor(dictionary=True)
-    query = """
-        SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.valor_total_pix, p.data_criacao,
-               c.nome_completo as cliente_nome, c.whatsapp as cliente_telefone,
-               s.nome_exibicao as status_nome, s.cor_badge
-        FROM protocolos_recompra p 
-        JOIN clientes_usuarios c ON p.cliente_id = c.id 
-        LEFT JOIN status_protocolos s ON p.status_id = s.id
-        ORDER BY p.data_criacao DESC
-    """
-    cursor.execute(query)
-    lista_protocolos = cursor.fetchall()
-    db.close()
+    lista_protocolos = admin_engine.obter_todos_protocolos_listagem()
     return render_template('protocolos.html', protocolos=lista_protocolos)
 
-# --- NOVA ROTA: FILA DE TRABALHO (ESTEIRA) ---
+# --- ROTA: FILA DE TRABALHO (ESTEIRA) ---
 @app.route('/esteira')
 @app.route('/esteira/<int:status_id>')
 @requer_permissao('protocolos', 'read')
@@ -180,7 +168,6 @@ def salvar_pericia_esteira(protocolo_id):
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
 
-    # Verifica se o JS disparou a requisição
     is_ajax = request.headers.get('Accept') == 'application/json'
 
     if not status_id or not valor_avaliado:
@@ -191,11 +178,9 @@ def salvar_pericia_esteira(protocolo_id):
 
     sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado)
 
-    # Se for AJAX, apenas retorna o status invisível
     if is_ajax:
         return jsonify({'sucesso': sucesso})
 
-    # Fallback normal (caso o JS não funcione)
     if not sucesso:
         flash('Erro interno ao salvar a perícia.', 'error')
         

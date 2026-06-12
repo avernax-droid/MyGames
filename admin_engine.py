@@ -20,6 +20,7 @@
 # - 11/06/2026: Atualização em atualizar_status_protocolo para suportar persistência do valor_avaliado.
 # - 11/06/2026: Inclusão do campo valor_avaliado na query de obter_cabecalho_protocolo.
 # - 11/06/2026: Correção em obter_protocolos_por_status (LEFT JOIN clientes_usuarios) para evitar sumiço de dados.
+# - 11/06/2026: Adição de obter_todos_protocolos_listagem para integrar com template de listagem.
 # ==============================================================================
 
 import mysql.connector
@@ -56,6 +57,29 @@ def obter_cabecalho_protocolo(protocolo_id):
         cursor.execute(query, (protocolo_id,))
         resultado = cursor.fetchone()
         return resultado
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def obter_todos_protocolos_listagem():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = """
+            SELECT p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao,
+                   c.nome_completo as cliente_nome, 
+                   c.whatsapp as cliente_telefone,
+                   s.nome_exibicao as status_nome, 
+                   s.cor_badge
+            FROM protocolos_recompra p 
+            LEFT JOIN clientes_usuarios c ON p.cliente_id = c.id 
+            LEFT JOIN status_protocolos s ON p.status_id = s.id
+            ORDER BY p.data_criacao DESC
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
     finally:
         if db and db.is_connected():
             cursor.close()
@@ -166,8 +190,6 @@ def obter_protocolos_por_status(status_id):
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        # CORREÇÃO: Alterado de JOIN para LEFT JOIN clientes_usuarios c
-        # Adicionado IFNULL para evitar quebra caso o cliente não exista na base de dados
         query = """
             SELECT p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao,
                    IFNULL(c.nome_completo, 'Cliente Não Vinculado') as cliente_nome,
