@@ -23,6 +23,8 @@
 # - 11/06/2026: Correção em obter_protocolos_por_status (LEFT JOIN clientes_usuarios) para evitar sumiço de dados.
 # - 11/06/2026: Adição de obter_todos_protocolos_listagem para integrar com template de listagem.
 # - 12/06/2026: Implementação de filtro em obter_todos_protocolos_listagem para ocultar protocolos encerrados (ID 9).
+# - 12/06/2026: Atualização em obter_cabecalho_protocolo para buscar data_status_atual da tabela de histórico.
+# - 12/06/2026: Adição do parâmetro admin_id e injeção do INSERT na tabela historico_status_protocolo.
 # ==============================================================================
 
 import mysql.connector
@@ -48,9 +50,13 @@ def obter_cabecalho_protocolo(protocolo_id):
     try:
         cursor = db.cursor(dictionary=True)
         query = """
-            SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado,
+            SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado, p.data_criacao,
                    c.nome_completo as cliente_nome, c.whatsapp as cliente_whatsapp, c.chave_pix,
-                   s.nome_exibicao as status_nome, s.cor_badge, s.slug_tecnico
+                   s.nome_exibicao as status_nome, s.cor_badge, s.slug_tecnico,
+                   IFNULL(
+                       (SELECT MAX(data_alteracao) FROM historico_status_protocolo WHERE protocolo_id = p.id),
+                       p.data_criacao
+                   ) AS data_status_atual
             FROM protocolos_recompra p 
             JOIN clientes_usuarios c ON p.cliente_id = c.id 
             LEFT JOIN status_protocolos s ON p.status_id = s.id
@@ -137,11 +143,13 @@ def buscar_status_ativos():
             cursor.close()
             db.close()
 
-def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado=None):
+def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado=None, admin_id=None):
     db = conectar_bd()
     if not db: return False
     try:
         cursor = db.cursor()
+        
+        # 1. Atualiza o status do protocolo principal
         if valor_avaliado is not None:
             query = """
                 UPDATE protocolos_recompra 
@@ -156,6 +164,14 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
                 WHERE id = %s
             """
             cursor.execute(query, (status_id, laudo_tecnico, protocolo_id))
+            
+        # 2. Insere na tabela de histórico se houver admin_id e status_id preenchidos
+        if admin_id and status_id:
+            query_log = """
+                INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id)
+                VALUES (%s, %s, %s)
+            """
+            cursor.execute(query_log, (protocolo_id, status_id, admin_id))
             
         db.commit()
         return True
@@ -282,7 +298,8 @@ def obter_todas_regioes():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        query = "SELECT id, city, estado_uf, multiplicador_preco, ativo FROM regioes_atendimento ORDER BY cidade ASC"
+        # CORREÇÃO: 'city' alterado para 'cidade'
+        query = "SELECT id, cidade, estado_uf, multiplicador_preco, ativo FROM regioes_atendimento ORDER BY cidade ASC"
         cursor.execute(query)
         resultados = cursor.fetchall()
         return resultados

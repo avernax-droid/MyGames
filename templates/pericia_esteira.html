@@ -14,6 +14,9 @@
                 lista exata anterior. Salvamento migrado para AJAX p/ display discreto.
   - 12/06/2026: UX Fluxo: Remoção do history.back() e substituição por link direto via 
                 url_for no botão 'Voltar' para evitar cache e forçar atualização da lista.
+  - 12/06/2026: UX UI: Adição da exibição da data_status_atual no cabeçalho do lote do cliente.
+  - 12/06/2026: UX Fluxo: Implementação do parâmetro 'origem' via query string para fixar a 
+                fila correta no botão Voltar pós-recarregamento da página.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -61,7 +64,12 @@
 <div class="grid-pericia">
     
     <div class="painel-leitura">
-        <h3 class="titulo-painel"><i class="fas fa-box-open"></i> Lote do Cliente: {{ protocolo.cliente_nome }}</h3>
+        <h3 class="titulo-painel" style="display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="fas fa-box-open"></i> Lote do Cliente: {{ protocolo.cliente_nome }}</span>
+            <span style="font-size: 13px; color: #4CAF50; font-weight: normal; text-transform: none;">
+                <i class="fas fa-clock" style="margin-right: 5px;"></i> Status atual desde: {{ protocolo.data_status_atual.strftime('%d/%m/%Y às %H:%M') if protocolo.data_status_atual else 'N/A' }}
+            </span>
+        </h3>
         
         {% set total_pix = namespace(value=0) %}
         <div class="lista-itens" style="max-height: 550px; overflow-y: auto; padding-right: 10px;">
@@ -77,7 +85,7 @@
                     <div class="acordeao-body">
                         <p style="font-size: 13px; color: #aaa; margin-bottom: 5px;">
                             <strong style="color: #ccc;">Observações/Estado:</strong> 
-                            <span style="color: #ffc107;">{{ item.descricao_estado | default('Nenhuma observação informada.', true) }}</span>
+                            <span style="color: #ffc107;">{{ item.descricao_estado | default('Nenhuma observation informada.', true) }}</span>
                         </p>
                         
                         <div class="mt-3">
@@ -138,7 +146,7 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
-                <a href="{{ url_for('esteira_protocolos', status_id=protocolo.status_id) }}" class="btn-voltar">Voltar</a>
+                <a href="{{ url_for('esteira_protocolos', status_id=request.args.get('origem', protocolo.status_id)) }}" class="btn-voltar">Voltar</a>
                 <button type="submit" class="btn-salvar" id="btn-salvar" disabled style="width: auto; padding-left: 40px; padding-right: 40px; opacity: 0.5; cursor: not-allowed;">Salvar</button>
             </div>
         </form>
@@ -155,6 +163,9 @@
         const btnSalvar = document.getElementById('btn-salvar');
         const btnToggleLaudo = document.getElementById('btnToggleLaudo');
         const totalOriginal = parseFloat(document.getElementById('total_original').dataset.valor);
+
+        // Alteração UX: Identifica a gaveta/status original de onde o operador iniciou a perícia
+        const statusOriginal = new URLSearchParams(window.location.search).get('origem') || "{{ protocolo.status_id }}";
 
         // Captura o estado inicial dos campos para comparar depois
         const estadoInicial = {
@@ -224,7 +235,7 @@
 
         verificarRegrasEModificacoes();
 
-        // NOVO: Hijack do formulário para envio via AJAX
+        // Hijack do formulário para envio via AJAX
         formPericia.addEventListener('submit', function(e) {
             e.preventDefault(); // Impede o recarregamento da tela
             
@@ -250,11 +261,9 @@
                     estadoInicial.valor = inputValor.value;
                     estadoInicial.laudo = campoLaudo.value;
 
-                    // Após 2.5s, restaura o visual do botão
+                    // Alteração UX: Força o redirecionamento injetando o status original como parâmetro fixo
                     setTimeout(() => {
-                        btnSalvar.textContent = "Salvar";
-                        btnSalvar.style.backgroundColor = "var(--cor-destaque)";
-                        verificarRegrasEModificacoes();
+                        window.location.href = window.location.pathname + "?origem=" + statusOriginal;
                     }, 2500);
                 } else {
                     alert("Erro ao salvar: " + (data.mensagem || "Verifique os dados."));

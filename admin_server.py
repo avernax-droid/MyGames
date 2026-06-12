@@ -26,6 +26,7 @@
 # - 11/06/2026: Inserção de laço de conversão JSON -> Lista para fotos na rota /esteira/periciar.
 # - 11/06/2026: Refatoração da rota /esteira/salvar_pericia/<id> para suportar requisições AJAX (UX silenciosa).
 # - 11/06/2026: Refatoração da rota /protocolos para uso da função admin_engine.obter_todos_protocolos_listagem.
+# - 12/06/2026: Injeção do admin_id nas rotas de atualização de status para suporte ao log de histórico.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -168,6 +169,9 @@ def salvar_pericia_esteira(protocolo_id):
     status_id = request.form.get('status_id')
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
+    
+    # Captura o admin que está fazendo a ação para o log de histórico
+    admin_id = session.get('admin_id')
 
     is_ajax = request.headers.get('Accept') == 'application/json'
 
@@ -177,7 +181,7 @@ def salvar_pericia_esteira(protocolo_id):
         flash('Status e Valor Avaliado são obrigatórios.', 'error')
         return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
-    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado)
+    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id)
 
     if is_ajax:
         return jsonify({'sucesso': sucesso})
@@ -224,12 +228,15 @@ def detalhes_protocolo(protocolo_id):
 def atualizar_status_protocolo(protocolo_id):
     status_id = request.form.get('status_id')
     laudo_tecnico = request.form.get('laudo_tecnico')
+    
+    # Captura o admin que está fazendo a ação para o log de histórico
+    admin_id = session.get('admin_id')
 
     if not status_id:
         flash('Status inválido. Selecione uma etapa válida da esteira.', 'error')
         return redirect(url_for('detalhes_protocolo', protocolo_id=protocolo_id))
 
-    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico)
+    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, None, admin_id)
 
     if sucesso:
         flash('Status do protocolo atualizado com sucesso!', 'success')
