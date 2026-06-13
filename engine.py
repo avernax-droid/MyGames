@@ -23,6 +23,7 @@
 # - 10/06/2026: Hotfix na função calcular_cotacao_final para corrigir digitação no nome da coluna (fator_depreciacao).
 # - 10/06/2026: Formatação e inserção dos dados de logística reversa (e-ticket e rastreio) no corpo do e-mail de resumo.
 # - 11/06/2026: Inclusão de status_id = 1 na função finalizar_proposta.
+# - 13/06/2026: Migração da integração dos Correios para arquitetura SOAP/XML. Inclusão de roteamento dinâmico de serviço (PAC/SEDEX) por faixa de CEP.
 # ==============================================================================
 
 import mysql.connector
@@ -32,6 +33,7 @@ import datetime
 import smtplib
 import json
 import requests
+import xml.etree.ElementTree as ET
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -168,7 +170,6 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         produto = obter_produto_por_id(produto_id)
         if not produto: return None
         
-        # HOTFIX: Corrigido de factor_depreciacao para fator_depreciacao
         cursor.execute("SELECT fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
         
@@ -293,7 +294,6 @@ def finalizar_proposta(dados_proposta):
         
         e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente)
         
-        # SQL ALTERADO PARA INCLUIR status_id = 1
         sql = """INSERT INTO protocolos_recompra 
                   (cliente_id, numero_protocolo, status, status_id, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
                   VALUES (%s, %s, 'Aberto', 1, %s, %s, NOW(), %s, %s, %s)"""
@@ -412,11 +412,10 @@ def buscar_canais_aquisicao():
 # --- INTEGRAÇÃO CORREIOS ---
 
 def gerar_logistica_reversa(dados_remetente):
-    cnpj = os.getenv('CORREIOS_CNPJ')
-    contrato = os.getenv('CORREIOS_CONTRATO')
-    cartao = os.getenv('CORREIOS_CARTAO_POSTAGEM')
     usuario = os.getenv('CORREIOS_USER')
     senha = os.getenv('CORREIOS_PASS')
+    cartao = os.getenv('CORREIOS_CARTAO_POSTAGEM')
+    contrato = os.getenv('CORREIOS_CONTRATO')
     ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
     
     # ==========================================
@@ -429,81 +428,121 @@ def gerar_logistica_reversa(dados_remetente):
         logging.info(f"SUCESSO (FAKE)! E-ticket: {e_ticket_fake} | Rastreio: {rastreio_fake}")
         return e_ticket_fake, rastreio_fake
 
-    base_url = "https://apihom.correios.com.br" if ambiente == "homologacao" else "https://api.correios.com.br"
-    
     # ==========================================
-    # FASE A: Autenticação (Gerando o Token)
+    # ROTEAMENTO DINÂMICO DE SERVIÇO (CEP)
+    # Regra de negócio da empresa:
+    # - CEP de 00000-000 até 19999-999: Utilizar SEDEX REVERSO AGÊNCIA
+    # - CEP de 20000-000 em diante: Utilizar PAC REVERSO AGÊNCIA
     # ==========================================
-    logging.info("Solicitando Token de Autenticação OAuth2...")
-    token_url = f"{base_url}/token/v1/autentica/cartaopostagem"
     
-    try:
-        auth = (usuario, senha)
-        payload_auth = {"numero": cartao}
-        
-        resp_auth = requests.post(token_url, json=payload_auth, auth=auth)
-        resp_auth.raise_for_status()
-        
-        token = resp_auth.json().get('token')
-        logging.info("Token de acesso gerado com sucesso.")
-        
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Falha na autenticação: {e}")
-        if e.response is not None:
-             logging.error(f"Detalhe: {e.response.text}")
-        return None, None
+    # Limpa o CEP para garantir apenas números
+    cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
+    
+    # Códigos padrão de logística reversa simultânea em agência
+    CODIGO_SEDEX_REVERSO = "04679"
+    CODIGO_PAC_REVERSO = "04677"
+    
+    codigo_servico = CODIGO_PAC_REVERSO  # Fallback de segurança para PAC
+    
+    if cep_cliente and len(cep_cliente) == 8:
+        if int(cep_cliente) < 20000000:
+            codigo_servico = CODIGO_SEDEX_REVERSO
+            logging.info(f"Roteamento de Frete: CEP {cep_cliente} classificado como SEDEX REVERSO ({codigo_servico})")
+        else:
+            codigo_servico = CODIGO_PAC_REVERSO
+            logging.info(f"Roteamento de Frete: CEP {cep_cliente} classificado como PAC REVERSO ({codigo_servico})")
 
-    # ==========================================
-    # FASE B: Disparo do Payload de Logística
-    # ==========================================
-    logging.info("Montando e enviando payload de autorização de postagem...")
-    reversa_url = f"{base_url}/logistica-reversa/v1/reversas"
+    # URL oficial de Logística Reversa em SOAP
+    url_soap = "https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS"
     
+    # Construção do Envelope XML dinâmico
+    xml_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.logisticareversa.correios.com.br/">
+       <soapenv:Header/>
+       <soapenv:Body>
+          <ser:solicitarPostagemReversa>
+             <codAdministrativo>{contrato}</codAdministrativo>
+             <codigo_servico>{codigo_servico}</codigo_servico>
+             <cartao>{cartao}</cartao>
+             <destinatario>
+                <nome>MyGames - Laboratorio de Pericia</nome>
+                <logradouro>Av Leoncio de Magalhaes</logradouro>
+                <numero>179</numero>
+                <complemento>Galpao</complemento>
+                <bairro>Jardim Sao Paulo</bairro>
+                <referencia></referencia>
+                <cidade>Sao Paulo</cidade>
+                <uf>SP</uf>
+                <cep>02042010</cep>
+                <telefone>11999999999</telefone>
+                <email>contato@mygames.com.br</email>
+             </destinatario>
+             <coletas_solicitadas>
+                <tipo>A</tipo>
+                <numero></numero>
+                <ag></ag>
+                <remetente>
+                   <nome>{dados_remetente.get('nome', '')[:50]}</nome>
+                   <logradouro>{dados_remetente.get('logradouro', '')[:50]}</logradouro>
+                   <numero>{dados_remetente.get('numero', '')[:10]}</numero>
+                   <complemento>{dados_remetente.get('complemento', '')[:30]}</complemento>
+                   <bairro>{dados_remetente.get('bairro', '')[:50]}</bairro>
+                   <referencia></referencia>
+                   <cidade>{dados_remetente.get('cidade', '')[:50]}</cidade>
+                   <uf>{dados_remetente.get('uf', '')[:2]}</uf>
+                   <cep>{dados_remetente.get('cep', '')[:8]}</cep>
+                   <ddd>{dados_remetente.get('ddd', '')[:2]}</ddd>
+                   <telefone>{dados_remetente.get('telefone', '')[:9]}</telefone>
+                   <email></email>
+                </remetente>
+                <obj_col>
+                   <item>1</item>
+                   <desc>Produtos Buyback MyGames</desc>
+                   <entrega></entrega>
+                   <num></num>
+                   <id></id>
+                </obj_col>
+             </coletas_solicitadas>
+          </ser:solicitarPostagemReversa>
+       </soapenv:Body>
+    </soapenv:Envelope>"""
+
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": ""
     }
     
-    payload = {
-        "contrato": contrato,
-        "cartaoPostagem": cartao,
-        "destinatario": {
-            "cnpj": cnpj,
-            "nome": "MyGames - Laboratório de Perícia",
-            "ddd": "11",
-            "telefone": "999999999", 
-            "cep": "02042010", 
-            "logradouro": "Av Leoncio de Magalhaes",
-            "numero": "179",
-            "complemento": "Galpão",
-            "bairro": "Jardim Sao Paulo",
-            "cidade": "São Paulo",
-            "uf": "SP"
-        },
-        "remetente": dados_remetente,
-        "coletas_solicitadas": [
-            {
-                "tipo": "A", 
-                "servico": "PAC", 
-                "peso": "3000" 
-            }
-        ]
-    }
+    # Autenticação exigida pelo WAF dos Correios
+    auth_http = (usuario, senha)
     
     try:
-        resp_reversa = requests.post(reversa_url, headers=headers, json=payload)
-        resp_reversa.raise_for_status()
+        logging.info("Enviando requisição SOAP para Logística Reversa...")
+        resp = requests.post(url_soap, data=xml_payload.encode('utf-8'), headers=headers, auth=auth_http, timeout=15)
         
-        dados_retorno = resp_reversa.json()
-        
-        e_ticket = dados_retorno.get('autorizacao_postagem')
-        codigo_rastreio = dados_retorno.get('codigo_rastreio')
-        
-        logging.info(f"SUCESSO! E-ticket: {e_ticket} | Rastreio: {codigo_rastreio}")
-        return e_ticket, codigo_rastreio
-        
+        if resp.status_code == 200:
+            root = ET.fromstring(resp.text)
+            
+            e_ticket = None
+            msg_erro = None
+            
+            for elem in root.iter():
+                if 'numero_pedido' in elem.tag:
+                    e_ticket = elem.text
+                if 'msg_erro' in elem.tag and elem.text:
+                    msg_erro = elem.text
+                    
+            if e_ticket:
+                logging.info(f"SUCESSO! E-ticket gerado: {e_ticket} via serviço {codigo_servico}")
+                return e_ticket, None
+            else:
+                logging.error(f"Recusa de negócio dos Correios. Motivo: {msg_erro}")
+                return None, None
+        else:
+            logging.error(f"Falha na integração. HTTP {resp.status_code}: {resp.text}")
+            return None, None
+
     except requests.exceptions.RequestException as e:
-        logging.error(f"Falha na geração da Logística Reversa: {e}")
-        if e.response is not None:
-             logging.error(f"Resposta dos Correios: {e.response.text}")
+        logging.error(f"Erro de conexão com os Correios: {e}")
+        return None, None
+    except Exception as e:
+        logging.error(f"Erro interno no processamento do XML: {e}")
         return None, None
