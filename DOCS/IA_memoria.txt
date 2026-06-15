@@ -27,8 +27,11 @@ Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta 
 
 3. ESTRUTURA DE DIRETÓRIOS (MÓDULOS)
 
+pasta MyGames:
+
 ├── DOCS
 │   ├── IA_memoria.txt
+│   ├── acesso_supabase.txt
 │   ├── arquivo_memoria.txt
 │   ├── especificação.txt
 │   ├── especificação_V0.txt
@@ -38,7 +41,7 @@ Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta 
 ├── __pycache__
 │   ├── engine.cpython-312.pyc
 │   └── server.cpython-312.pyc
-├── catalogo_exportado_fabio.xlsx:Zone.Identifier
+├── correçoes.txt
 ├── dev.sh
 ├── engine.py
 ├── requirements.txt
@@ -59,7 +62,7 @@ Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta 
 │   ├── base.html
 │   ├── boas_vindas.html
 │   ├── cadastro_complementar.html
-│   ├── mobile                  # NOVO: Módulos exclusivos para Smartphones
+│   ├── mobile
 │   │   ├── base_mobile.html
 │   │   ├── cadastro_complementar.html
 │   │   ├── pericia.html
@@ -75,6 +78,7 @@ Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta 
 │   ├── sucesso.html
 │   ├── termos_oferta.html
 │   └── upload_mobile.html
+├── teste_correios.py
 ├── utils
 │   ├── Troca Game Avaliação - Geral.xlsx
 │   ├── auditoria.py
@@ -113,97 +117,255 @@ Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta 
     ├── lib64 -> lib
     └── pyvenv.cfg
 
+pasta MyGames_Admin:
+
+├── DOC
+│   ├── IA_memoria_admin.txt
+│   └── memoria.txt
+├── __pycache__
+│   └── admin_engine.cpython-312.pyc
+├── admin_engine.py
+├── admin_server.py
+├── doc_modulos.txt
+├── extrai_funcoes.py
+├── requirements.txt
+├── static
+│   └── images
+│       └── catalogo
+├── templates
+│   ├── base.html
+│   ├── catalogo.html
+│   ├── configuracoes
+│   │   ├── canais.html
+│   │   ├── categorias.html
+│   │   ├── opcoes_estado.html
+│   │   ├── perguntas.html
+│   │   ├── regioes.html
+│   │   └── status.html
+│   ├── dashboard.html
+│   ├── detalhes_protocolo.html
+│   ├── esteira.html
+│   ├── login.html
+│   ├── pericia_esteira.html
+│   └── protocolos.html
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── dotenv
+    │   ├── flask
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.12
+    │   ├── python -> python3.12
+    │   ├── python3 -> python3.12
+    │   └── python3.12 -> /usr/bin/python3.12
+    ├── include
+    │   └── python3.12
+    ├── lib
+    │   └── python3.12
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+    
 DESCRIÇÃO DOS MÓDULOS PRINCIPAIS:
 - engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados, gestão de UUIDs e gestão segura de leads via UPSERT (validação por CPF). Persiste também logs de feedback de recusa de ofertas.
 - server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, detecta o dispositivo (Mobile/Desktop via user-agents) realizando roteamento dinâmico, processa uploads e atende endpoints de Handoff Remoto.
 
-DIRETÓRIO /templates (Versão Desktop / Fallback):
-- base.html: Estrutura padrão de layout.
-- boas_vindas.html: Landing page, captura canal de aquisição e cidade (integração IBGE). Híbrido, atende Desktop e Mobile perfeitamente.
-- produto.html: Catálogo de seleção em Grid.
-- pericia.html: Formulário de estado de conservação, interface dividida em abas para upload local via PC ou handoff remoto gerando QR Code dinâmico.
-- resultado.html: Exibe a cotação.
-- resumo_lote.html: Carrinho/resumo dos itens avaliados (formato Tabela).
-- termos_oferta.html: Interface de exibição da política da empresa pós-oferta com checkboxes.
-- cadastro_complementar.html: Formulário final de captura de lead em colunas.
-- sucesso.html: Geração do protocolo final.
-- upload_mobile.html: Interface mobile acessada pelo QR Code do Desktop.
+Modulos do aplicativo site/cliente - pasta MyGames
 
-DIRETÓRIO /templates/mobile (Exclusivo para Smartphones):
-- base_mobile.html: Layout mestre mobile com trava de viewport (maximum-scale=1.0) para impedir zoom indesejado e adequação do stepper.
-- produto.html: Catálogo transformado em lista vertical (List-View).
-- pericia.html: Formulário adaptado com botões largos, ignora fluxo de QR Code e aciona a câmera nativa (capture="environment").
-- resultado.html / resumo_lote.html: Interfaces convertidas de tabelas/grids para Cards fluidos com botões de ação verticalizados.
-- termos_oferta.html: Checkboxes convertidos em grandes painéis acionáveis (Cards de Seleção).
-- cadastro_complementar.html: Inputs empilhados (100% width) utilizando `type="tel"` ou `inputmode` para disparar teclados numéricos nativos (CPF, CEP, WhatsApp).
-- sucesso.html: Formatação adaptada com word-break no código do protocolo.
+ARQUIVO                                  | TÍTULO                                        | FUNÇÃO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+engine.py                                | Motor de Regras e Integração de Banco de Dados | Módulo core do sistema responsável por toda a camada de persistência  de dados (MySQL), cálculos de perícia (depreciação de valores), integração com  APIs externas (IBGE) e envio de comunicações automatizadas (e-mail). Orquestra  a lógica entre o front-end e o banco de dados.
+server.py                                | Servidor Web e Roteamento Flask               | Controladora principal da aplicação web. Gerencia todas as rotas (endpoints) do sistema, controla o fluxo de sessão do usuário (stepper), processa formulários,  gerencia uploads de arquivos e integra as chamadas ao módulo 'engine.py'.  Atua como a camada de interface entre o usuário e a lógica de negócio.
+templates/cadastro_complementar.html     | Finalização de Cadastro (Identificação)       | Tela responsável por coletar e validar os dados pessoais, de endereço  e de pagamento (chave PIX) do usuário. Possui lógica integrada para buscar e  preencher automaticamente os dados de clientes recorrentes a partir do CPF,  preparando a sessão para a geração do protocolo final do lote.
+templates/upload_mobile.html             | Interface Mobile de Câmera (Handoff Remoto)   | Tela ultra-leve acessada via QR Code pelo smartphone do usuário.  Permite o acesso nativo à câmera do dispositivo ou galeria para captura de fotos  da perícia. Envia os arquivos diretamente para o servidor via AJAX e informa a  conclusão para que o desktop possa prosseguir.
+templates/resumo_lote.html               | Resumo e Revisão do Lote de Produtos          | Exibe uma lista detalhada de todos os itens avaliados pelo usuário até  o momento, com seus respectivos estados de conservação, fotos (se houver),  observações e valores calculados (ou indicação de análise manual). Oferece  opções para retornar à seleção de produtos, prosseguir para os termos da oferta  ou descartar todo o lote atual.
+templates/pericia.html                   | Avaliação Técnica e Conservação do Produto    | Tela responsável por coletar informações detalhadas sobre o estado de  conservação do item selecionado.
+templates/produto.html                   | Seleção de Categoria e Busca de Produtos      | Tela responsável por permitir que o usuário escolha uma categoria  (Console, Controle, Jogo, Acessório) e pesquise dinamicamente itens do catálogo.  O módulo filtra os resultados em tempo real via JavaScript, priorizando produtos  que começam com o termo digitado, e também fornece a opção de "Outro produto  não listado" como rota de fuga para itens ausentes no banco.
+templates/sucesso.html                   | Tela de Conclusão e Protocolo                 | Exibe o número do protocolo gerado, confirma o envio do e-mail de  resumo e apresenta o valor final (ou parcial) do lote. Também emite um alerta  ao usuário caso existam itens sob consulta que dependam de análise manual  da equipe técnica.
+templates/termos_oferta.html             | Termos da Oferta e Política de Recompra       | Exibe as políticas da empresa após a cotação. Exige o aceite explícito  (checkbox) para avançar à identificação, ou permite recusar exibindo uma área  de feedback inline e descartando o lote.
+templates/boas_vindas.html               | Landing Page e Captura de Localização         | Ponto de entrada do sistema MyGames. Sua principal responsabilidade  é recepcionar o usuário, capturar sua localização geográfica (Cidade e UF)  através de busca em tempo real (API do IBGE) e registrar o canal de aquisição  (como ele conheceu a empresa) antes de liberar o acesso ao catálogo.
+templates/resultado.html                 | Exibição de Oferta e Revisão de Perícia       | Apresenta o resultado da avaliação técnica de um produto individual.  Exibe o valor da oferta gerada (ou o aviso de avaliação sob consulta para itens  personalizados), o estado de conservação selecionado e uma galeria de revisão  com fotos e comentários enviados pelo usuário. Inclui funcionalidade para  descartar a avaliação atual do item.
+templates/base.html                      | Template Base e Design System Globais         | Serve como o esqueleto principal (layout mestre) para todas as outras  telas do sistema. Define a estrutura HTML global, importa fontes, estabelece as  variáveis CSS globais do Design System (cores, botões, cards) e renderiza a barra  de progresso (stepper) de fases de navegação do usuário.
+templates/mobile/cadastro_complementar.html | Finalização de Cadastro (Mobile)              | Versão exclusiva para smartphones. Destrói o layout de colunas da  versão desktop para empilhar todos os inputs em 100% da largura (evitando que  os campos fiquem "espremidos"). Adiciona atributos 'inputmode' e 'type' específicos  para acionar o teclado numérico correto no iOS e Android em campos de telefone/CEP. Mantém toda a lógica de viaCEP e Autocomplete por CPF do Desktop.
+templates/mobile/resumo_lote.html        | Resumo e Revisão do Lote (Mobile)             | Versão exclusiva para smartphones. Elimina a estrutura de tabela (<table>) que prejudica a leitura em telas estreitas, substituindo-a por uma lista de Cards  fluidos (List-View). Reorganiza a exibição de quantidade e preço, e empilha os  botões de ação final para proteger a conversão e evitar cliques indesejados.
+templates/mobile/pericia.html            | Avaliação Técnica e Conservação (Mobile)      | Versão exclusiva para smartphones. Otimiza os botões de opção (radio)  para toques largos, adapta os formulários de perguntas extras (quantidade/original) e remove a lógica complexa de QR Code (Handoff), substituindo-a por um botão  nativo de acionamento direto da câmera do dispositivo.
+templates/mobile/produto.html            | Seleção e Busca de Produtos (Mobile)          | Versão exclusiva para smartphones. Transforma a grade de produtos do  desktop em uma lista vertical fluida (List-View), maximizando a área de toque  para evitar cliques acidentais e melhorando a leitura durante a busca com o  teclado virtual aberto.
+templates/mobile/base_mobile.html        | Template Base e Design System (Mobile)        | Serve como o esqueleto principal para o fluxo de usuários em smartphones.  Contém meta tags exclusivas de viewport para bloquear zoom acidental,  adapta o stepper de navegação e os touch-targets (botões/modais) para telas  menores, mantendo as variáveis do Design System original.
+templates/mobile/sucesso.html            | Tela de Conclusão e Protocolo (Mobile)        | Versão exclusiva para smartphones. Otimiza a exibição do código longo  do protocolo para que não quebre o layout horizontal do celular (word-break).  Extrai os estilos inline para classes limpas e ajusta o dimensionamento do  alerta de pendência e do botão final para encerramento de sessão.
+templates/mobile/termos_oferta.html      | Termos da Oferta e Política (Mobile)          | Versão exclusiva para smartphones. Transforma os checkboxes de aceite e recusa em "Cards Acionáveis", permitindo que o usuário toque em qualquer  parte da caixa para selecionar a opção. Otimiza a tipografia da lista de  políticas para evitar fadiga visual e empilha os botões de ação final.
+templates/mobile/resultado.html          | Exibição de Oferta e Revisão (Mobile)         | Versão exclusiva para smartphones. Apresenta o resultado da cotação  otimizando o tamanho da fonte do preço para telas menores e, o mais importante,  reorganizando os botões de ação final (Avançar, Adicionar Mais, Descartar)  em uma pilha vertical para evitar toques acidentais e melhorar a fluidez da UX.
+
+Modulos do aplicativo admin/backoffice - pasta MyGames_Admin
+
+ARQUIVO                                    | TÍTULO                                         | FUNÇÃO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+admin_engine.py                            | Motor de Regras e Integração de Banco de Dados | Motor de persistência e regras de negócio do painel administrativo. Centraliza a execução de queries SQL complexas e o isolamento da camada de dados.
+admin_server.py                            | Servidor Web e Roteamento Flask                | Servidor Controller principal do painel administrativo. Gerencia a autenticação via identidade do usuário, sessão e permissões RBAC.
+templates/dashboard.html                   | Visão Geral do Sistema (Dashboard)             | Página inicial do painel administrativo exibida logo após o login  bem-sucedido. Herda a estrutura principal do base.html e servirá futuramente  para exibir métricas gerais (resumo de protocolos abertos, itens pendentes, etc).
+templates/login.html                       | Tela de Autenticação da Equipe                 | Interface de login seguro para o painel administrativo. Valida  as credenciais de acesso via Identidade do Usuário e exibe mensagens de erro.
+templates/regioes.html                     | Gestão de Regiões de Atendimento               | Interface de listagem e configuração (CRUD) das praças logísticas atendidas. Permite definir o multiplicador de preço por região através de janela Modal nativa, restrito ao nível de acesso de Administrador.
+templates/protocolos.html                  | Gestão de Protocolos (Recompras)               | Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.
+
+templates/configuracoes/perguntas.html     | Gestão de Perguntas de Conservação             | Interface de CRUD focada na tabela de perguntas da categoria selecionada.
+templates/configuracoes/status.html        | Gestão de Status de Protocolos                 | Interface de CRUD (Listagem, Inserção e Edição) para os Status da Esteira
+templates/configuracoes/regioes.html       | Gestão de Regiões de Atendimento               | Interface de listagem e configuração (CRUD) das praças logísticas atendidas. Permite definir o multiplicador de preço por região através de janela Modal nativa, restrito ao nível de acesso de Administrador.
+templates/configuracoes/categorias.html    | Gestão de Categorias de Produtos               | Interface de CRUD (Listagem, Inserção e Edição) de Categorias
+templates/configuracoes/canais.html        | Gestão de Canais de Aquisição                  | Interface de CRUD (Listagem, Inserção e Edição) de Canais de Aquisição
+templates/configuracoes/opcoes_estado.html | Gestão de Opções de Estado de Conservação      | CRUD dos estados (Novo, Usado, Com Detalhes, etc) e seus impactos no preço.
 
 4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
-TABELA                | COLUNA                   | TIPO           | CHAVE
---------------------------------------------------------------------------
-avaliacoes_manuais    | id                       | INT            | PK, AI
-                      | nome_produto_informado   | VARCHAR(255)   | -
-                      | descricao_estado         | TEXT           | -
-                      | email_contato            | VARCHAR(150)   | -
-                      | data_solicitacao         | DATETIME       | -
-                      | status                   | ENUM           | -
---------------------------------------------------------------------------
-canais_aquisicao      | id                       | INT            | PK, AI
-                      | slug_tecnico             | VARCHAR(50)    | -
-                      | nome_exibicao            | VARCHAR(100)   | -
-                      | ativo                    | TINYINT(1)     | -
---------------------------------------------------------------------------
-catalogo_mestre       | id                       | INT            | PK, AI
-                      | nome_produto             | VARCHAR(255)   | -
-                      | categoria_id             | INT            | -
-                      | valor_pix_base           | DECIMAL(10,2)  | -
-                      | ativo                    | TINYINT(1)     | -
---------------------------------------------------------------------------
-clientes_usuarios     | id                       | INT            | PK, AI
-                      | nome_completo            | VARCHAR(255)   | -
-                      | email                    | VARCHAR(150)   | -
-                      | whatsapp                 | VARCHAR(20)    | -
-                      | cidade                   | VARCHAR(100)   | -
-                      | estado_nome              | VARCHAR(50)    | -
-                      | estado_uf                | VARCHAR(2)     | -
-                      | origem_lead              | VARCHAR(50)    | -
-                      | cpf                      | VARCHAR(14)    | -
-                      | chave_pix                | VARCHAR(100)   | -
-                      | cep                      | VARCHAR(9)     | -
-                      | endereco                 | VARCHAR(255)   | -
-                      | numero                   | VARCHAR(20)    | -
-                      | complemento              | VARCHAR(100)   | -
-                      | bairro                   | VARCHAR(100)   | -
-                      | data_cadastro            | DATETIME       | -
---------------------------------------------------------------------------
-feedbacks_recusa      | id                       | INT            | PK, AI
-                      | sessao_uuid              | VARCHAR(50)    | NOT NULL
-                      | motivo_texto             | TEXT           | -
-                      | cidade_informada         | VARCHAR(100)   | -
-                      | estado_uf                | VARCHAR(2)     | -
-                      | canal_aquisicao          | VARCHAR(50)    | -
-                      | valor_oferta_recusada    | DECIMAL(10,2)  | -
-                      | itens_carrinho_json      | JSON           | -
-                      | user_agent               | VARCHAR(255)   | -
-                      | ip_origem                | VARCHAR(45)    | -
-                      | data_recusa              | DATETIME       | -
---------------------------------------------------------------------------
-itens_periciados      | id                       | INT            | PK, AI
-                      | protocolo_id             | INT            | -
-                      | fotos_json               | JSON           | -
-                      | valor_pix_unitario       | DECIMAL(10,2)  | -
---------------------------------------------------------------------------
-opcoes_estado         | id                       | INT            | PK, AI
-                      | categoria_id             | INT            | -
-                      | fator_depreciacao        | DECIMAL(5,2)   | -
---------------------------------------------------------------------------
-protocolos_recompra   | id                       | INT            | PK, AI
-                      | numero_protocolo         | VARCHAR(20)    | -
-                      | status                   | ENUM           | -
---------------------------------------------------------------------------
-regioes_atendimento   | id                       | INT            | PK, AI
-                      | multiplicador_preco      | DECIMAL(4,2)   | -
---------------------------------------------------------------------------
+
+TABELA                              COLUNA                  TIPO                                                                CHAVE       ORD_TABELA                          ORD_COLUNA  ORDEM_TIPO
+avaliacoes_manuais                  id                      INT                                                                 PK, AI      avaliacoes_manuais                  1           0
+                                    nome_produto_informado  VARCHAR(255)                                                        -           avaliacoes_manuais                  2           0
+                                    descricao_estado        TEXT                                                                -           avaliacoes_manuais                  3           0
+                                    email_contato           VARCHAR(150)                                                        -           avaliacoes_manuais                  4           0
+                                    data_solicitacao        DATETIME                                                            -           avaliacoes_manuais                  5           0
+                                    status                  ENUM('PENDENTE','AVALIADO','RECUSADO')                              -           avaliacoes_manuais                  6           0
+----------                          ----------              ----------                                                          ----------  avaliacoes_manuais                  999         1
+canais_aquisicao                    id                      INT                                                                 PK, AI      canais_aquisicao                    1           0
+                                    slug_tecnico            VARCHAR(50)                                                         UK          canais_aquisicao                    2           0
+                                    nome_exibicao           VARCHAR(100)                                                        -           canais_aquisicao                    3           0
+                                    ativo                   TINYINT(1)                                                          -           canais_aquisicao                    4           0
+----------                          ----------              ----------                                                          ----------  canais_aquisicao                    999         1
+catalogo_mestre                     id                      INT                                                                 PK, AI      catalogo_mestre                     1           0
+                                    nome_produto            VARCHAR(255)                                                        -           catalogo_mestre                     2           0
+                                    categoria_id            INT                                                                 FK          catalogo_mestre                     3           0
+                                    plataforma              VARCHAR(50)                                                         -           catalogo_mestre                     4           0
+                                    valor_venda_ref         DECIMAL(10,2)                                                       -           catalogo_mestre                     5           0
+                                    valor_pix_base          DECIMAL(10,2)                                                       -           catalogo_mestre                     6           0
+                                    valor_cred_base         DECIMAL(10,2)                                                       -           catalogo_mestre                     7           0
+                                    foto_oficial_url        VARCHAR(255)                                                        -           catalogo_mestre                     8           0
+                                    sku_interno             VARCHAR(50)                                                         -           catalogo_mestre                     9           0
+                                    ativo                   TINYINT(1)                                                          -           catalogo_mestre                     10          0
+----------                          ----------              ----------                                                          ----------  catalogo_mestre                     999         1
+catalogo_mestre_backup_antes_carga  id                      INT                                                                 -           catalogo_mestre_backup_antes_carga  1           0
+                                    nome_produto            VARCHAR(255)                                                        -           catalogo_mestre_backup_antes_carga  2           0
+                                    categoria_id            INT                                                                 -           catalogo_mestre_backup_antes_carga  3           0
+                                    plataforma              VARCHAR(50)                                                         -           catalogo_mestre_backup_antes_carga  4           0
+                                    valor_venda_ref         DECIMAL(10,2)                                                       -           catalogo_mestre_backup_antes_carga  5           0
+                                    valor_pix_base          DECIMAL(10,2)                                                       -           catalogo_mestre_backup_antes_carga  6           0
+                                    valor_cred_base         DECIMAL(10,2)                                                       -           catalogo_mestre_backup_antes_carga  7           0
+                                    foto_oficial_url        VARCHAR(255)                                                        -           catalogo_mestre_backup_antes_carga  8           0
+                                    sku_interno             VARCHAR(50)                                                         -           catalogo_mestre_backup_antes_carga  9           0
+                                    ativo                   TINYINT(1)                                                          -           catalogo_mestre_backup_antes_carga  10          0
+----------                          ----------              ----------                                                          ----------  catalogo_mestre_backup_antes_carga  999         1
+categorias                          id                      INT                                                                 PK, AI      categorias                          1           0
+                                    nome                    VARCHAR(50)                                                         -           categorias                          2           0
+                                    ativo                   TINYINT(1)                                                          -           categorias                          3           0
+----------                          ----------              ----------                                                          ----------  categorias                          999         1
+categorias_avaliacao                id                      INT                                                                 PK, AI      categorias_avaliacao                1           0
+                                    nome_categoria          VARCHAR(100)                                                        -           categorias_avaliacao                2           0
+                                    slug                    VARCHAR(50)                                                         -           categorias_avaliacao                3           0
+                                    categoria_id            INT                                                                 FK          categorias_avaliacao                4           0
+                                    obrigatorio             TINYINT(1)                                                          -           categorias_avaliacao                5           0
+----------                          ----------              ----------                                                          ----------  categorias_avaliacao                999         1
+clientes_usuarios                   id                      INT                                                                 PK, AI      clientes_usuarios                   1           0
+                                    nome_completo           VARCHAR(255)                                                        -           clientes_usuarios                   2           0
+                                    email                   VARCHAR(150)                                                        UK          clientes_usuarios                   3           0
+                                    whatsapp                VARCHAR(20)                                                         -           clientes_usuarios                   4           0
+                                    cidade                  VARCHAR(100)                                                        -           clientes_usuarios                   5           0
+                                    estado_nome             VARCHAR(100)                                                        -           clientes_usuarios                   6           0
+                                    estado_uf               CHAR(2)                                                             -           clientes_usuarios                   7           0
+                                    origem_lead             VARCHAR(50)                                                         -           clientes_usuarios                   8           0
+                                    cpf                     VARCHAR(14)                                                         -           clientes_usuarios                   9           0
+                                    chave_pix               VARCHAR(100)                                                        -           clientes_usuarios                   10          0
+                                    cep                     VARCHAR(9)                                                          -           clientes_usuarios                   11          0
+                                    endereco                VARCHAR(255)                                                        -           clientes_usuarios                   12          0
+                                    numero                  VARCHAR(20)                                                         -           clientes_usuarios                   13          0
+                                    complemento             VARCHAR(100)                                                        -           clientes_usuarios                   14          0
+                                    bairro                  VARCHAR(100)                                                        -           clientes_usuarios                   15          0
+                                    data_cadastro           TIMESTAMP                                                           -           clientes_usuarios                   16          0
+----------                          ----------              ----------                                                          ----------  clientes_usuarios                   999         1
+feedbacks_recusa                    id                      INT                                                                 PK, AI      feedbacks_recusa                    1           0
+                                    sessao_uuid             VARCHAR(50)                                                         -           feedbacks_recusa                    2           0
+                                    motivo_texto            TEXT                                                                -           feedbacks_recusa                    3           0
+                                    cidade_informada        VARCHAR(100)                                                        -           feedbacks_recusa                    4           0
+                                    estado_uf               VARCHAR(2)                                                          -           feedbacks_recusa                    5           0
+                                    canal_aquisicao         VARCHAR(50)                                                         -           feedbacks_recusa                    6           0
+                                    valor_oferta_recusada   DECIMAL(10,2)                                                       -           feedbacks_recusa                    7           0
+                                    itens_carrinho_json     JSON                                                                -           feedbacks_recusa                    8           0
+                                    user_agent              VARCHAR(255)                                                        -           feedbacks_recusa                    9           0
+                                    ip_origem               VARCHAR(45)                                                         -           feedbacks_recusa                    10          0
+                                    data_recusa             DATETIME                                                            -           feedbacks_recusa                    11          0
+----------                          ----------              ----------                                                          ----------  feedbacks_recusa                    999         1
+itens_periciados                    id                      INT                                                                 PK, AI      itens_periciados                    1           0
+                                    protocolo_id            INT                                                                 FK          itens_periciados                    2           0
+                                    produto_id              INT                                                                 FK          itens_periciados                    3           0
+                                    quantidade              INT                                                                 -           itens_periciados                    4           0
+                                    fotos_json              JSON                                                                -           itens_periciados                    5           0
+                                    comentarios             TEXT                                                                -           itens_periciados                    6           0
+                                    valor_pix_unitario      DECIMAL(10,2)                                                       -           itens_periciados                    7           0
+                                    valor_cred_unitario     DECIMAL(10,2)                                                       -           itens_periciados                    8           0
+----------                          ----------              ----------                                                          ----------  itens_periciados                    999         1
+opcoes_estado                       id                      INT                                                                 PK, AI      opcoes_estado                       1           0
+                                    categoria_id            INT                                                                 FK          opcoes_estado                       2           0
+                                    descricao               VARCHAR(255)                                                        -           opcoes_estado                       3           0
+                                    fator_depreciacao       DECIMAL(5,2)                                                        -           opcoes_estado                       4           0
+                                    valor_fixo_extra        DECIMAL(10,2)                                                       -           opcoes_estado                       5           0
+                                    exibir_ordem            INT                                                                 -           opcoes_estado                       6           0
+----------                          ----------              ----------                                                          ----------  opcoes_estado                       999         1
+perguntas_conservacao               id                      INT                                                                 PK, AI      perguntas_conservacao               1           0
+                                    categoria_id            INT                                                                 FK          perguntas_conservacao               2           0
+                                    texto_pergunta          VARCHAR(255)                                                        -           perguntas_conservacao               3           0
+                                    tipo_resposta           ENUM('SIM/NAO','MULTIPLA_ESCOLHA')                                  -           perguntas_conservacao               4           0
+                                    impacto_valor           DECIMAL(10,2)                                                       -           perguntas_conservacao               5           0
+----------                          ----------              ----------                                                          ----------  perguntas_conservacao               999         1
+pericia_selecionada                 item_id                 INT                                                                 PK          pericia_selecionada                 1           0
+                                    opcao_id                INT                                                                 PK          pericia_selecionada                 2           0
+----------                          ----------              ----------                                                          ----------  pericia_selecionada                 999         1
+propostas_venda                     id                      INT                                                                 PK, AI      propostas_venda                     1           0
+                                    usuario_id              INT                                                                 -           propostas_venda                     2           0
+                                    produto_id              INT                                                                 -           propostas_venda                     3           0
+                                    categoria_id            INT                                                                 FK          propostas_venda                     4           0
+                                    quantidade              INT                                                                 -           propostas_venda                     5           0
+                                    observacoes             TEXT                                                                -           propostas_venda                     6           0
+                                    fotos_caminho           VARCHAR(500)                                                        -           propostas_venda                     7           0
+                                    valor_preliminar        DECIMAL(10,2)                                                       -           propostas_venda                     8           0
+                                    status_avaliacao        ENUM('PENDENTE','EM ANÁLISE FÍSICA','CONCLUÍDA')                    -           propostas_venda                     9           0
+                                    data_proposta           DATETIME                                                            -           propostas_venda                     10          0
+----------                          ----------              ----------                                                          ----------  propostas_venda                     999         1
+protocolos_recompra                 id                      INT                                                                 PK, AI      protocolos_recompra                 1           0
+                                    cliente_id              INT                                                                 FK          protocolos_recompra                 2           0
+                                    numero_protocolo        VARCHAR(20)                                                         UK          protocolos_recompra                 3           0
+                                    status_id               INT                                                                 FK          protocolos_recompra                 4           0
+                                    status                  ENUM('ABERTO','AGUARDANDO FOTOS','ACEITO','RECUSADO','FINALIZADO')  -           protocolos_recompra                 5           0
+                                    valor_total_pix         DECIMAL(10,2)                                                       -           protocolos_recompra                 6           0
+                                    valor_total_credito     DECIMAL(10,2)                                                       -           protocolos_recompra                 7           0
+                                    valor_avaliado          DECIMAL(10,2)                                                       -           protocolos_recompra                 8           0
+                                    qtd_caixas              INT                                                                 -           protocolos_recompra                 9           0
+                                    codigo_rastreio         VARCHAR(50)                                                         -           protocolos_recompra                 10          0
+                                    laudo_tecnico           TEXT                                                                -           protocolos_recompra                 11          0
+                                    data_criacao            TIMESTAMP                                                           -           protocolos_recompra                 12          0
+                                    canal_aquisicao_id      INT                                                                 FK          protocolos_recompra                 13          0
+                                    e_ticket                VARCHAR(20)                                                         -           protocolos_recompra                 14          0
+----------                          ----------              ----------                                                          ----------  protocolos_recompra                 999         1
+regioes_atendimento                 id                      INT                                                                 PK, AI      regioes_atendimento                 1           0
+                                    cidade                  VARCHAR(100)                                                        FK          regioes_atendimento                 2           0
+                                    estado_uf               CHAR(2)                                                             -           regioes_atendimento                 3           0
+                                    multiplicador_preco     DECIMAL(4,2)                                                        -           regioes_atendimento                 4           0
+                                    ativo                   TINYINT(1)                                                          -           regioes_atendimento                 5           0
+----------                          ----------              ----------                                                          ----------  regioes_atendimento                 999         1
+status_protocolos                   id                      INT                                                                 PK, AI      status_protocolos                   1           0
+                                    slug_tecnico            VARCHAR(50)                                                         UK          status_protocolos                   2           0
+                                    nome_exibicao           VARCHAR(100)                                                        -           status_protocolos                   3           0
+                                    cor_badge               VARCHAR(30)                                                         -           status_protocolos                   4           0
+                                    ativo                   TINYINT(1)                                                          -           status_protocolos                   5           0
+----------                          ----------              ----------                                                          ----------  status_protocolos                   999         1
+usuarios_admin                      id                      INT                                                                 PK, AI      usuarios_admin                      1           0
+                                    nome_completo           VARCHAR(150)                                                        -           usuarios_admin                      2           0
+                                    usuario_login           VARCHAR(50)                                                         UK          usuarios_admin                      3           0
+                                    email                   VARCHAR(150)                                                        UK          usuarios_admin                      4           0
+                                    senha_hash              VARCHAR(255)                                                        -           usuarios_admin                      5           0
+                                    nivel_acesso            ENUM('ADMINISTRADOR','OPERADOR')                                    -           usuarios_admin                      6           0
+                                    ativo                   TINYINT(1)                                                          -           usuarios_admin                      7           0
+                                    data_criacao            DATETIME                                                            -           usuarios_admin                      8           0
+                                    ultimo_login            DATETIME                                                            -           usuarios_admin                      9           0
+----------                          ----------              ----------                                                          ----------  usuarios_admin                      999         1
+
 
 5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES
 - Arquitetura de Roteamento (Smart Template): A função `render_smart_template` (via user-agents) em `server.py` determina o fluxo do usuário em tempo real. Dispositivos móveis buscam preferencialmente interfaces na pasta `/mobile`. Se não existir (Fallback Seguro), renderizam o template Desktop para não gerar erros (ex: `boas_vindas.html`).

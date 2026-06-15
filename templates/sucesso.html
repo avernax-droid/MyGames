@@ -5,13 +5,12 @@
   DATA DE CRIAÇÃO: 28/05/2026
   TÍTULO: Tela de Conclusão e Protocolo
   FUNÇÃO: Exibe o número do protocolo gerado, confirma o envio do e-mail de 
-  resumo e apresenta o valor final (ou parcial) do lote. Também emite um alerta 
-  ao usuário caso existam itens sob consulta que dependam de análise manual 
-  da equipe técnica.
+  resumo e apresenta os dados de contato da empresa dinamicamente.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
-  - 10/06/2026: Adição do painel de exibição de Logística Reversa (e-ticket e rastreio).
+  - 10/06/2026: Adição do painel de exibição de Logística Reversa.
+  - 15/06/2026: Injeção dinâmica dos dados da empresa (e-mail/telefone) via banco de dados.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -33,7 +32,7 @@
             Protocolo Gerado!
         </h2>
         <p style="color: var(--texto-dim); margin-top: 5px;">
-            Um resumo detalhado com o demonstrativo dos itens foi enviado para <strong>{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
+            Um resumo detalhado foi enviado para <strong>{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
         </p>
     </header>
 
@@ -67,7 +66,7 @@
         </div>
         
         <div style="font-size: 0.85rem; color: var(--texto-dim); border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; line-height: 1.4;">
-            <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança, dirija-se a qualquer agência dos Correios e informe o Código de Postagem (E-Ticket) ao atendente. O frete já está totalmente pago pelo contrato comercial da MyGames.
+            <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança, dirija-se a qualquer agência dos Correios e informe o Código de Postagem (E-Ticket). O frete já está pago pela {{ empresa.nome_fantasia if empresa else 'MyGames' }}.
         </div>
     </div>
     {% endif %}
@@ -75,24 +74,28 @@
     {% if tem_pendentes %}
     <div style="background: rgba(255, 170, 0, 0.1); border: 1px dashed #ffaa00; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: left;">
         <p style="color: #ffaa00; margin: 0 0 5px 0; font-weight: bold; font-size: 14px;">⚠️ ANÁLISE PENDENTE</p>
-        <p style="color: var(--texto-br); font-size: 13px; margin: 0;">Notamos que seu lote contém itens que requerem avaliação manual. Nossa equipe analisará as fotos e informações e enviará a oferta final atualizada em até 24 horas úteis.</p>
+        <p style="color: var(--texto-br); font-size: 13px; margin: 0;">Itens sob análise manual. Nossa equipe enviará a oferta final atualizada em até 24 horas úteis.</p>
     </div>
     {% endif %}
 
     <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border-left: 4px solid var(--cor-destaque);">
-        <p style="margin: 8px 0; color: var(--texto-dim);"><strong>Total de Itens do Lote:</strong> <span style="color: var(--texto-br);">{{ session.get('itens_avaliados', [])|length }}</span></p>
-        
+        <p style="margin: 8px 0; color: var(--texto-dim);"><strong>Total de Itens:</strong> <span style="color: var(--texto-br);">{{ session.get('itens_avaliados', [])|length }}</span></p>
         <p style="margin: 8px 0; color: var(--texto-dim);">
             <strong>{{ 'Valor Parcial da Proposta:' if tem_pendentes else 'Valor Total da Proposta:' }}</strong> 
-            <span style="color: var(--cor-destaque); font-weight: bold; font-size: 1.2rem;">
-                R$ {{ "%.2f"|format(total_lote) }}{{ '*' if tem_pendentes else '' }}
-            </span>
+            <span style="color: var(--cor-destaque); font-weight: bold; font-size: 1.2rem;">R$ {{ "%.2f"|format(total_lote) }}</span>
         </p>
+    </div>
+
+    <div style="margin-bottom: 25px; padding: 15px; border-top: 1px solid #333; font-size: 0.85rem; color: var(--texto-dim);">
+        <p>Em caso de dúvidas, contate nossa equipe:</p>
+        <p><strong>{{ empresa.nome_fantasia if empresa else 'MyGames' }}</strong></p>
+        <p><i class="fas fa-envelope"></i> {{ empresa.email_contato if empresa and empresa.email_contato else 'suporte@mygames.com' }}</p>
+        <p><i class="fas fa-phone"></i> {{ empresa.telefone_contato if empresa and empresa.telefone_contato else '(00) 0000-0000' }}</p>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 15px;">
         <a href="{{ url_for('sair') }}" class="btn-primary" style="width: 100%; box-sizing: border-box;">
-            Encerrar Sessão de {{ session.get('player_nome', 'Jogador') }}
+            Encerrar Sessão
         </a>
     </div>
 </div>

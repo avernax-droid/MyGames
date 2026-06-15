@@ -25,6 +25,7 @@
 # - 07/06/2026: Correção de colisão de nomes de arquivos em uploads simultâneos via mobile (uso de enumerate na rota /cotar).
 # - 10/06/2026: Recebimento e repasse dos dados de logística reversa (e-ticket e rastreio) na rota /finalizar.
 # - 10/06/2026: Inclusão dos campos e_ticket e codigo_rastreio no dicionário dados_email para envio por e-mail.
+# - 15/06/2026: Integração da rota /finalizar com a tabela dados_empresa para exibição dinâmica no sucesso.html.
 # ==============================================================================
 
 import os
@@ -478,7 +479,9 @@ def finalizar():
         e_ticket = res_protocolo.get('e_ticket')
         codigo_rastreio = res_protocolo.get('codigo_rastreio')
 
-        # Mapeamento estendido das chaves para entrega no e-mail
+        # Busca dados atualizados da empresa na tabela dados_empresa
+        empresa = engine.obter_dados_empresa()
+
         dados_email = {
             'protocolo': res_protocolo['numero'],
             'quantidade_itens': len(itens),
@@ -487,6 +490,7 @@ def finalizar():
             'codigo_rastreio': codigo_rastreio
         }
         
+        # Envia o e-mail (que também pode usar os dados da empresa internamente no engine)
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
         return render_smart_template(
@@ -495,7 +499,8 @@ def finalizar():
             total_lote=total_pix, 
             fase_atual=6,
             e_ticket=e_ticket,
-            codigo_rastreio=codigo_rastreio
+            codigo_rastreio=codigo_rastreio,
+            empresa=empresa # Passando os dados corporativos para a View!
         )
     
     return "Erro ao finalizar agendamento.", 500

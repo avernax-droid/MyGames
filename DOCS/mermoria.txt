@@ -1175,3 +1175,325 @@ Sincronizar a View: O pericia_esteira.html depende desse dicionário. Se o admin
 Fluxo de Saída: O redirecionamento final da rota salvar_pericia_esteira deve apontar para url_for('esteira_protocolos'), garantindo que o operador sempre volte para a tela de triagem após processar um item.
 
 Este descritivo consolida o estado lógico do sistema. O projeto está estruturado em uma arquitetura de esteira funcional, bastando a finalização da integração de dados nas rotas mencionadas.
+
+==========
+11/06
+
+RESUMO DE ATIVIDADES E PENDÊNCIAS - PROJETO MYGAMES
+O QUE JÁ FIZEMOS (CONCLUÍDO):
+Padronização de Status:
+
+Identificamos que novos protocolos estavam sendo criados com status_id = NULL no banco de dados.
+
+Corrigimos o módulo engine.py (cliente) para injetar status_id = 1 ("Aguardando o cliente levar o produto no correio") 
+automaticamente em todo novo registro via INSERT.
+
+Executamos o comando de UPDATE no banco de dados para padronizar os registros antigos que estavam sem status.
+
+Correção de Logística Reversa:
+
+Ajustamos a variável de ambiente CORREIOS_AMBIENTE no .env de produção para fake (ou o ambiente de teste adequado), 
+permitindo que o fluxo de finalização de venda não falhasse silenciosamente.
+
+Sincronização e Deploy:
+
+Versionamos todas as alterações nos repositórios GitHub (MyGames e MyGames_Admin) através de git push.
+
+Atualizamos os ambientes de homologação via script deploy_homo.sh com a flag --build, garantindo que as novas versões 
+do código estejam ativas nos containers Docker.
+
+O QUE AINDA TEMOS QUE RESOLVER (PENDÊNCIAS):
+Ajuste da Regra de Visibilidade na Esteira:
+
+Problema: O protocolo continua sendo exibido na "Esteira de Gestão" mesmo após o operador alterar o status 
+(ex: para "Finalizado" ou outro status concluído).
+
+Causa provável: A query de listagem utilizada na esteira (no admin_engine.py) não possui filtros que excluam status 
+já finalizados ou processados.
+
+Ação necessária: Revisar a query SQL na função responsável pela Esteira e implementar um filtro NOT IN ou WHERE 
+status_id para que registros com status de "fim de ciclo" não sejam carregados na página.
+
+Revisão do Status de Workflow:
+
+Validar se todos os status cadastrados na tabela status_protocolos estão classificados corretamente entre 
+"Ativos na esteira" e "Arquivados/Finalizados".
+
+Confirmar se após a alteração no filtro da query, o botão "voltar" redireciona o fluxo de forma que a listagem seja 
+recarregada e a exclusão do registro da visão do operador seja imediata.
+
+Este resumo reflete exatamente o estado atual do desenvolvimento. Quando estiver pronto para retomar, basta me enviar 
+o código da função que carrega a Esteira no admin_engine.py e resolveremos o problema do filtro de visualização.
+
+=======
+12/06
+
+Descritivo do Problema: Bloqueio de Acesso à API de Logística Reversa
+Contexto:
+O sistema MyGames possui uma funcionalidade de Logística Reversa que visa automatizar a geração de códigos de postagem (e-tickets) para a devolução de produtos. Esta automação depende da comunicação via web service com os servidores dos Correios (portal CWS).
+
+O Problema:
+O sistema está operando em um impasse técnico decorrente de restrições de permissão no contrato junto aos Correios (21011923), manifestando-se das seguintes formas:
+
+Impossibilidade de Uso da API Moderna (REST):
+
+Embora o sistema consiga autenticar-se com sucesso (geração de token OAuth2 válida), as tentativas de consumo dos endpoints oficiais (/logistica-reversa/v1/reversas ou /autorizacao-postagem) resultam em erro de 503 Service Unavailable com a mensagem GTW-003: Serviço inexistente.
+
+Conclusão: O ambiente de produção dos Correios não disponibiliza esta rota para este contrato específico.
+
+Impossibilidade de Uso da API Legada (SOAP/XML):
+
+Ao tentar o protocolo de comunicação padrão (SOAP), o sistema recebe um erro de 401 Unauthorized (Acesso Negado).
+
+Mesmo após a validação bem-sucedida das credenciais (CNPJ como usuário e senha validada no portal oficial do cliente), o Web Service recusa a conexão.
+
+Conclusão: O usuário/CNPJ configurado não possui o perfil de "Administrador de WebService" ativado no sistema legado dos Correios, impedindo a autorização das requisições via XML.
+
+Impacto no Sistema:
+
+A funcionalidade de finalização de protocolo não consegue emitir o E-ticket real automaticamente.
+
+Atualmente, o sistema encontra-se resiliente através de blocos de tratamento de erro (try/except), que impedem o travamento do front-end e permitem que o protocolo seja salvo no banco de dados, contudo, sem a informação de rastreio real.
+
+Ação Necessária (Fora do Desenvolvimento):
+O problema é de natureza contratual e administrativa. É necessária uma intervenção junto ao suporte ou gerência de contas dos Correios para:
+
+Solicitar formalmente a liberação da funcionalidade de Logística Reversa para o contrato informado.
+
+Verificar se o perfil do usuário (CNPJ) possui privilégios de "WebService" ativos no painel de administração (IdCorreios).
+
+Confirmar se a migração deste contrato para a API REST já foi efetivada internamente pelos Correios.
+
+==================
+
+13/06
+
+ASSUNTO: Erro IWS101 - Bloqueio de Permissão no Web Service de Logística Reversa (SOAP)
+
+1. DADOS DO CLIENTE E CONTRATO
+Empresa: ROCK LASER INTERNACIONAL COMÉRCIO DE VIDEOGAME LTDA
+CNPJ: 29.322.164/0001-17
+Contrato Comercial: 9912517105
+Cartão de Postagem: 0076088456
+Usuário (idCorreios) utilizado na integração: enzo2409
+
+2. CENÁRIO DA INTEGRAÇÃO
+Estamos finalizando a integração do nosso sistema de e-commerce (Projeto MyGames) com a API dos Correios para emissão automatizada de 
+e-tickets (Logística Reversa Simultânea em Agência).
+O desenvolvimento técnico foi concluído com sucesso utilizando o padrão SOAP, porém as requisições estão sendo barradas pela regra de 
+negócio da conta.
+
+3. PARÂMETROS TÉCNICOS DA REQUISIÇÃO (NOSSO AMBIENTE)
+
+Endpoint Utilizado (Produção): https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS
+
+Método de Autenticação na Borda (WAF/API Gateway): HTTP Basic Auth utilizando as credenciais (idCorreios e o Código de Acesso à API).
+
+Protocolo: POST (text/xml; charset=utf-8)
+
+Estrutura do Envelope: Padrão XML SOAP com o namespace correto (http://service.logisticareversa.correios.com.br/).
+
+Códigos de Serviço Testados no XML: 04677 (PAC Reverso) e 04679 (SEDEX Reverso).
+
+4. DESCRIÇÃO EXATA DO PROBLEMA
+A nossa aplicação consegue atravessar o Firewall (Gateway) dos Correios com sucesso (Status Code 200/500 dependendo do payload). O XML 
+passa perfeitamente pelo processo de "unmarshalling" e validação de schema (nenhuma tag está faltando ou sobrando).
+
+No entanto, a operação é abortada na última camada pelo motor dos Correios com o seguinte retorno no <soap:Fault>:
+
+Erro: IWS101
+
+Mensagem: Autorização de acesso negada para o sistema.
+
+Exceção: br.com.correios.infraws.exception.AutorizacaoException
+
+5. DIAGNÓSTICO TÉCNICO
+Este erro indica que a nossa requisição está tecnicamente perfeita, mas o usuário ou o contrato não possuem o privilégio comercial 
+habilitado no banco de dados para utilizar este Web Service.
+
+6. SOLICITAÇÃO DE SUPORTE
+Para que possamos colocar o sistema em produção, precisamos que as seguintes validações sejam feitas pela equipe dos Correios:
+
+A) PERMISSÃO DO USUÁRIO: Verificar no CWS se o idCorreios "enzo2409" possui os "check-boxes" de acesso à API de Logística Reversa 
+explicitamente marcados.
+B) VÍNCULO CONTRATUAL: Confirmar se o contrato atual (9912517105) possui o aditivo de Logística Reversa (e-ticket) ativo.
+C) CÓDIGOS DE SERVIÇO: Confirmar quais são os Códigos de Serviço numéricos exatos (ex: 04677, 03006, etc.) que estão liberados na tabela 
+deste contrato para a emissão de PAC Reverso e SEDEX Reverso.
+
+
+===============================
+
+13/06
+PONTO DE PARADA (CHECKPOINT) - 13/06/2026
+MÓDULO: MyGames_Admin (Backoffice)
+TAREFA ATUAL: Criação da Interface de Manutenção (CRUD) para Tabelas de Domínio Genéricas.
+
+ESTADO ATUAL:
+O desenvolvimento técnico da integração SOAP com os Correios foi concluído, validado e "commitado" no repositório (branch feature/mobile-otimizado).
+O foco foi redirecionado para a construção das interfaces administrativas do Backoffice, iniciando pelo padrão de tela para a tabela categorias.
+O código HTML completo da tela categorias.html (com Grid DataTables e Modal de Inclusão/Alteração em Dark Mode) foi gerado, mas ainda não foi salvo no projeto.
+
+PRÓXIMOS PASSOS PARA O NOVO CHAT:
+
+1. Salvar os Arquivos Visuais (HTML)
+
+Criar o arquivo MyGames_Admin/templates/categorias.html e colar o código fornecido no final do chat anterior.
+
+Adicionar o atalho <a href="{{ url_for('listar_categorias') }}"...><i class="fas fa-tags"></i> Categorias</a> no menu lateral do arquivo MyGames_Admin/templates/base.html.
+
+2. Desenvolver a Camada de Dados (admin_engine.py)
+
+Criar as funções Python responsáveis por interagir com o banco de dados MySQL para a tabela categorias.
+
+As funções necessárias serão:
+
+listar_categorias(): Select para alimentar a Grid.
+
+salvar_categoria(id, nome, ativo): Lógica de UPSERT (Insert se for novo registro, Update se já existir o ID).
+
+excluir_categoria(id): Lógica de deleção física (com trava de segurança em código para IDs <= 4).
+
+3. Criar as Rotas do Controlador (admin_server.py)
+
+Criar a rota @app.route('/categorias') para renderizar o template e enviar os dados da Grid.
+
+Criar a rota @app.route('/categorias/salvar', methods=['POST']) para processar o formulário do modal.
+
+Criar a rota @app.route('/categorias/excluir/<int:id>', methods=['POST']) para processar a deleção.
+
+OBSERVAÇÃO TÉCNICA:
+A estrutura visual e lógica criada para categorias servirá como "Molde Ouro". Assim que homologada, o mesmo fluxo de Grid + Modal será replicado para as outras tabelas genéricas do sistema (ex: status_protocolos, canais_aquisicao).
+
+==============
+
+15/06
+
+RESUMO DO TRABALHO REALIZADO (PROJETO MYGAMES_ADMIN)
+1. Estruturação do Ambiente e UI Base:
+
+Atualização do base.html com a criação de um menu estilo "Accordion" (expansível) para o grupo de configurações.
+
+Implementação de destaque visual (bordas e cores) no grupo de Configurações na Sidebar para facilitar a identificação do operador.
+
+Criação de uma estrutura de subpastas em templates/configuracoes/ para organização dos módulos de CRUD.
+
+2. Implementação do CRUD de Categorias:
+
+Criação da query de persistência (get_categorias, upsert_categoria) no admin_engine.py.
+
+Criação das rotas de renderização e processamento (AJAX) no admin_server.py.
+
+Desenvolvimento do ecrã templates/configuracoes/categorias.html com suporte a Modal de edição e botão "Voltar".
+
+3. Implementação do CRUD de Canais de Aquisição:
+
+Criação das funções SQL no admin_engine.py com geração automática de slug_tecnico.
+
+Criação das rotas correspondentes no admin_server.py com suporte a submissão AJAX.
+
+Desenvolvimento do ecrã templates/configuracoes/canais.html.
+
+4. Implementação do CRUD de Status de Protocolos:
+
+Criação das funções de persistência no admin_engine.py.
+
+Criação das rotas no admin_server.py.
+
+Desenvolvimento do ecrã templates/configuracoes/status.html com seletor de cor e feedback visual de sucesso (ícone de ticket/check).
+
+5. Refatoração Geral:
+
+Unificação do tratamento de rotas POST de configuração para respostas em JSON, eliminando o uso de flash() que obrigava a recarregar a 
+página com mensagens de erro/sucesso.
+
+O QUE FALTA FAZER (BACKLOG)
+1. Desenvolvimento dos Módulos Remanescentes:
+
+Usuários Admin (usuarios_admin): Criar interface de gestão de acesso.
+
+Perguntas de Conservação (perguntas_conservacao): Criar interface de manutenção das perguntas da perícia técnica.
+
+Opções de Estado (opcoes_estado): Criar interface para definir os fatores de depreciação de cada categoria.
+
+2. Conclusão da Integração:
+
+Implementar as funções SQL (admin_engine.py) para os três módulos listados acima.
+
+Criar os ecrãs HTML na pasta templates/configuracoes/.
+
+Substituir os stubs (rotas placeholder) que ainda existem no admin_server.py pelas rotas funcionais destes módulos.
+
+3. Auditoria Final:
+
+Revisar se todas as permissões RBAC no admin_server.py estão corretamente aplicadas para o nível de Operador vs. Administrador em cada nova 
+rota criada.
+
+================
+
+15/06
+
+Documentação Técnica: Sistema de Configurações MyGames Admin
+1. Escopo Realizado
+Implementamos a estrutura de Master-Detail para as configurações de Perguntas de Conservação e Opções de Estado, garantindo isolamento de 
+dados por categoria e segurança operacional.
+
+Alterações nos Módulos
+admin_engine.py (Camada de Dados):
+
+Criação das funções obter_todas_perguntas() e upsert_pergunta(), utilizando LEFT JOIN com a tabela de categorias para garantir a integridade 
+da exibição.
+
+Criação das funções obter_opcoes_estado() e upsert_opcao_estado() para gerenciar depreciação e valores extras.
+
+Documentação completa no cabeçalho do arquivo sobre as novas implementações.
+
+admin_server.py (Controlador Flask):
+
+Implementação do context_processor para injeção global da lista_categorias_global, permitindo que o menu lateral consulte o banco de dados 
+em tempo real.
+
+Criação de rotas dinâmicas (/perguntas/<int:categoria_id> e /opcoes_estado/<int:categoria_id>) para filtrar dados conforme a categoria 
+selecionada.
+
+Remoção definitiva dos "stubs" (rotas placeholder) que causavam conflitos de endpoint.
+
+base.html (Interface Base):
+
+Refatoração do menu lateral (Sidebar) para um formato de acordeão de 3º nível.
+
+Implementação de lógica de destaque visual (pill shape) que identifica a categoria ativa (ID da categoria na URL).
+
+Ordenação forçada das categorias por ID via filtros do Jinja (| sort(attribute='id')), garantindo a hierarquia correta no menu.
+
+Módulos de Interface (perguntas.html e opcoes_estado.html):
+
+Padronização visual em Dark Mode com uso de modais para CRUD.
+
+Implementação de submissão AJAX com feedback visual de "OK" (ticket ✔️).
+
+Bloqueio lógico de campos de categoria no formulário de edição para prevenir erros de realocação de dados.
+
+2. Status do Projeto
+Perguntas de Conservação: ✅ Concluído (Interface, CRUD e Navegação).
+
+Opções de Estado: ✅ Concluído (Interface, CRUD e Navegação).
+
+Categorias: ✅ Concluído.
+
+Status de Protocolos: ✅ Concluído.
+
+Canais de Aquisição: ✅ Concluído.
+
+Regiões de Atendimento: ✅ Concluído.
+
+3. O que falta realizar
+Usuários Admin: O módulo está com a rota de flash ("Em desenvolvimento"). Falta criar o formulário de cadastro/edição de administradores e a 
+função no admin_engine.py para gerenciamento de credenciais e hash de senhas.
+
+Opções de Estado (Frontend/Modal): No módulo opcoes_estado.html, ainda temos um placeholder alert('Configurar modal...') no script. 
+Precisamos implementar o formulário de modal e a função AJAX de salvamento para esta tela, espelhando a lógica que já validamos em "Perguntas".
+
+Testes de Integração Final: Validar o cálculo de depreciação na esteira, garantindo que as Opções de Estado e as Perguntas estejam 
+influenciando corretamente o valor final do protocolo.
+
+
