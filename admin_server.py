@@ -8,30 +8,24 @@
 #
 # HISTÓRICO DE ALTERAÇÕES:
 # - 30/05/2026: Criação do servidor controller inicial e rotas de autenticação.
-# - 30/05/2026: Implementação de Controle de Acesso Baseado em Funções (RBAC).
 # - 01/06/2026: Adição de rotas para gestão (CRUD) de Regiões de Atendimento e Catálogo.
-# - 01/06/2026: Inserção da rota de detalhes de Protocolos (/protocolos/<id>).
-# - 04/06/2026: Adição de rota proxy (/api/buscar_cidades) para consulta na API do IBGE.
-# - 04/06/2026: Ajuste na rota /regioes/salvar para suportar requisições AJAX com retorno JSON.
-# - 04/06/2026: Adição da rota /catalogo/salvar com upload seguro físico de fotos_oficiais (Werkzeug).
-# - 04/06/2026: Adição da rota interna /api/buscar_produtos_nome para auto-completar de produtos.
-# - 10/06/2026: Atualização da query de listagem de protocolos para suportar LEFT JOIN de status.
-# - 10/06/2026: Injeção da lista dinâmica de status na rota de detalhes do protocolo.
-# - 10/06/2026: Criação da rota POST /protocolos/atualizar_status/<id> para a esteira de gestão.
-# - 10/06/2026: Criação da rota GET /esteira para exibir a Fila de Trabalho por gavetas.
-# - 10/06/2026: Criação da rota GET /esteira/periciar/<id> para o Cockpit de Ação.
-# - 10/06/2026: Criação da rota POST /esteira/salvar_pericia/<id> com redirecionamento de fluxo.
-# - 11/06/2026: Atualização da rota POST /esteira/salvar_pericia/<id> para capturar o campo valor_avaliado.
-# - 11/06/2026: Ajuste no app.run para host='0.0.0.0' visando suporte externo (Docker/Cloudflare).
-# - 11/06/2026: Inserção de laço de conversão JSON -> Lista para fotos na rota /esteira/periciar.
-# - 11/06/2026: Refatoração da rota /esteira/salvar_pericia/<id> para suportar requisições AJAX (UX silenciosa).
-# - 11/06/2026: Refatoração da rota /protocolos para uso da função admin_engine.obter_todos_protocolos_listagem.
-# - 12/06/2026: Injeção do admin_id nas rotas de atualização de status para suporte ao log de histórico.
+# - 04/06/2026: Adição de rotas AJAX e de upload seguro para o catálogo.
+# - 10/06/2026: Criação do pipeline de rotas para a Fila de Trabalho (Esteira) e Cockpit.
+# - 11/06/2026: Refatorações AJAX para salvamento de perícia e correções de portas/Docker.
+# - 12/06/2026: Injeção de rastreio de auditoria (admin_id) nas atualizações de status.
+# - 15/06/2026: Refatoração estrutural de rotas para a subpasta 'configuracoes/'.
+# - 15/06/2026: Adição de suporte AJAX (retorno JSON) nas rotas de salvamento de configurações.
+# - 15/06/2026: Implementação de Context Processor para injeção global de categorias no menu lateral.
+# - 15/06/2026: Refatoração da rota /perguntas para suportar filtro de navegação por <categoria_id>.
+# - 15/06/2026: Ajuste na rota '/opcoes_estado/salvar' para suportar JSON via Fetch API.
+# - 15/06/2026: Implementação das rotas /usuarios e /usuarios/salvar para gestão da equipe.
+# - 15/06/2026: Refatoração da rota raiz (/) para processar o fluxo de Auto-Cadastro com hash de senhas e bloqueio de inativos.
+# - 15/06/2026: Adição das rotas /dados_empresa e /dados_empresa/salvar para gestão corporativa (Remetente/Termos).
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
 import mysql.connector
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -87,24 +81,69 @@ def requer_permissao(modulo, acao='read'):
         return decorated_function
     return decorator
 
-# --- ROTAS CORE ---
+# --- CONTEXT PROCESSOR (INJEÇÃO GLOBAL PARA O BASE.HTML) ---
+@app.context_processor
+def injetar_dados_globais():
+    """Injeta variáveis globalmente em todos os templates renderizados pelo Flask."""
+    dados = {'lista_categorias_global': []}
+    if 'admin_id' in session:
+        try:
+            # Disponibiliza as categorias para montar o menu de navegação da barra esquerda
+            dados['lista_categorias_global'] = admin_engine.get_categorias()
+        except Exception:
+            pass
+    return dados
+
+# --- ROTAS CORE (COM AUTO-CADASTRO E LOGIN) ---
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'admin_id' in session: return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
-        usuario_login = request.form.get('usuario_login')
-        senha = request.form.get('senha')
-        db = conectar_bd()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM usuarios_admin WHERE usuario_login = %s AND ativo = 1", (usuario_login,))
-        usuario = cursor.fetchone()
-        db.close()
-        if usuario and check_password_hash(usuario['senha_hash'], senha):
-            session['admin_id'] = usuario['id']
-            session['admin_nome'] = usuario['nome_completo']
-            session['admin_nivel'] = usuario['nivel_acesso']
-            return redirect(url_for('dashboard'))
-        flash('Dados incorretos.', 'error')
+        acao = request.form.get('acao', 'login')
+        
+        # Fluxo de Auto-Cadastro
+        if acao == 'registrar':
+            nome = request.form.get('nome_completo')
+            user_login = request.form.get('usuario_login')
+            email = request.form.get('email')
+            senha = request.form.get('senha')
+            
+            if not all([nome, user_login, email, senha]):
+                flash('Preencha todos os campos para solicitar acesso.', 'error')
+                return render_template('login.html')
+                
+            senha_hash = generate_password_hash(senha)
+            sucesso = admin_engine.registrar_novo_usuario(nome, user_login, email, senha_hash)
+            
+            if sucesso:
+                flash('Solicitação enviada com sucesso! Aguarde a liberação do Administrador.', 'success')
+            else:
+                flash('Erro ao solicitar acesso. O usuário ou e-mail já pode estar em uso.', 'error')
+            return redirect(url_for('login'))
+            
+        # Fluxo de Login Tradicional
+        else:
+            usuario_login = request.form.get('usuario_login')
+            senha = request.form.get('senha')
+            
+            db = conectar_bd()
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM usuarios_admin WHERE usuario_login = %s", (usuario_login,))
+            usuario = cursor.fetchone()
+            db.close()
+            
+            if usuario and check_password_hash(usuario['senha_hash'], senha):
+                if usuario['ativo'] == 1:
+                    session['admin_id'] = usuario['id']
+                    session['admin_nome'] = usuario['nome_completo']
+                    session['admin_nivel'] = usuario['nivel_acesso']
+                    return redirect(url_for('dashboard'))
+                else:
+                    flash('Sua conta está pendente de aprovação pelo Administrador.', 'error')
+            else:
+                flash('Dados incorretos.', 'error')
+                
     return render_template('login.html')
 
 @app.route('/dashboard')
@@ -170,9 +209,7 @@ def salvar_pericia_esteira(protocolo_id):
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
     
-    # Captura o admin que está fazendo a ação para o log de histórico
     admin_id = session.get('admin_id')
-
     is_ajax = request.headers.get('Accept') == 'application/json'
 
     if not status_id or not valor_avaliado:
@@ -229,7 +266,6 @@ def atualizar_status_protocolo(protocolo_id):
     status_id = request.form.get('status_id')
     laudo_tecnico = request.form.get('laudo_tecnico')
     
-    # Captura o admin que está fazendo a ação para o log de histórico
     admin_id = session.get('admin_id')
 
     if not status_id:
@@ -304,11 +340,269 @@ def salvar_catalogo():
     flash('Produto salvo com sucesso!' if sucesso else 'Erro ao salvar produto.', 'success' if sucesso else 'error')
     return redirect(url_for('listar_catalogo'))
 
+# --- ROTAS DE DADOS CORPORATIVOS ---
+@app.route('/dados_empresa')
+def dados_empresa():
+    if session.get('admin_nivel') != 'Administrador':
+        flash('Acesso restrito a Administradores.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    empresa = admin_engine.obter_dados_empresa()
+    return render_template('configuracoes/empresa.html', empresa=empresa)
+
+@app.route('/dados_empresa/salvar', methods=['POST'])
+def salvar_empresa():
+    if session.get('admin_nivel') != 'Administrador':
+        return jsonify({'success': False, 'error': 'Acesso restrito a Administradores.'}), 403
+        
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+        
+    sucesso = admin_engine.salvar_dados_empresa(data)
+    
+    if sucesso:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Erro ao salvar os dados da empresa no banco de dados.'})
+
+# --- ROTAS DE CATEGORIAS (CRUD) ---
+@app.route('/categorias')
+@requer_permissao('catalogo', 'read')
+def listar_categorias():
+    lista_categorias = admin_engine.get_categorias()
+    return render_template('configuracoes/categorias.html', lista_categorias=lista_categorias)
+
+@app.route('/categorias/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_categoria():
+    cat_id = request.form.get('id')
+    nome = request.form.get('nome')
+    ativo = request.form.get('ativo')
+    
+    cat_id = int(cat_id) if cat_id and cat_id.isdigit() else None
+    ativo_int = 1 if ativo else 0
+    
+    sucesso = admin_engine.upsert_categoria(cat_id, nome, ativo_int)
+    
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'sucesso': sucesso,
+            'mensagem': 'Categoria salva com sucesso!' if sucesso else 'Erro ao salvar a categoria.'
+        })
+    
+    if sucesso:
+        flash('Categoria salva com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar a categoria. Tente novamente.', 'error')
+        
+    return redirect(url_for('listar_categorias'))
+
+# --- ROTAS DE CANAIS DE AQUISIÇÃO (CRUD) ---
+@app.route('/canais')
+@requer_permissao('catalogo', 'read')
+def listar_canais():
+    lista_canais = admin_engine.get_canais()
+    return render_template('configuracoes/canais.html', lista_canais=lista_canais)
+
+@app.route('/canais/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_canal():
+    canal_id = request.form.get('id')
+    nome = request.form.get('nome')
+    ativo = request.form.get('ativo')
+    
+    canal_id = int(canal_id) if canal_id and canal_id.isdigit() else None
+    ativo_int = 1 if ativo else 0
+    
+    sucesso = admin_engine.upsert_canal(canal_id, nome, ativo_int)
+    
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'sucesso': sucesso,
+            'mensagem': 'Canal de aquisição salvo com sucesso!' if sucesso else 'Erro ao salvar o canal de aquisição.'
+        })
+    
+    if sucesso:
+        flash('Canal de aquisição salvo com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar o canal de aquisição. Tente novamente.', 'error')
+        
+    return redirect(url_for('listar_canais'))
+
+# --- ROTAS DE STATUS DE PROTOCOLOS (CRUD) ---
+@app.route('/status')
+@requer_permissao('protocolos', 'read')
+def listar_status():
+    lista_status = admin_engine.obter_todos_status()
+    return render_template('configuracoes/status.html', lista_status=lista_status)
+
+@app.route('/status/salvar', methods=['POST'])
+@requer_permissao('protocolos', 'update')
+def salvar_status():
+    status_id = request.form.get('id')
+    nome_exibicao = request.form.get('nome_exibicao')
+    cor_badge = request.form.get('cor_badge')
+    ativo = request.form.get('ativo')
+    
+    status_id = int(status_id) if status_id and status_id.isdigit() else None
+    ativo_int = 1 if ativo else 0
+    
+    sucesso = admin_engine.upsert_status(status_id, nome_exibicao, cor_badge, ativo_int)
+    
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'sucesso': sucesso,
+            'mensagem': 'Status do protocolo salvo com sucesso!' if sucesso else 'Erro ao salvar o status.'
+        })
+    
+    if sucesso:
+        flash('Status do protocolo salvo com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar o status. Tente novamente.', 'error')
+        
+    return redirect(url_for('listar_status'))
+
+# --- ROTAS DE PERGUNTAS DE CONSERVAÇÃO (CRUD COM FILTRO OPCIONAL) ---
+@app.route('/perguntas')
+@app.route('/perguntas/<int:categoria_id>')
+@requer_permissao('catalogo', 'read')
+def listar_perguntas(categoria_id=None):
+    todas_perguntas = admin_engine.obter_todas_perguntas()
+    
+    # Se um ID de categoria foi passado, filtramos as perguntas em Python
+    if categoria_id:
+        lista_perguntas = [p for p in todas_perguntas if p['categoria_id'] == categoria_id]
+    else:
+        lista_perguntas = [] # Mantém vazio se não houver categoria selecionada
+        
+    lista_categorias = admin_engine.get_categorias() 
+    categoria_ativa = next((c for c in lista_categorias if c['id'] == categoria_id), None)
+    
+    return render_template('configuracoes/perguntas.html', 
+                           lista_perguntas=lista_perguntas, 
+                           lista_categorias=lista_categorias,
+                           categoria_selecionada=categoria_id,
+                           categoria_ativa=categoria_ativa)
+
+@app.route('/perguntas/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_pergunta():
+    perg_id = request.form.get('id')
+    texto = request.form.get('texto_pergunta')
+    categoria_id = request.form.get('categoria_id')
+    tipo = request.form.get('tipo_resposta')
+    impacto = request.form.get('impacto_valor')
+    
+    perg_id = int(perg_id) if perg_id and perg_id.isdigit() else None
+    categoria_id = int(categoria_id) if categoria_id and categoria_id.isdigit() else None
+    
+    try:
+        impacto_float = float(impacto) if impacto else 0.0
+    except ValueError:
+        impacto_float = 0.0
+        
+    sucesso = admin_engine.upsert_pergunta(perg_id, texto, categoria_id, tipo, impacto_float)
+    
+    if request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'sucesso': sucesso,
+            'mensagem': 'Pergunta salva com sucesso!' if sucesso else 'Erro ao salvar a pergunta.'
+        })
+        
+    return redirect(url_for('listar_perguntas', categoria_id=categoria_id))
+
+# --- ROTAS DE OPÇÕES DE ESTADO (CRUD) ---
+@app.route('/opcoes_estado')
+@app.route('/opcoes_estado/<int:categoria_id>')
+@requer_permissao('catalogo', 'read')
+def listar_opcoes_estado(categoria_id=None):
+    lista_opcoes = admin_engine.obter_opcoes_estado(categoria_id) if categoria_id else []
+    lista_categorias = admin_engine.get_categorias()
+    categoria_ativa = next((c for c in lista_categorias if c['id'] == categoria_id), None)
+    
+    return render_template('configuracoes/opcoes_estado.html', 
+                           lista_opcoes=lista_opcoes,
+                           categoria_selecionada=categoria_id,
+                           categoria_ativa=categoria_ativa)
+
+@app.route('/opcoes_estado/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_opcao_estado():
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+        
+    op_id = data.get('id')
+    cat_id = data.get('categoria_id')
+    descricao = data.get('descricao')
+    dep = data.get('fator_depreciacao')
+    extra = data.get('valor_fixo_extra')
+    
+    op_id = int(op_id) if op_id and str(op_id).isdigit() else None
+    
+    try:
+        dep_float = float(dep) if dep else 0.0
+        extra_float = float(extra) if extra else 0.0
+    except ValueError:
+        dep_float, extra_float = 0.0, 0.0
+        
+    try:
+        sucesso = admin_engine.upsert_opcao_estado(op_id, cat_id, descricao, dep_float, extra_float)
+        
+        if sucesso:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Falha na gravação no banco de dados.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# --- ROTAS DE USUÁRIOS ADMIN (CRUD) ---
+@app.route('/usuarios')
+@requer_permissao('catalogo', 'read')
+def listar_usuarios():
+    # Bloqueio em Nível de Rota para garantir que apenas o Administrador veja a lista
+    if session.get('admin_nivel') != 'Administrador':
+        flash('Acesso restrito a Administradores.', 'error')
+        return redirect(url_for('dashboard'))
+        
+    lista_usuarios = admin_engine.obter_todos_usuarios()
+    return render_template('configuracoes/usuarios.html', lista_usuarios=lista_usuarios)
+
+@app.route('/usuarios/salvar', methods=['POST'])
+@requer_permissao('catalogo', 'update')
+def salvar_usuario():
+    # Bloqueio em Nível de Rota para garantir que apenas o Administrador execute alterações
+    if session.get('admin_nivel') != 'Administrador':
+        return jsonify({'success': False, 'error': 'Acesso restrito a Administradores.'}), 403
+        
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+        
+    usr_id = data.get('id')
+    nivel_acesso = data.get('nivel_acesso')
+    ativo = data.get('ativo')
+    
+    usr_id = int(usr_id) if usr_id and str(usr_id).isdigit() else None
+    ativo_int = 1 if ativo in [1, '1', True, 'True', 'true'] else 0
+    
+    sucesso = admin_engine.atualizar_permissoes_usuario(usr_id, nivel_acesso, ativo_int)
+    
+    if sucesso:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Erro ao atualizar as permissões no banco de dados.'})
+
+# --- ROTAS DE REGIÕES DE ATENDIMENTO (CRUD) ---
 @app.route('/regioes')
 @requer_permissao('regioes', 'read')
 def listar_regioes():
     lista_regioes = admin_engine.obter_todas_regioes()
-    return render_template('regioes.html', regioes=lista_regioes)
+    return render_template('configuracoes/regioes.html', regioes=lista_regioes)
 
 @app.route('/regioes/salvar', methods=['POST'])
 @requer_permissao('regioes', 'update')

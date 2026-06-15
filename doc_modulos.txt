@@ -1,0 +1,8 @@
+ARQUIVO                                  | TÍTULO                                        | FUNÇÃO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+admin_engine.py                          | Motor de Regras e Integração de Banco de Dados | Motor de persistência e regras de negócio do painel administrativo. Centraliza a execução de queries SQL complexas e o isolamento da camada de dados.
+admin_server.py                          | Servidor Web e Roteamento Flask               | Servidor Controller principal do painel administrativo. Gerencia a autenticação via identidade do usuário, sessão e permissões RBAC.
+templates/dashboard.html                 | Visão Geral do Sistema (Dashboard)            | Página inicial do painel administrativo exibida logo após o login  bem-sucedido. Herda a estrutura principal do base.html e servirá futuramente  para exibir métricas gerais (resumo de protocolos abertos, itens pendentes, etc).
+templates/login.html                     | Tela de Autenticação da Equipe                | Interface de login seguro para o painel administrativo. Valida  as credenciais de acesso via Identidade do Usuário e exibe mensagens de erro.
+templates/regioes.html                   | Gestão de Regiões de Atendimento              | Interface de listagem e configuração (CRUD) das praças logísticas atendidas. Permite definir o multiplicador de preço por região através de janela Modal nativa, restrito ao nível de acesso de Administrador.
+templates/protocolos.html                | Gestão de Protocolos (Recompras)              | Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.

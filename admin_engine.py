@@ -25,11 +25,23 @@
 # - 12/06/2026: Implementação de filtro em obter_todos_protocolos_listagem para ocultar protocolos encerrados (ID 9).
 # - 12/06/2026: Atualização em obter_cabecalho_protocolo para buscar data_status_atual da tabela de histórico.
 # - 12/06/2026: Adição do parâmetro admin_id e injeção do INSERT na tabela historico_status_protocolo.
+# - 15/06/2026: Adição das funções de persistência (get_categorias, upsert_categoria) para a tabela categorias.
+# - 15/06/2026: Adição das funções de persistência (get_canais, upsert_canal) para a tabela canais_aquisicao.
+# - 15/06/2026: Correção no schema de canais_aquisicao (nome_exibicao) e geração automática de slug_tecnico.
+# - 15/06/2026: Adição das funções de persistência (obter_todos_status, upsert_status) para status_protocolos.
+# - 15/06/2026: Adição das funções de persistência (obter_todas_perguntas, upsert_pergunta) para perguntas_conservacao.
+# - 15/06/2026: Adição das funções 'obter_opcoes_estado' e 'upsert_opcao_estado'.
+# - 15/06/2026: Correção na query SQL de 'upsert_opcao_estado' para utilizar a coluna 'descricao' em vez de 'nome_estado'.
+# - 15/06/2026: Adição das funções obter_todos_usuarios, atualizar_permissoes_usuario e registrar_novo_usuario 
+#               para suportar o fluxo de Auto-Cadastro e Aprovação de Usuários Admin.
+# - 15/06/2026: Adição das funções obter_dados_empresa e salvar_dados_empresa para gerenciar os dados corporativos.
 # ==============================================================================
 
 import mysql.connector
 import os
 import json
+import re
+import unicodedata
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -298,7 +310,6 @@ def obter_todas_regioes():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        # CORREÇÃO: 'city' alterado para 'cidade'
         query = "SELECT id, cidade, estado_uf, multiplicador_preco, ativo FROM regioes_atendimento ORDER BY cidade ASC"
         cursor.execute(query)
         resultados = cursor.fetchall()
@@ -331,6 +342,330 @@ def salvar_regiao(regiao_id, cidade, estado_uf, multiplicador_preco, ativo):
         return True
     except mysql.connector.Error as err:
         print(f"Erro ao salvar região: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Categorias]
+def get_categorias():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT id, nome, ativo FROM categorias ORDER BY nome ASC"
+        cursor.execute(query)
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def upsert_categoria(cat_id, nome, ativo):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        if cat_id:
+            query = "UPDATE categorias SET nome = %s, ativo = %s WHERE id = %s"
+            cursor.execute(query, (nome, ativo, cat_id))
+        else:
+            query = "INSERT INTO categorias (nome, ativo) VALUES (%s, %s)"
+            cursor.execute(query, (nome, ativo))
+            
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar categoria: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Canais de Aquisição]
+def get_canais():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT id, nome_exibicao as nome, ativo FROM canais_aquisicao ORDER BY nome_exibicao ASC"
+        cursor.execute(query)
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def upsert_canal(canal_id, nome, ativo):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        
+        # Gerando o slug_tecnico dinamicamente (removendo acentos e espaços)
+        slug = unicodedata.normalize('NFKD', nome).encode('ASCII', 'ignore').decode('utf-8')
+        slug = re.sub(r'[^a-zA-Z0-9]+', '_', slug).strip('_').lower()
+        
+        if canal_id:
+            query = "UPDATE canais_aquisicao SET nome_exibicao = %s, ativo = %s, slug_tecnico = %s WHERE id = %s"
+            cursor.execute(query, (nome, ativo, slug, canal_id))
+        else:
+            query = "INSERT INTO canais_aquisicao (nome_exibicao, slug_tecnico, ativo) VALUES (%s, %s, %s)"
+            cursor.execute(query, (nome, slug, ativo))
+            
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar canal de aquisição: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Status de Protocolos]
+def obter_todos_status():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT id, slug_tecnico, nome_exibicao, cor_badge, ativo FROM status_protocolos ORDER BY id ASC"
+        cursor.execute(query)
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def upsert_status(status_id, nome_exibicao, cor_badge, ativo):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        
+        # Gerando o slug_tecnico dinamicamente a partir do nome
+        slug = unicodedata.normalize('NFKD', nome_exibicao).encode('ASCII', 'ignore').decode('utf-8')
+        slug = re.sub(r'[^a-zA-Z0-9]+', '_', slug).strip('_').lower()
+        
+        if status_id:
+            query = "UPDATE status_protocolos SET nome_exibicao = %s, slug_tecnico = %s, cor_badge = %s, ativo = %s WHERE id = %s"
+            cursor.execute(query, (nome_exibicao, slug, cor_badge, ativo, status_id))
+        else:
+            query = "INSERT INTO status_protocolos (nome_exibicao, slug_tecnico, cor_badge, ativo) VALUES (%s, %s, %s, %s)"
+            cursor.execute(query, (nome_exibicao, slug, cor_badge, ativo))
+            
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar status de protocolo: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Opções de Estado]
+def obter_opcoes_estado(categoria_id):
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT * FROM opcoes_estado WHERE categoria_id = %s ORDER BY id ASC"
+        cursor.execute(query, (categoria_id,))
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def upsert_opcao_estado(id, cat_id, descricao, dep, extra):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        if id:
+            query = """
+                UPDATE opcoes_estado 
+                SET descricao = %s, fator_depreciacao = %s, valor_fixo_extra = %s 
+                WHERE id = %s
+            """
+            cursor.execute(query, (descricao, dep, extra, id))
+        else:
+            query = """
+                INSERT INTO opcoes_estado (categoria_id, descricao, fator_depreciacao, valor_fixo_extra) 
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(query, (cat_id, descricao, dep, extra))
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar opção de estado: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Perguntas de Conservação]
+def obter_todas_perguntas():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = """
+            SELECT p.id, p.texto_pergunta, p.categoria_id, p.tipo_resposta, p.impacto_valor,
+                   c.nome AS nome_categoria
+            FROM perguntas_conservacao p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            ORDER BY c.nome, p.id
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Erro ao obter perguntas: {e}")
+        return []
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def upsert_pergunta(perg_id, texto, categoria_id, tipo, impacto):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        if perg_id:
+            query = """
+                UPDATE perguntas_conservacao 
+                SET texto_pergunta = %s, categoria_id = %s, tipo_resposta = %s, impacto_valor = %s
+                WHERE id = %s
+            """
+            cursor.execute(query, (texto, categoria_id, tipo, impacto, perg_id))
+        else:
+            query = """
+                INSERT INTO perguntas_conservacao (texto_pergunta, categoria_id, tipo_resposta, impacto_valor)
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(query, (texto, categoria_id, tipo, impacto))
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Erro no upsert da pergunta: {e}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Usuários Admin]
+def obter_todos_usuarios():
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = """
+            SELECT id, nome_completo, usuario_login, email, nivel_acesso, ativo, data_criacao, ultimo_login 
+            FROM usuarios_admin 
+            ORDER BY nome_completo ASC
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def atualizar_permissoes_usuario(usr_id, nivel_acesso, ativo):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        query = """
+            UPDATE usuarios_admin 
+            SET nivel_acesso = %s, ativo = %s 
+            WHERE id = %s
+        """
+        cursor.execute(query, (nivel_acesso, ativo, usr_id))
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao atualizar permissões do usuário: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def registrar_novo_usuario(nome_completo, usuario_login, email, senha_hash):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        query = """
+            INSERT INTO usuarios_admin (nome_completo, usuario_login, email, senha_hash, nivel_acesso, ativo, data_criacao)
+            VALUES (%s, %s, %s, %s, 'OPERADOR', 0, NOW())
+        """
+        cursor.execute(query, (nome_completo, usuario_login, email, senha_hash))
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao registrar novo usuário: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# [Funções de Gestão de Dados Corporativos]
+def obter_dados_empresa():
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM dados_empresa WHERE id = 1")
+        return cursor.fetchone()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def salvar_dados_empresa(dados):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        query = """
+            INSERT INTO dados_empresa (id, razao_social, nome_fantasia, cnpj, cep, logradouro, numero, complemento, bairro, cidade, estado_uf, telefone_contato, email_contato)
+            VALUES (1, %(razao_social)s, %(nome_fantasia)s, %(cnpj)s, %(cep)s, %(logradouro)s, %(numero)s, %(complemento)s, %(bairro)s, %(cidade)s, %(estado_uf)s, %(telefone_contato)s, %(email_contato)s)
+            ON DUPLICATE KEY UPDATE
+            razao_social = VALUES(razao_social),
+            nome_fantasia = VALUES(nome_fantasia),
+            cnpj = VALUES(cnpj),
+            cep = VALUES(cep),
+            logradouro = VALUES(logradouro),
+            numero = VALUES(numero),
+            complemento = VALUES(complemento),
+            bairro = VALUES(bairro),
+            cidade = VALUES(cidade),
+            estado_uf = VALUES(estado_uf),
+            telefone_contato = VALUES(telefone_contato),
+            email_contato = VALUES(email_contato)
+        """
+        cursor.execute(query, dados)
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao salvar dados da empresa: {err}")
         db.rollback()
         return False
     finally:

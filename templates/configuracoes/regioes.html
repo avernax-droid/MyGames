@@ -15,6 +15,7 @@
   - 04/06/2026: Adição de rotina JavaScript de auto-completar na "Cidade" para preenchimento dinâmico de "UF" via IBGE.
   - 04/06/2026: Correção de erro de sintaxe do Jinja2 (endendif -> endif).
   - 04/06/2026: Implementação de AJAX no formulário de regiões para manter o modal aberto e exibir feedback visual.
+  - 15/06/2026: Inclusão do botão "Voltar" padronizado no cabeçalho da página.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -24,9 +25,14 @@
 {% block page_title %}
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span>Regiões de Atendimento</span>
-        <button onclick="abrirModalRegiao()" class="btn-primary">
-            + Nova Região
-        </button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <a href="{{ url_for('dashboard') }}" class="btn-voltar">
+                Voltar
+            </a>
+            <button onclick="abrirModalRegiao()" class="btn-primary">
+                + Nova Região
+            </button>
+        </div>
     </div>
 {% endblock %}
 
@@ -162,7 +168,7 @@
         gap: 15px;
     }
     
-    /* Estilos Globais para Botões Primários e Secundários */
+    /* Estilos Globais para Botões */
     .btn-primary {
         background-color: var(--cor-destaque);
         color: #000000;
@@ -198,6 +204,30 @@
         background-color: #222;
         border-color: #666;
         color: var(--texto-br);
+    }
+
+    /* Botão Voltar Padronizado */
+    .btn-voltar {
+        background: transparent;
+        border: 1px solid #444;
+        color: var(--texto-dim);
+        padding: 9px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: max-content;
+    }
+    
+    .btn-voltar:hover {
+        border-color: var(--texto-br);
+        color: var(--texto-br);
+        background-color: rgba(255, 255, 255, 0.05);
     }
 
     /* Autocomplete CSS */

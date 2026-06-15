@@ -2,14 +2,16 @@
   ==============================================================================
   PROJETO: MyGames - Backoffice
   MÓDULO: login.html
-  DATA DE CREIAÇÃO: 30/05/2026
-  TÍTULO: Tela de Autenticação da Equipe
-  FUNÇÃO: Interface de login seguro para o painel administrativo. Valida 
-  as credenciais de acesso via Identidade do Usuário e exibe mensagens de erro.
+  DATA DE CRIAÇÃO: 30/05/2026
+  TÍTULO: Tela de Autenticação e Registro da Equipe
+  FUNÇÃO: Interface pública do painel administrativo. Gerencia o login tradicional
+  e o fluxo de Auto-Cadastro (Solicitação de Acesso) para novos membros.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 30/05/2026: Criação da interface inicial seguindo a identidade visual Dark Mode.
   - 30/05/2026: Alteração do campo de credencial de E-mail para Identidade do Usuário.
+  - 15/06/2026: Implementação do fluxo de Auto-Cadastro com transição via JS (formulário duplo), 
+                inclusão de validação de confirmação de senha e suporte a flash messages de sucesso.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -17,7 +19,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Administrativo - MyGames</title>
+    <title>Acesso Administrativo - MyGames</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --bg-fundo: #121212;
@@ -33,7 +36,8 @@
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            height: 100vh; 
+            min-height: 100vh; 
+            padding: 20px;
         }
 
         .login-wrapper {
@@ -42,25 +46,26 @@
             border-radius: 12px;
             border: 1px solid #333;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
         }
 
         .login-wrapper h2 {
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             color: var(--cor-destaque);
             font-size: 24px;
         }
 
-        .login-wrapper p {
+        .login-wrapper p.subtitle {
             text-align: center;
             color: var(--texto-dim);
             font-size: 14px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
-        .form-group { margin-bottom: 20px; }
+        .form-group { margin-bottom: 18px; }
         
         .form-group label { 
             display: block; 
@@ -73,7 +78,7 @@
         
         .form-control { 
             width: 100%; 
-            padding: 14px; 
+            padding: 12px 14px; 
             background: #121212; 
             border: 1px solid #444; 
             border-radius: 8px; 
@@ -86,52 +91,82 @@
             outline: none; 
             border-color: var(--cor-destaque); 
             background: #252525;
+            box-shadow: 0 0 5px rgba(0, 230, 118, 0.2);
         }
 
-        .btn-login { 
+        .btn-submit { 
             width: 100%; 
-            padding: 15px; 
+            padding: 14px; 
             background: var(--cor-destaque); 
             color: #000; 
             border: none; 
             border-radius: 8px; 
-            font-size: 16px; 
+            font-size: 15px; 
             font-weight: bold; 
             cursor: pointer; 
             transition: 0.3s; 
             margin-top: 10px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
         
-        .btn-login:hover { opacity: 0.9; transform: scale(0.98); }
+        .btn-submit:hover { background-color: #00b359; box-shadow: 0 0 10px rgba(0, 230, 118, 0.3); }
 
-        .flash-error { 
-            background: rgba(255, 68, 68, 0.1); 
-            border: 1px dashed #ff4444; 
-            color: #ff4444; 
+        .flash-msg { 
             padding: 12px; 
             border-radius: 8px; 
             margin-bottom: 20px; 
             text-align: center; 
-            font-size: 14px; 
+            font-size: 13px; 
             font-weight: bold;
+            border: 1px dashed;
         }
+        .flash-error { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
+        .flash-success { background: rgba(0, 230, 118, 0.1); border-color: var(--cor-destaque); color: var(--cor-destaque); }
+
+        /* --- TOGGLE LINK --- */
+        .toggle-container {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--texto-dim);
+        }
+        .toggle-link {
+            color: var(--cor-destaque);
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .toggle-link:hover { text-decoration: underline; color: #fff; }
+
+        /* --- UTILITÁRIOS --- */
+        .hidden { display: none; }
+        .row-dupla { display: flex; gap: 12px; }
+        .row-dupla .form-group { flex: 1; }
     </style>
 </head>
 <body>
 
     <div class="login-wrapper">
-        <h2>Painel MyGames</h2>
-        <p>Acesso restrito à equipe</p>
+        <h2 id="header-titulo">Painel MyGames</h2>
+        <p class="subtitle" id="header-subtitulo">Acesso restrito à equipe</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash-error">{{ message }}</div>
+                    <div class="flash-msg {% if category == 'success' %}flash-success{% else %}flash-error{% endif %}">
+                        {{ message }}
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form action="/" method="POST">
+        <form action="/" method="POST" id="form-login">
+            <input type="hidden" name="acao" value="login">
+            
             <div class="form-group">
                 <label>Identidade do Usuário</label>
                 <input type="text" name="usuario_login" class="form-control" placeholder="ex: antonio.verna" required autofocus>
@@ -142,9 +177,82 @@
                 <input type="password" name="senha" class="form-control" placeholder="••••••••" required>
             </div>
 
-            <button type="submit" class="btn-login">ACESSAR SISTEMA</button>
+            <button type="submit" class="btn-submit"><i class="fas fa-sign-in-alt"></i> ACESSAR SISTEMA</button>
+            
+            <div class="toggle-container">
+                Ainda não tem acesso? <a class="toggle-link" onclick="alternarFormularios('registro')">Solicitar Conta</a>
+            </div>
+        </form>
+
+        <form action="/" method="POST" id="form-registro" class="hidden">
+            <input type="hidden" name="acao" value="registrar">
+            
+            <div class="form-group">
+                <label>Nome Completo</label>
+                <input type="text" name="nome_completo" class="form-control" placeholder="Seu nome real" required>
+            </div>
+
+            <div class="form-group">
+                <label>Identidade do Usuário (Login)</label>
+                <input type="text" name="usuario_login" class="form-control" placeholder="ex: antonio.verna" style="text-transform: lowercase;" required>
+            </div>
+
+            <div class="form-group">
+                <label>E-mail Corporativo/Pessoal</label>
+                <input type="email" name="email" class="form-control" placeholder="ex: antonio@mygames.com" required>
+            </div>
+
+            <div class="row-dupla">
+                <div class="form-group">
+                    <label>Criar Senha</label>
+                    <input type="password" id="reg_senha" name="senha" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirmar Senha</label>
+                    <input type="password" id="reg_senha_conf" class="form-control" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> ENVIAR SOLICITAÇÃO</button>
+            
+            <div class="toggle-container">
+                Já possui uma conta? <a class="toggle-link" onclick="alternarFormularios('login')">Fazer Login</a>
+            </div>
         </form>
     </div>
 
+    <script>
+        const formLogin = document.getElementById('form-login');
+        const formRegistro = document.getElementById('form-registro');
+        const headerTitulo = document.getElementById('header-titulo');
+        const headerSubtitulo = document.getElementById('header-subtitulo');
+
+        function alternarFormularios(alvo) {
+            if (alvo === 'registro') {
+                formLogin.classList.add('hidden');
+                formRegistro.classList.remove('hidden');
+                headerTitulo.innerText = 'Solicitar Acesso';
+                headerSubtitulo.innerText = 'Preencha seus dados para aprovação';
+                document.querySelector('#form-registro input[name="nome_completo"]').focus();
+            } else {
+                formRegistro.classList.add('hidden');
+                formLogin.classList.remove('hidden');
+                headerTitulo.innerText = 'Painel MyGames';
+                headerSubtitulo.innerText = 'Acesso restrito à equipe';
+            }
+        }
+
+        // Validação de senhas no frontend antes do envio
+        formRegistro.addEventListener('submit', function(e) {
+            const senha = document.getElementById('reg_senha').value;
+            const senhaConf = document.getElementById('reg_senha_conf').value;
+            
+            if (senha !== senhaConf) {
+                e.preventDefault(); // Interrompe o envio
+                alert('Atenção: A senha e a confirmação de senha não coincidem. Digite novamente.');
+                document.getElementById('reg_senha_conf').focus();
+            }
+        });
+    </script>
 </body>
 </html>
