@@ -12,6 +12,7 @@
   - 10/06/2026: Adição do painel de exibição de Logística Reversa.
   - 15/06/2026: Injeção dinâmica dos dados da empresa (e-mail/telefone) via banco de dados.
   - 15/06/2026: Hotfix - Blindagem de renderização Jinja2 com .get() para dicionário empresa.
+  - 16/06/2026: Atualização da variável de nome da empresa para alinhar com o banco de dados (nome_fantasia) e uso direto da variável.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -67,7 +68,7 @@
         </div>
         
         <div style="font-size: 0.85rem; color: var(--texto-dim); border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; line-height: 1.4;">
-            <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança, dirija-se a qualquer agência dos Correios e informe o Código de Postagem (E-Ticket). O frete já está pago pela {{ empresa.get('nome_empresa', 'MyGames') if empresa else 'MyGames' }}.
+            <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança, dirija-se a qualquer agência dos Correios e informe o Código de Postagem (E-Ticket). O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'MyGames' }}</strong>.
         </div>
     </div>
     {% endif %}
@@ -89,7 +90,7 @@
 
     <div style="margin-bottom: 25px; padding: 15px; border-top: 1px solid #333; font-size: 0.85rem; color: var(--texto-dim);">
         <p>Em caso de dúvidas, contate nossa equipe:</p>
-        <p><strong>{{ empresa.get('nome_empresa', 'MyGames') if empresa else 'MyGames' }}</strong></p>
+        <p><strong>{{ nome_fantasia if nome_fantasia else 'MyGames' }}</strong></p>
         <p><i class="fas fa-envelope"></i> {{ empresa.get('email_contato', 'suporte@mygames.com') if empresa else 'suporte@mygames.com' }}</p>
         <p><i class="fas fa-phone"></i> {{ empresa.get('telefone_contato', '(00) 0000-0000') if empresa else '(00) 0000-0000' }}</p>
     </div>

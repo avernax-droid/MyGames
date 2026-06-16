@@ -25,6 +25,8 @@
 # - 11/06/2026: Inclusão de status_id = 1 na função finalizar_proposta.
 # - 13/06/2026: Migração da integração dos Correios para arquitetura SOAP/XML. Inclusão de roteamento dinâmico de serviço (PAC/SEDEX) por faixa de CEP.
 # - 15/06/2026: Inclusão da função obter_dados_empresa para corrigir o AttributeError na geração do protocolo mobile.
+# - 16/06/2026: Dinamização dos dados do remetente (e-mail e nome fantasia) no envio de e-mails, buscando da tabela dados_empresa com LIMIT 1.
+# - 16/06/2026: Inclusão de formataddr para mascarar o remetente oficial do GMail com o Nome Fantasia da empresa na caixa de entrada do cliente.
 # ==============================================================================
 
 import mysql.connector
@@ -38,6 +40,7 @@ import xml.etree.ElementTree as ET
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr  # NOVO: Necessário para formatar o nome do remetente
 import os
 from dotenv import load_dotenv
 
@@ -216,8 +219,14 @@ def obter_dados_empresa():
         
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM dados_empresa WHERE id = 1")
-        return cursor.fetchone()
+        # Busca o primeiro registro na tabela dados_empresa
+        cursor.execute("SELECT * FROM dados_empresa LIMIT 1")
+        resultado = cursor.fetchone()
+        
+        if not resultado:
+            print("AVISO: A tabela 'dados_empresa' está vazia no banco de dados!")
+            
+        return resultado
     except Exception as e:
         print(f"Erro ao buscar dados da empresa: {e}")
         return None
@@ -228,9 +237,20 @@ def obter_dados_empresa():
 
 def enviar_email_resumo(cliente, dados_email, itens_avaliados):
     try:
-        remetente, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
+        # Busca dados da empresa para dinamizar o envio
+        empresa = obter_dados_empresa()
+        nome_fantasia = empresa.get('nome_fantasia', 'MyGames') if empresa else 'MyGames'
+        
+        # Mantemos o login com a conta base do SMTP configurada
+        remetente_login, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
+        
         msg = MIMEMultipart()
-        msg['From'], msg['To'], msg['Subject'] = remetente, cliente['email'], f"Confirmação MyGames - Protocolo {dados_email['protocolo']}"
+        
+        # O SEGREDO ESTÁ AQUI: Formatamos o remetente para exibir o "Nome Fantasia"
+        # Ex: "Rock Laser" <avernax@gmail.com>
+        msg['From'] = formataddr((nome_fantasia, remetente_login))
+        msg['To'] = cliente['email']
+        msg['Subject'] = f"Confirmação {nome_fantasia} - Protocolo {dados_email['protocolo']}"
         
         corpo = f"Olá {cliente['nome_completo']},\n\n"
         corpo += f"Protocolo: {dados_email['protocolo']}\n"
@@ -246,8 +266,8 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
                 corpo += f" Código de Rastreio dos Correios: {dados_email['codigo_rastreio']}\n"
             corpo += "\n Instruções: Embale os itens com segurança, dirija-se\n"
             corpo += " a uma agência dos Correios e informe o E-Ticket acima.\n"
-            corpo += " O envio é faturado diretamente para a conta comercial\n"
-            corpo += " da MyGames, sendo 100% gratuito para você.\n"
+            corpo += f" O envio é faturado diretamente para a conta comercial\n"
+            corpo += f" da {nome_fantasia}, sendo 100% gratuito para você.\n"
             corpo += "--------------------------------------------------------\n\n"
 
         tem_analise_manual = False
@@ -278,12 +298,15 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         corpo += "empresa via Correios.\n"
         corpo += "--------------------------------------------------------\n\n"
         
-        corpo += "Atenciosamente,\nEquipe MyGames"
+        corpo += f"Atenciosamente,\nEquipe {nome_fantasia}"
             
         msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
         
         server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls(); server.login(remetente, senha); server.send_message(msg); server.quit()
+        server.starttls()
+        server.login(remetente_login, senha)
+        server.send_message(msg)
+        server.quit()
         return True
     except Exception as e: 
         print(f"Erro ao enviar email: {e}")

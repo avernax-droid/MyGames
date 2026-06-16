@@ -13,6 +13,7 @@
   - 04/06/2026: Inclusão do cabeçalho padrão de documentação e layout mobile base.
   - 10/06/2026: Implementação do Card Fluido de Logística Reversa para exibição do e-ticket e rastreio.
   - 15/06/2026: Hotfix - Blindagem de renderização Jinja2 com .get() na instrução da logística reversa.
+  - 16/06/2026: Atualização da variável de nome da empresa (nome_fantasia) para alinhar com o banco de dados e padronizar com a versão desktop.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -223,7 +224,7 @@
             {% endif %}
 
             <div class="mobile-correios-instrucao">
-                <strong>Instruções de Postagem:</strong> Dirija-se a uma agência dos Correios com os itens embalados e informe o Código de Postagem acima. O envio é 100% gratuito pela {{ empresa.get('nome_empresa', 'MyGames') if empresa else 'MyGames' }}.
+                <strong>Instruções de Postagem:</strong> Dirija-se a uma agência dos Correios com os itens embalados e informe o Código de Postagem acima. O envio é 100% gratuito pela <strong>{{ nome_fantasia if nome_fantasia else 'MyGames' }}</strong>.
             </div>
         </div>
         {% endif %}

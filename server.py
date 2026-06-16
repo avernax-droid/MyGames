@@ -26,6 +26,7 @@
 # - 10/06/2026: Recebimento e repasse dos dados de logística reversa (e-ticket e rastreio) na rota /finalizar.
 # - 10/06/2026: Inclusão dos campos e_ticket e codigo_rastreio no dicionário dados_email para envio por e-mail.
 # - 15/06/2026: Integração da rota /finalizar com a tabela dados_empresa para exibição dinâmica no sucesso.html.
+# - 16/06/2026: Tratamento seguro da variável nome_fantasia na rota /finalizar com fallback para evitar erros de renderização no Jinja2.
 # ==============================================================================
 
 import os
@@ -481,6 +482,9 @@ def finalizar():
 
         # Busca dados atualizados da empresa na tabela dados_empresa
         empresa = engine.obter_dados_empresa()
+        
+        # Fallback seguro: se a tabela estiver vazia, define um padrão
+        nome_fantasia_seguro = empresa.get('nome_fantasia', 'MyGames') if empresa else 'MyGames'
 
         dados_email = {
             'protocolo': res_protocolo['numero'],
@@ -490,7 +494,7 @@ def finalizar():
             'codigo_rastreio': codigo_rastreio
         }
         
-        # Envia o e-mail (que também pode usar os dados da empresa internamente no engine)
+        # Envia o e-mail
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
         return render_smart_template(
@@ -500,7 +504,7 @@ def finalizar():
             fase_atual=6,
             e_ticket=e_ticket,
             codigo_rastreio=codigo_rastreio,
-            empresa=empresa # Passando os dados corporativos para a View!
+            nome_fantasia=nome_fantasia_seguro # Passando a variável de texto direto e limpa!
         )
     
     return "Erro ao finalizar agendamento.", 500
