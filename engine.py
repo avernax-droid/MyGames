@@ -24,6 +24,7 @@
 # - 10/06/2026: Formatação e inserção dos dados de logística reversa (e-ticket e rastreio) no corpo do e-mail de resumo.
 # - 11/06/2026: Inclusão de status_id = 1 na função finalizar_proposta.
 # - 13/06/2026: Migração da integração dos Correios para arquitetura SOAP/XML. Inclusão de roteamento dinâmico de serviço (PAC/SEDEX) por faixa de CEP.
+# - 15/06/2026: Inclusão da função obter_dados_empresa para corrigir o AttributeError na geração do protocolo mobile.
 # ==============================================================================
 
 import mysql.connector
@@ -203,6 +204,27 @@ def registrar_item_periciado(protocolo_id, item):
         if db and db.is_connected(): cursor.close(); db.close()
 
 # --- MÓDULO DE FINALIZAÇÃO ---
+
+def obter_dados_empresa():
+    """
+    Busca os dados da empresa (nome, cnpj, etc) no banco de dados 
+    para a geração do protocolo e envio de e-mails.
+    """
+    db = conectar_bd()
+    if not db: 
+        return None
+        
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM dados_empresa WHERE id = 1")
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Erro ao buscar dados da empresa: {e}")
+        return None
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
 
 def enviar_email_resumo(cliente, dados_email, itens_avaliados):
     try:
