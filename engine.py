@@ -27,6 +27,8 @@
 # - 15/06/2026: Inclusão da função obter_dados_empresa para corrigir o AttributeError na geração do protocolo mobile.
 # - 16/06/2026: Dinamização dos dados do remetente (e-mail e nome fantasia) no envio de e-mails, buscando da tabela dados_empresa com LIMIT 1.
 # - 16/06/2026: Inclusão de formataddr para mascarar o remetente oficial do GMail com o Nome Fantasia da empresa na caixa de entrada do cliente.
+# - 16/06/2026: Correção de autenticação WS-Security na integração SOAP dos Correios e roteamento dinâmico de URL de homologação/produção.
+# - 16/06/2026: Ajuste na URL de homologação da integração Correios (adição do sufixo ?wsdl) para resolver erro HTTP 404.
 # ==============================================================================
 
 import mysql.connector
@@ -40,7 +42,7 @@ import xml.etree.ElementTree as ET
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr  # NOVO: Necessário para formatar o nome do remetente
+from email.utils import formataddr 
 import os
 from dotenv import load_dotenv
 
@@ -244,10 +246,9 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         # Mantemos o login com a conta base do SMTP configurada
         remetente_login, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
         
-        msg = MIMEMultipart()
-        
         # O SEGREDO ESTÁ AQUI: Formatamos o remetente para exibir o "Nome Fantasia"
         # Ex: "Rock Laser" <avernax@gmail.com>
+        msg = MIMEMultipart()
         msg['From'] = formataddr((nome_fantasia, remetente_login))
         msg['To'] = cliente['email']
         msg['Subject'] = f"Confirmação {nome_fantasia} - Protocolo {dados_email['protocolo']}"
@@ -497,12 +498,24 @@ def gerar_logistica_reversa(dados_remetente):
             codigo_servico = CODIGO_PAC_REVERSO
             logging.info(f"Roteamento de Frete: CEP {cep_cliente} classificado como PAC REVERSO ({codigo_servico})")
 
-    # URL oficial de Logística Reversa em SOAP
-    url_soap = "https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS"
+    # ==========================================
+    # ROTEAMENTO DE URL (HOMOLOGAÇÃO VS PRODUÇÃO)
+    # ==========================================
+    if ambiente == "producao":
+        url_soap = "https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS"
+    else:
+        url_soap = "https://apphom.correios.com.br/logisticaInversaWS/logisticaInversaService/logisticaInversaWS?wsdl"
     
-    # Construção do Envelope XML dinâmico
+    # Construção do Envelope XML dinâmico (com Autenticação WS-Security)
     xml_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.logisticareversa.correios.com.br/">
-       <soapenv:Header/>
+       <soapenv:Header>
+          <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+             <wsse:UsernameToken>
+                <wsse:Username>{usuario}</wsse:Username>
+                <wsse:Password>{senha}</wsse:Password>
+             </wsse:UsernameToken>
+          </wsse:Security>
+       </soapenv:Header>
        <soapenv:Body>
           <ser:solicitarPostagemReversa>
              <codAdministrativo>{contrato}</codAdministrativo>
