@@ -6,18 +6,18 @@
   TÍTULO: Exibição de Oferta e Revisão de Perícia
   FUNÇÃO: Apresenta o resultado da avaliação técnica de um produto individual. 
   Exibe o valor da oferta gerada (ou o aviso de avaliação sob consulta para itens 
-  personalizados), o estado de conservação selecionado e uma galeria de revisão 
-  com fotos e comentários enviados pelo usuário. Inclui funcionalidade para 
-  descartar a avaliação atual do item.
+  personalizados) e uma galeria de revisão com fotos e comentários enviados pelo usuário. 
+  Inclui funcionalidade para descartar a avaliação atual do item.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
-  - 29/05/2026: Redução proporcional do tamanho da fonte no valor da cotação.
-  - 29/05/2026: Alinhamento dos três botões de ação na mesma linha.
   - 29/05/2026: Integração com Modal Global e correção da navegação pós-descarte.
-  - 29/05/2026: Inclusão de alerta visual (badge) para multiplicador de preço regional.
-  - 29/05/2026: Exibição do valor normal riscado ao lado do valor com bônus e compactação de layout.
   - 02/06/2026: Remoção do aviso de bônus regional e do valor riscado (Precificação oculta).
+  - 19/06/2026: Inclusão da mensagem de reavaliação dinâmica (com a categoria correspondente).
+  - 19/06/2026: Remoção da exibição do estado de conservação (badge) na tela de resultado a pedido do usuário.
+  - 19/06/2026: Atualização dos rótulos (labels) dos botões de ação final para maior clareza na UX.
+  - 19/06/2026: Inclusão de alerta sobre jogos digitais e cotação por média exclusivo para a categoria de Jogos.
+  - 19/06/2026: Ajuste de UX pós-descarte individual: Ocultação dos botões de fluxo e exibição de um botão único "VOLTAR" para a seleção de produtos.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -36,6 +36,14 @@
                 </div>
                 <div class="produto-nome-display">{{ cotacao.produto }}</div>
             </header>
+
+            {% if categoria_nome in ['Jogo', 'Jogos'] %}
+            <div class="alerta-jogos-digital" style="margin: 15px auto 5px auto; padding: 12px; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.5); border-radius: 8px; max-width: 90%;">
+                <p style="color: #ffaa00; font-size: 13px; margin: 0; line-height: 1.4;">
+                    Não compramos jogos de mídia digital, estes jogos não foram considerados na cotação. Cotação de Jogos pela média, porém jogos especiais poderão melhorar a sua cotação na perícia técnica.
+                </p>
+            </div>
+            {% endif %}
             
             {% if session.get('is_outros') %}
             <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin: 15px 0; text-align: left;">
@@ -53,9 +61,9 @@
             {% endif %}
             
             <div class="info-estado">
-                <span class="badge-estado-selecionado">
-                    {{ cotacao.descricao }}
-                </span>
+                <p class="texto-reavaliacao">
+                    O valor informado se refere para {{ categoria_nome }} em Perfeito Estado de Funcionamento e Sem Itens Faltantes. Seu item será reavaliado na perícia técnica.
+                </p>
             </div>
 
             <div class="revisao-pericia">
@@ -86,17 +94,23 @@
         </div>
 
         <div class="acoes-finais" style="margin-top: 15px;">
-            <div style="display: flex; justify-content: space-between; gap: 10px;">
-                <a href="{{ url_for('produto') }}" class="btn-secondary">
-                    MAIS PRODUTOS
+            <div id="grupo-botoes-originais" style="display: flex; justify-content: space-between; gap: 10px;">
+                <a href="{{ url_for('produto') }}" class="btn-secondary" style="padding: 10px; font-size: 13px; text-align: center; display: flex; align-items: center; justify-content: center; flex: 1;">
+                    INSERIR MAIS PRODUTOS NA COTAÇÃO
                 </a>
 
-                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 10px; font-size: 13px;">
-                    DESCARTAR AVALIAÇÃO
+                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 10px; font-size: 13px; flex: 1;">
+                    NÃO QUERO VENDER ESTE ITEM
                 </button>
 
-                <a href="{{ url_for('resumo') }}" class="btn-primary">
-                    FECHAR
+                <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 10px; font-size: 13px; text-align: center; display: flex; align-items: center; justify-content: center; flex: 1;">
+                    QUERO VENDER
+                </a>
+            </div>
+
+            <div id="grupo-botao-voltar-descarte" style="display: none; justify-content: center; width: 100%;">
+                <a href="{{ url_for('produto') }}" class="btn-primary" style="padding: 15px 40px; font-size: 15px; text-align: center; width: 100%; max-width: 300px;">
+                    VOLTAR
                 </a>
             </div>
         </div>
@@ -104,17 +118,18 @@
 </div>
 
 <script>
-    // ALTERAÇÃO: Nome da função atualizado para ser chamada pelo Modal Global
     function executarDescarteIndividualAjax() {
         fetch('/descartar-atual')
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sucesso') {
-                    // Esconde os dados do produto e apenas o botão de descarte.
-                    // Mantém os botões "MAIS PRODUTOS" e "FECHAR" ativos na tela.
+                    // Esconde os dados da avaliação e o grupo de 3 botões
                     document.getElementById('dados-avaliacao-container').style.display = 'none';
-                    document.getElementById('btn-descarte-acao').style.display = 'none'; 
+                    document.getElementById('grupo-botoes-originais').style.display = 'none'; 
+                    
+                    // Exibe a mensagem de sucesso e o botão único de voltar
                     document.getElementById('feedback-descarte').style.display = 'block';
+                    document.getElementById('grupo-botao-voltar-descarte').style.display = 'flex';
                 }
             })
             .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
@@ -138,11 +153,13 @@
     .valor-pix { color: var(--cor-destaque); font-size: 34px; font-weight: bold; line-height: 1; font-family: monospace; }
 
     .info-estado { margin-bottom: 15px; }
-    .badge-estado-selecionado {
-        display: inline-block; background: rgba(0, 255, 0, 0.08);
-        border: 1px solid var(--cor-destaque); color: var(--cor-destaque);
-        padding: 6px 14px; border-radius: 6px;
-        font-weight: bold; font-size: 13px; text-transform: uppercase;
+    
+    .texto-reavaliacao {
+        color: var(--texto-dim);
+        font-size: 12px;
+        line-height: 1.4;
+        margin: 0 auto;
+        max-width: 80%;
     }
 
     .revisao-pericia { 

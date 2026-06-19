@@ -29,6 +29,7 @@
 # - 16/06/2026: Inclusão de formataddr para mascarar o remetente oficial do GMail com o Nome Fantasia da empresa na caixa de entrada do cliente.
 # - 16/06/2026: Correção de autenticação WS-Security na integração SOAP dos Correios e roteamento dinâmico de URL de homologação/produção.
 # - 16/06/2026: Ajuste na URL de homologação da integração Correios (adição do sufixo ?wsdl) para resolver erro HTTP 404.
+# - 19/06/2026: Refatoração da função gerar_logistica_reversa para integração com o Portal Postal via SOAP (PrePostagemXml) e ajuste na chamada em finalizar_proposta.
 # ==============================================================================
 
 import mysql.connector
@@ -338,7 +339,12 @@ def finalizar_proposta(dados_proposta):
             "telefone": cliente.get('whatsapp', '')
         }
         
-        e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente)
+        # Ajuste para integrar itens avaliados garantindo o formato seguro da API
+        itens_avaliados = dados_proposta.get('itens', [])
+        if not itens_avaliados:
+            itens_avaliados = [{'produto_nome': 'Produtos Diversos', 'quantidade': 1, 'valor_pix_unitario': 0.00}]
+            
+        e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente, protocolo, itens_avaliados)
         
         sql = """INSERT INTO protocolos_recompra 
                   (cliente_id, numero_protocolo, status, status_id, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
@@ -457,150 +463,126 @@ def buscar_canais_aquisicao():
 
 # --- INTEGRAÇÃO CORREIOS ---
 
-def gerar_logistica_reversa(dados_remetente):
-    usuario = os.getenv('CORREIOS_USER')
-    senha = os.getenv('CORREIOS_PASS')
-    cartao = os.getenv('CORREIOS_CARTAO_POSTAGEM')
-    contrato = os.getenv('CORREIOS_CONTRATO')
+def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
+    """
+    Integração com Web Service do Portal Postal (Correios AGF).
+    Utiliza o método PrePostagemXml (Sem Sequência Lógica).
+    """
+    # Credenciais fixas da agência (Portal Postal)
+    cod_agencia = 98
+    login_ws = "trocagames"
+    senha_ws = "@123456"
+    url_soap = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
     ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
     
-    # ==========================================
-    # MOCK (SIMULAÇÃO DE RESPOSTA)
-    # ==========================================
     if ambiente == "fake":
-        logging.info("MODO FAKE ATIVADO: Simulando resposta da API dos Correios...")
-        e_ticket_fake = "888888888"
-        rastreio_fake = "BR987654321BR"
-        logging.info(f"SUCESSO (FAKE)! E-ticket: {e_ticket_fake} | Rastreio: {rastreio_fake}")
-        return e_ticket_fake, rastreio_fake
+        logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
+        return "888888888", "BR987654321BR"
 
-    # ==========================================
-    # ROTEAMENTO DINÂMICO DE SERVIÇO (CEP)
-    # Regra de negócio da empresa:
-    # - CEP de 00000-000 até 19999-999: Utilizar SEDEX REVERSO AGÊNCIA
-    # - CEP de 20000-000 em diante: Utilizar PAC REVERSO AGÊNCIA
-    # ==========================================
-    
-    # Limpa o CEP para garantir apenas números
+    # Roteamento Dinâmico de Serviço (CEP)
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
-    
-    # Códigos padrão de logística reversa simultânea em agência
-    CODIGO_SEDEX_REVERSO = "04679"
-    CODIGO_PAC_REVERSO = "04677"
-    
-    codigo_servico = CODIGO_PAC_REVERSO  # Fallback de segurança para PAC
+    servico_correios = "PAC" # Fallback padrão
     
     if cep_cliente and len(cep_cliente) == 8:
         if int(cep_cliente) < 20000000:
-            codigo_servico = CODIGO_SEDEX_REVERSO
-            logging.info(f"Roteamento de Frete: CEP {cep_cliente} classificado como SEDEX REVERSO ({codigo_servico})")
+            servico_correios = "SEDEX"
+            logging.info(f"Roteamento: CEP {cep_cliente} classificado como SEDEX")
         else:
-            codigo_servico = CODIGO_PAC_REVERSO
-            logging.info(f"Roteamento de Frete: CEP {cep_cliente} classificado como PAC REVERSO ({codigo_servico})")
+            logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC")
 
-    # ==========================================
-    # ROTEAMENTO DE URL (HOMOLOGAÇÃO VS PRODUÇÃO)
-    # ==========================================
-    if ambiente == "producao":
-        url_soap = "https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS"
-    else:
-        url_soap = "https://apphom.correios.com.br/logisticaInversaWS/logisticaInversaService/logisticaInversaWS?wsdl"
-    
-    # Construção do Envelope XML dinâmico (com Autenticação WS-Security)
-    xml_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.logisticareversa.correios.com.br/">
-       <soapenv:Header>
-          <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-             <wsse:UsernameToken>
-                <wsse:Username>{usuario}</wsse:Username>
-                <wsse:Password>{senha}</wsse:Password>
-             </wsse:UsernameToken>
-          </wsse:Security>
-       </soapenv:Header>
+    # 1. Construção dinâmica do conteúdo (Itens Periciados)
+    xml_itens = ""
+    for item in itens_avaliados:
+        # A descrição precisa ter pelo menos 5 caracteres alfabéticos e sem especiais
+        descricao_limpa = str(item.get('produto_nome', 'Item MyGames')).replace('<', '').replace('>', '').replace('&', 'e')[:100]
+        if len(descricao_limpa) < 5:
+            descricao_limpa = descricao_limpa.ljust(5, 'x')
+            
+        xml_itens += f"""
+        <item>
+            <descricao>{descricao_limpa}</descricao>
+            <quantidade>{item.get('quantidade', 1)}</quantidade>
+            <valor>{item.get('valor_pix_unitario', '0.00')}</valor>
+        </item>"""
+
+    # 2. Construção do XML interno de postagem
+    xml_dados_postagem = f"""<portalpostal>
+    <pre_postagem>
+        <chave>{numero_protocolo}</chave>
+        <nome>{dados_remetente.get('nome', 'Cliente MyGames')[:100]}</nome>
+        <cep>{cep_cliente}</cep>
+        <endereco>{dados_remetente.get('logradouro', '')[:100]}</endereco>
+        <numero>{dados_remetente.get('numero', '')[:10]}</numero>
+        <complemento>{dados_remetente.get('complemento', '')[:100]}</complemento>
+        <bairro>{dados_remetente.get('bairro', '')[:100]}</bairro>
+        <cidade>{dados_remetente.get('cidade', '')[:100]}</cidade>
+        <estado>{dados_remetente.get('uf', '')[:2]}</estado>
+        <servico>{servico_correios}</servico>
+        <conteudo>{xml_itens}</conteudo>
+    </pre_postagem>
+</portalpostal>"""
+
+# 3. Construção do Envelope SOAP com CDATA e Namespace corrigido (pos)
+    soap_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:pos="http://postagem/xsd">
+       <soapenv:Header/>
        <soapenv:Body>
-          <ser:solicitarPostagemReversa>
-             <codAdministrativo>{contrato}</codAdministrativo>
-             <codigo_servico>{codigo_servico}</codigo_servico>
-             <cartao>{cartao}</cartao>
-             <destinatario>
-                <nome>MyGames - Laboratorio de Pericia</nome>
-                <logradouro>Av Leoncio de Magalhaes</logradouro>
-                <numero>179</numero>
-                <complemento>Galpao</complemento>
-                <bairro>Jardim Sao Paulo</bairro>
-                <referencia></referencia>
-                <cidade>Sao Paulo</cidade>
-                <uf>SP</uf>
-                <cep>02042010</cep>
-                <telefone>11999999999</telefone>
-                <email>contato@mygames.com.br</email>
-             </destinatario>
-             <coletas_solicitadas>
-                <tipo>A</tipo>
-                <numero></numero>
-                <ag></ag>
-                <remetente>
-                   <nome>{dados_remetente.get('nome', '')[:50]}</nome>
-                   <logradouro>{dados_remetente.get('logradouro', '')[:50]}</logradouro>
-                   <numero>{dados_remetente.get('numero', '')[:10]}</numero>
-                   <complemento>{dados_remetente.get('complemento', '')[:30]}</complemento>
-                   <bairro>{dados_remetente.get('bairro', '')[:50]}</bairro>
-                   <referencia></referencia>
-                   <cidade>{dados_remetente.get('cidade', '')[:50]}</cidade>
-                   <uf>{dados_remetente.get('uf', '')[:2]}</uf>
-                   <cep>{dados_remetente.get('cep', '')[:8]}</cep>
-                   <ddd>{dados_remetente.get('ddd', '')[:2]}</ddd>
-                   <telefone>{dados_remetente.get('telefone', '')[:9]}</telefone>
-                   <email></email>
-                </remetente>
-                <obj_col>
-                   <item>1</item>
-                   <desc>Produtos Buyback MyGames</desc>
-                   <entrega></entrega>
-                   <num></num>
-                   <id></id>
-                </obj_col>
-             </coletas_solicitadas>
-          </ser:solicitarPostagemReversa>
+          <pos:PrePostagemXml>
+             <pos:xml><![CDATA[{xml_dados_postagem}]]></pos:xml>
+             <pos:codAgencia>{cod_agencia}</pos:codAgencia>
+             <pos:login>{login_ws}</pos:login>
+             <pos:senha>{senha_ws}</pos:senha>
+          </pos:PrePostagemXml>
        </soapenv:Body>
     </soapenv:Envelope>"""
 
     headers = {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": ""
+        "SOAPAction": "urn:PrePostagemXml"
     }
     
-    # Autenticação exigida pelo WAF dos Correios
-    auth_http = (usuario, senha)
-    
     try:
-        logging.info("Enviando requisição SOAP para Logística Reversa...")
-        resp = requests.post(url_soap, data=xml_payload.encode('utf-8'), headers=headers, auth=auth_http, timeout=15)
+        logging.info("Enviando requisição SOAP para o Portal Postal...")
+        resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=15)
         
         if resp.status_code == 200:
             root = ET.fromstring(resp.text)
             
-            e_ticket = None
-            msg_erro = None
+            # Navega no XML de retorno para encontrar a resposta
+            codigo_rastreio = None
+            detalhes_erro = None
             
             for elem in root.iter():
-                if 'numero_pedido' in elem.tag:
-                    e_ticket = elem.text
-                if 'msg_erro' in elem.tag and elem.text:
-                    msg_erro = elem.text
-                    
-            if e_ticket:
-                logging.info(f"SUCESSO! E-ticket gerado: {e_ticket} via serviço {codigo_servico}")
-                return e_ticket, None
+                # O XML devolvido fica embutido na resposta SOAP
+                if 'PrePostagemXmlReturn' in elem.tag or 'return' in elem.tag:
+                    retorno_xml_str = elem.text
+                    if retorno_xml_str:
+                        retorno_root = ET.fromstring(retorno_xml_str)
+                        for postagem in retorno_root.findall('.//postagem'):
+                            codigo_rastreio = postagem.findtext('codigo_rastreio')
+                            if codigo_rastreio == 'erro':
+                                detalhes_erro = postagem.findtext('detalhes')
+                                codigo_rastreio = None
+                        
+                        for erro in retorno_root.findall('.//erro'):
+                            detalhes_erro = erro.text
+
+            if codigo_rastreio:
+                logging.info(f"SUCESSO! Código de Rastreio gerado: {codigo_rastreio}")
+                # O Portal Postal não usa E-ticket da mesma forma, retornamos o rastreio
+                return codigo_rastreio, codigo_rastreio
             else:
-                logging.error(f"Recusa de negócio dos Correios. Motivo: {msg_erro}")
+                logging.error(f"Falha ao gerar etiqueta no Portal Postal. Motivo: {detalhes_erro}")
                 return None, None
         else:
-            logging.error(f"Falha na integração. HTTP {resp.status_code}: {resp.text}")
+            logging.error(f"Falha na integração HTTP {resp.status_code}: {resp.text}")
             return None, None
 
     except requests.exceptions.RequestException as e:
-        logging.error(f"Erro de conexão com os Correios: {e}")
+        logging.error(f"Erro de conexão com o Portal Postal: {e}")
+        return None, None
+    except ET.ParseError as e:
+        logging.error(f"Erro ao processar XML de retorno: {e}")
         return None, None
     except Exception as e:
-        logging.error(f"Erro interno no processamento do XML: {e}")
+        logging.error(f"Erro interno no processamento: {e}")
         return None, None

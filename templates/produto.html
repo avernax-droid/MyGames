@@ -15,6 +15,8 @@
   - 28/05/2026: Refatoração da função filtrarProdutos() para priorizar resultados que iniciam com o caractere digitado.
   - 03/06/2026: Correção de inversão de chaves. Atualizados os IDs de Jogo (para 4) e Acessório (para 3) no HTML e na constante ID_JOGO do JS para alinhar com a base de dados.
   - 03/06/2026: Remoção do atalho (bypass) da categoria Jogo no JavaScript para permitir a visualização e seleção dos jogos específicos cadastrados no catálogo.
+  - 19/06/2026: Inclusão de texto de orientação (subtítulo) abaixo de "Selecione a categoria" e controle de exibição dinâmica via JS.
+  - 19/06/2026: Ajuste na estilização do subtítulo com um tom de verde discreto para destaque visual.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -25,6 +27,7 @@
 <div class="container-busca">
     <header class="busca-header">
         <h2 id="tituloEtapa">Selecione a categoria</h2>
+        <p id="subTituloEtapa" class="busca-subtitulo">Inserir cada item do seu game separadamente: Console c/ 1 Controle, Controle Adicional, Quantidade de Jogos e Acessórios</p>
     </header>
 
     <div id="stepCategorias" class="grid-categorias">
@@ -59,12 +62,10 @@
     let categoriaAtualId = null;
 
     async function selecionarCategoria(catId, catNome) {
-        // O atalho que pulava a tela de jogos foi removido daqui.
-        // Agora todas as categorias carregam a lista de produtos normalmente.
-        
         document.getElementById('stepCategorias').style.display = 'none';
         document.getElementById('stepProdutos').style.display = 'block';
         document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;
+        document.getElementById('subTituloEtapa').style.display = 'none';
         document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
         
         carregarProdutos(catId);
@@ -74,6 +75,7 @@
         document.getElementById('stepProdutos').style.display = 'none';
         document.getElementById('stepCategorias').style.display = 'grid';
         document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
+        document.getElementById('subTituloEtapa').style.display = 'block';
         document.getElementById('inputBusca').value = '';
         document.getElementById('listaProdutos').innerHTML = '';
     }
@@ -100,12 +102,10 @@
 
         if (termo === '') return;
 
-        // 1. Filtra quem tem a letra/termo em qualquer lugar do nome
         const produtosFiltrados = produtosDaCategoria.filter(p => 
             p.nome_produto.toLowerCase().includes(termo)
         );
 
-        // 2. Ordenação inteligente: Quem COMEÇA com a letra digitada vai pro topo
         produtosFiltrados.sort((a, b) => {
             const nomeA = a.nome_produto.toLowerCase();
             const nomeB = b.nome_produto.toLowerCase();
@@ -118,7 +118,6 @@
             return nomeA.localeCompare(nomeB);
         });
 
-        // 3. Renderiza os cards atualizados
         produtosFiltrados.forEach(p => {
             const card = document.createElement('div');
             card.className = 'card-produto';
@@ -150,8 +149,17 @@
 <style>
     .container-busca { max-width: 900px; margin: auto; padding: 20px; }
     .busca-header { margin-bottom: 30px; text-align: center; }
-    .busca-header h2 { color: var(--texto-br); text-transform: uppercase; font-size: 24px; transition: 0.3s; }
+    .busca-header h2 { color: var(--texto-br); text-transform: uppercase; font-size: 24px; margin-bottom: 5px; }
     
+    .busca-subtitulo {
+        color: #00cc00; /* Tom de verde discreto para destaque */
+        font-size: 14px;
+        margin: 10px auto 0 auto;
+        max-width: 630px;
+        line-height: 1.5;
+        font-weight: 500;
+    }
+
     .grid-categorias { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
     .card-categoria {
         background: var(--bg-fundo); border: 2px solid #333; border-radius: 15px; padding: 30px 20px;

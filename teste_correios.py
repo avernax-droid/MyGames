@@ -1,141 +1,128 @@
-import os
 import requests
 import xml.etree.ElementTree as ET
-from dotenv import load_dotenv
 import logging
+import uuid
 
 # Configuração de logs
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS SOAP] %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [PORTAL POSTAL SOAP] %(levelname)s - %(message)s')
 
-# Força a recarga do .env ignorando qualquer cache
-load_dotenv(override=True)
+print("\n--- INICIANDO TESTE DE LOGÍSTICA REVERSA (PORTAL POSTAL - SEM SEQUÊNCIA LÓGICA) ---")
 
-usuario = os.getenv('CORREIOS_USER')
-senha = os.getenv('CORREIOS_PASS')
-cartao = os.getenv('CORREIOS_CARTAO_POSTAGEM')
-contrato = os.getenv('CORREIOS_CONTRATO')
+# Credenciais do Portal Postal (Hardcoded para teste temporário)
+cod_agencia = 98
+login_ws = "trocagames"
+senha_ws = "@123456"
+url_soap = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
 
 # Dados do remetente (Cliente do Buyback simulado)
 dados_remetente = {
     "nome": "Leonardo Madruga Teste",
-    "cep": "02042010", # Teste com CEP de SP (aciona SEDEX: 04679)
-    # "cep": "20000000", # Mude para um CEP do RJ ou outro estado para testar o PAC (04677)
+    "cep": "02042010", # Teste com CEP de SP (aciona SEDEX)
     "logradouro": "Avenida Leoncio de Magalhaes",
     "numero": "179",
     "complemento": "Apto 12",
     "bairro": "Jardim Sao Paulo",
     "cidade": "Sao Paulo",
-    "uf": "SP",
-    "ddd": "11",
-    "telefone": "999999999"
+    "uf": "SP"
 }
-
-print("\n--- INICIANDO TESTE DE LOGÍSTICA REVERSA DINÂMICA (VIA SOAP/XML) ---")
 
 # Limpa o CEP para garantir apenas números
 cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
 
-CODIGO_SEDEX_REVERSO = "04679"
-CODIGO_PAC_REVERSO = "04677"
-
-codigo_servico = CODIGO_PAC_REVERSO
-
-# Lógica de roteamento dinâmico
+# Roteamento Dinâmico de Serviço
+servico_correios = "PAC" # Fallback padrão
 if cep_cliente and len(cep_cliente) == 8:
     if int(cep_cliente) < 20000000:
-        codigo_servico = CODIGO_SEDEX_REVERSO
-        logging.info(f"Regra de CEP: {cep_cliente} -> Classificado como SEDEX REVERSO ({codigo_servico})")
+        servico_correios = "SEDEX"
+        logging.info(f"Regra de CEP: {cep_cliente} -> Classificado como {servico_correios}")
     else:
-        codigo_servico = CODIGO_PAC_REVERSO
-        logging.info(f"Regra de CEP: {cep_cliente} -> Classificado como PAC REVERSO ({codigo_servico})")
+        logging.info(f"Regra de CEP: {cep_cliente} -> Classificado como {servico_correios}")
 
-url_soap = "https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS"
+# Geração de uma chave de protocolo única para o teste
+protocolo_teste = f"TESTE-{uuid.uuid4().hex[:8].upper()}"
+logging.info(f"Chave/Protocolo gerado para o teste: {protocolo_teste}")
 
-# Construção do Envelope XML dinâmico
-xml_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.logisticareversa.correios.com.br/">
+# Construção do XML interno de postagem (Envelopado em CDATA depois)
+xml_dados_postagem = f"""<portalpostal>
+    <pre_postagem>
+        <chave>{protocolo_teste}</chave>
+        <nome>{dados_remetente['nome'][:100]}</nome>
+        <cep>{cep_cliente}</cep>
+        <endereco>{dados_remetente['logradouro'][:100]}</endereco>
+        <numero>{dados_remetente['numero'][:10]}</numero>
+        <complemento>{dados_remetente['complemento'][:100]}</complemento>
+        <bairro>{dados_remetente['bairro'][:100]}</bairro>
+        <cidade>{dados_remetente['cidade'][:100]}</cidade>
+        <estado>{dados_remetente['uf'][:2]}</estado>
+        <servico>{servico_correios}</servico>
+        <conteudo>
+            <item>
+                <descricao>Console Xbox Series S Usado</descricao>
+                <quantidade>1</quantidade>
+                <valor>1200.00</valor>
+            </item>
+        </conteudo>
+    </pre_postagem>
+</portalpostal>"""
+
+# Construção do Envelope SOAP com CDATA e Namespace corrigido (pos)
+soap_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:pos="http://postagem/xsd">
    <soapenv:Header/>
    <soapenv:Body>
-      <ser:solicitarPostagemReversa>
-         <codAdministrativo>{contrato}</codAdministrativo>
-         <codigo_servico>{codigo_servico}</codigo_servico>
-         <cartao>{cartao}</cartao>
-         <destinatario>
-            <nome>MyGames - Laboratorio de Pericia</nome>
-            <logradouro>Av Leoncio de Magalhaes</logradouro>
-            <numero>179</numero>
-            <complemento>Galpao</complemento>
-            <bairro>Jardim Sao Paulo</bairro>
-            <referencia></referencia>
-            <cidade>Sao Paulo</cidade>
-            <uf>SP</uf>
-            <cep>02042010</cep>
-            <telefone>11999999999</telefone>
-            <email>contato@mygames.com.br</email>
-         </destinatario>
-         <coletas_solicitadas>
-            <tipo>A</tipo>
-            <numero></numero>
-            <ag></ag>
-            <remetente>
-               <nome>{dados_remetente['nome'][:50]}</nome>
-               <logradouro>{dados_remetente['logradouro'][:50]}</logradouro>
-               <numero>{dados_remetente['numero'][:10]}</numero>
-               <complemento>{dados_remetente['complemento'][:30]}</complemento>
-               <bairro>{dados_remetente['bairro'][:50]}</bairro>
-               <referencia></referencia>
-               <cidade>{dados_remetente['cidade'][:50]}</cidade>
-               <uf>{dados_remetente['uf'][:2]}</uf>
-               <cep>{dados_remetente['cep'][:8]}</cep>
-               <ddd>{dados_remetente['ddd'][:2]}</ddd>
-               <telefone>{dados_remetente['telefone'][:9]}</telefone>
-               <email></email>
-            </remetente>
-            <obj_col>
-               <item>1</item>
-               <desc>Produtos Buyback MyGames</desc>
-               <entrega></entrega>
-               <num></num>
-               <id></id>
-            </obj_col>
-         </coletas_solicitadas>
-      </ser:solicitarPostagemReversa>
+      <pos:PrePostagemXml>
+         <pos:xml><![CDATA[{xml_dados_postagem}]]></pos:xml>
+         <pos:codAgencia>{cod_agencia}</pos:codAgencia>
+         <pos:login>{login_ws}</pos:login>
+         <pos:senha>{senha_ws}</pos:senha>
+      </pos:PrePostagemXml>
    </soapenv:Body>
 </soapenv:Envelope>"""
 
 headers = {
     "Content-Type": "text/xml; charset=utf-8",
-    "SOAPAction": ""
+    "SOAPAction": "urn:PrePostagemXml"
 }
 
-auth_http = (usuario, senha)
-
 try:
-    logging.info(f"Disparando Envelope SOAP para os Correios (Serviço: {codigo_servico})...")
-    resp = requests.post(url_soap, data=xml_payload.encode('utf-8'), headers=headers, auth=auth_http, timeout=15)
+    logging.info(f"Disparando Envelope SOAP para o Portal Postal...")
+    resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=15)
     
     logging.info(f"Status Code: {resp.status_code}")
     
     if resp.status_code == 200:
         root = ET.fromstring(resp.text)
         
-        e_ticket = None
-        msg_erro = None
+        codigo_rastreio = None
+        detalhes_erro = None
         
+        # A resposta do Portal Postal embute o XML de retorno dentro de uma tag text
         for elem in root.iter():
-            if 'numero_pedido' in elem.tag:
-                e_ticket = elem.text
-            if 'msg_erro' in elem.tag and elem.text:
-                msg_erro = elem.text
-        
-        if e_ticket:
+            if 'PrePostagemXmlReturn' in elem.tag or 'return' in elem.tag:
+                retorno_xml_str = elem.text
+                if retorno_xml_str:
+                    retorno_root = ET.fromstring(retorno_xml_str)
+                    
+                    for postagem in retorno_root.findall('.//postagem'):
+                        codigo_rastreio = postagem.findtext('codigo_rastreio')
+                        if codigo_rastreio == 'erro':
+                            detalhes_erro = postagem.findtext('detalhes')
+                            codigo_rastreio = None
+                    
+                    for erro in retorno_root.findall('.//erro'):
+                        detalhes_erro = erro.text
+
+        if codigo_rastreio:
             print("\n✅ SUCESSO ABSOLUTO (SOAP)!")
-            print(f"E-Ticket gerado: {e_ticket} via serviço {codigo_servico}")
+            print(f"Código de Rastreio gerado: {codigo_rastreio} via serviço {servico_correios}")
         else:
-            print("\n⚠️ A requisição passou, mas houve uma recusa de negócio dos Correios.")
-            print(f"Motivo: {msg_erro}")
+            print("\n⚠️ A requisição passou, mas houve uma falha de negócio do Portal Postal.")
+            print(f"Motivo: {detalhes_erro}")
     else:
         print("\n❌ FALHA NA INTEGRAÇÃO.")
         print(f"Body: {resp.text}")
 
+except ET.ParseError as e:
+    print(f"\n❌ Erro ao fazer o parser do XML de retorno: {e}")
+    print(f"Resposta bruta: {resp.text}")
 except Exception as e:
-    print(f"Erro interno na requisição SOAP: {e}")
+    print(f"\n❌ Erro interno na requisição HTTP/SOAP: {e}")

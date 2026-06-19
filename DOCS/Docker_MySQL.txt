@@ -1,0 +1,191 @@
+Adotar o MySQL dentro do Docker é o passo decisivo para aproximar o ambiente de homologação da realidade de um servidor de produção. 
+Quando o banco de dados roda isolado em um contêiner, eliminamos de vez problemas com dependências locais, serviços suspensos pelo sistema 
+operacional e caminhos de arquivos conflitantes.
+
+Para realizar essa transição sem nenhum risco de os aplicativos perderem o acesso à base de dados, o segredo está em entender como o Docker 
+gerencia sua própria rede interna e como planejar a migração em etapas bem definidas.
+
+Passos para migrar o MySQL para o Docker com Segurança
+Como o ambiente atual está em fase de ajuste e homologação, o plano abaixo garante que a mudança ocorra sem quebras no fluxo de 
+desenvolvimento:
+
+1. Gerar o Backup Estrutural (Dump)
+Antes de alterar qualquer linha de configuração, certifique-se de que o banco de dados atual está ativo e exporte toda a estrutura de 
+tabelas (como dados_empresa, clientes_usuarios, protocolos_recompra) e os dados de teste atuais para um arquivo .sql usando o 
+MySQL Workbench.
+
+2. Configurar o Serviço do Banco no docker-compose.yml
+O contêiner do banco de dados deve ser adicionado ao mesmo arquivo que gerencia o site e o admin. Isso faz com que o Docker coloque todos na 
+mesma rede virtual automaticamente.
+
+A configuração ideal para o serviço de banco deve conter:
+
+Imagem Oficial: Utilizar uma imagem estável (como mysql:8.0).
+
+Variáveis de Inicialização:
+Configurar o nome do banco, usuário e senhas por meio das variáveis de ambiente (MYSQL_DATABASE, MYSQL_PASSWORD, etc.).
+
+Volume de Persistência: 
+Mapear um volume (ex: dados_banco:/var/lib/mysql) para garantir que os dados não sejam apagados quando o contêiner for reiniciado ou recriado.
+
+Exposição de Porta Local: 
+Mapear a porta "3306:3306" para que o MySQL Workbench instalado na máquina física continue conseguindo acessar o banco para consultas manuais.
+
+3. Alterar a Rota de Conexão dos Aplicativos (O Ponto Crítico)
+Atualmente, as aplicações buscam o banco apontando para a máquina hospedeira (host.docker.internal). Dentro da rede do Docker, o endereço de 
+um contêiner passa a ser o próprio nome do serviço definido no arquivo compose.
+
+Se o serviço do banco for nomeado como banco_dados, a variável DB_HOST nos arquivos .env do aplicativo do site e do admin deve ser alterada 
+de host.docker.internal para banco_dados.
+
+Remova a diretiva extra_hosts dos aplicativos, pois eles não precisarão mais saltar para fora do Docker para alcançar o MySQL.
+
+Adicione a tag depends_on: - banco_dados nos aplicativos. Isso força o Docker a iniciar o contêiner do banco antes de tentar subir o servidor 
+Flask, evitando erros de conexão na inicialização.
+
+4. Subir o Ambiente e Restaurar o Arquivo SQL
+Com o arquivo atualizado, execute o script de deploy. O Docker criará o banco de dados totalmente limpo. Abra o MySQL Workbench, conecte-se 
+na nova instância (usando a senha definida no contêiner) e execute o arquivo .sql de backup para restabelecer as tabelas e os dados de homologação.
+
+Entendendo o Túnel da Cloudflare (cloudflared)
+O contêiner do túnel da Cloudflare funciona como uma ponte de segurança extremamente eficiente entre a internet e o ambiente local.
+
+No modelo tradicional de hospedagem, para que alguém na internet acesse um sistema rodando no seu computador, é preciso abrir portas no 
+roteador (Port Forwarding) e expor o endereço IP real da rede doméstica. Isso deixa o servidor vulnerável a varreduras de portas e ataques 
+diretos de hackers.
+
+O Cloudflare Tunnel inverte completamente essa lógica por meio de três pilares:
+
+Conexão de Saída (Outbound): 
+Quando o contêiner cloudflared inicia, ele não abre nenhuma porta para receber conexões. Em vez disso, ele realiza uma chamada de saída 
+segura e criptografada em direção aos servidores da Cloudflare na internet, criando um duto privado e permanente.
+
+Ocultação de Infraestrutura: 
+O IP real do computador de desenvolvimento nunca é revelado. Para o mundo externo, o sistema responde através dos servidores globais da 
+Cloudflare (ou sob domínios temporários trycloudflare.com em desenvolvimento).
+
+Redirecionamento Interno por Fusão de Rede: Utilizando a configuração de compartilhamento de rede (network_mode: "service:..."), o contêiner do túnel se acopla diretamente à placa de rede do aplicativo Flask. Quando uma requisição legítima chega da internet, a Cloudflare a envia pelo duto criptografado diretamente para dentro desse ecossistema, onde o tráfego é entregue de forma local e instantânea.
+
+Para visualizar como as requisições navegam por essa estrutura de rede e entender como o tráfego externo chega até os contêineres e o banco 
+de dados de forma segura, explore o simulador de arquitetura abaixo.
+
+Documentação de Arquitetura: 
+Fluxo de Rede e Segurança (Docker + Cloudflare)
+
+1. Visão Geral do Ecossistema
+A infraestrutura do sistema utiliza uma arquitetura baseada em contêineres (Docker) protegida por túneis de confiança zero (Cloudflare Zero 
+Trust). Este modelo garante que os aplicativos e o banco de dados funcionem em um ambiente totalmente isolado e previsível, sem a necessidade 
+de expor o endereço IP real do servidor à internet pública.
+
+A arquitetura é dividida em quatro camadas principais:
+- Internet (Origem): O dispositivo do usuário final (cliente ou administrador) ou potenciais ameaças (hackers/bots).
+- Filtro Cloudflare (WAF/Proxy): A rede global que recebe o tráfego primeiro, fornecendo certificado SSL (HTTPS) e bloqueio de ameaças.
+- Ambiente Docker (Aplicação): A rede interna do servidor onde rodam os túneis (cf-tunnel-site, cf-tunnel-admin) e as aplicações Flask (mygames-site, mygames-admin).
+- Camada de Dados (Persistência): O contêiner isolado do MySQL (banco_dados) e seus volumes físicos.
+
+2. Cenários de Fluxo de Tráfego
+Para entender como a rede se comporta, abaixo estão os mapeamentos dos principais cenários de uso:
+
+Cenário A: Acesso Legítimo ao Site do Cliente
+Condição: Um cliente real digita o endereço do site no navegador.
+
+Passo 1: A requisição sai do celular/computador do cliente e atinge a rede da Cloudflare.
+Passo 2: A Cloudflare verifica que o tráfego é limpo e o encaminha pelo duto criptografado (Túnel).
+Passo 3: O pacote chega ao servidor host de forma invisível e é entregue diretamente ao contêiner cf-tunnel-site.
+Passo 4: Como o túnel compartilha a mesma interface de rede do aplicativo (network_mode: "service:mygames-site"), ele entrega a requisição no localhost:5000 do contêiner do site.
+Passo 5: O aplicativo Flask processa a tela, acessa o banco de dados e devolve o HTML pelo mesmo caminho inverso.
+
+Cenário B: Comunicação Interna (App -> Banco de Dados)
+Condição: O aplicativo precisa salvar um novo protocolo ou lead.
+
+Passo 1: O código Python no contêiner mygames-site ou mygames-admin solicita uma conexão com o banco de dados usando a variável DB_HOST=banco_dados.
+Passo 2: O roteador interno do próprio Docker traduz o nome banco_dados para o IP virtual do contêiner do MySQL.
+Passo 3: A comunicação ocorre 100% de forma isolada na rede privada do Docker (na porta 3306 interna). Nenhum dado transita pelo servidor host ou pela internet, garantindo máxima segurança contra interceptações.
+
+Cenário C: Tentativa de Ataque Hacker
+Condição: Um script malicioso tenta varrer portas abertas ou injetar códigos SQL no IP do servidor.
+
+Passo 1: O ataque é disparado pela internet.
+Passo 2: Como o servidor host não possui portas abertas (não há roteamento de porta 80 ou 443 expostas no roteador), e os IPs apontam para a 
+Cloudflare, o tráfego bate nos escudos do Web Application Firewall (WAF) da Cloudflare.
+
+Resultado: O ataque é bloqueado na nuvem. O tráfego malicioso sequer chega perto da infraestrutura do Docker ou do banco de dados MySQL, 
+economizando processamento e banda do servidor.
+
+Cenário D: Queda de Túnel ou Manutenção
+Condição: O serviço do Docker é interrompido ou o túnel está desligado.
+
+Passo 1: O usuário tenta acessar o site.
+Passo 2: A Cloudflare tenta encaminhar o tráfego pelo túnel, mas percebe que a conexão está rompida.
+
+Resultado: O tráfego morre na rede da Cloudflare, que exibe uma página de erro padrão e amigável (Erro 502/503 - Bad Gateway). O servidor físico não recebe carga de tentativas de reconexão desnecessárias.
+
+3. Benefícios Estratégicos da Arquitetura
+Sem Port Forwarding: Não é necessário abrir portas no roteador da empresa ou configurar firewalls complexos no Linux.
+
+Portabilidade Total: Ao empacotar o site, o admin, o banco de dados e os túneis no mesmo arquivo docker-compose.yml, o sistema inteiro pode 
+ser clonado e ligado em qualquer outro computador do mundo em minutos, rodando apenas ./deploy_homo.sh.
+
+Persistência Segura: Mesmo que a rede caia ou os contêineres dos aplicativos sejam deletados e recriados, os dados dos clientes e do catálogo 
+permanecem intactos nos Volumes Físicos mapeados no servidor hospedeiro.
+
+
+===================
+
+Documentação: Adoção do MySQL no Docker (Ambiente de Homologação)
+Objetivo: Containerizar o banco de dados MySQL para o ambiente de homologação do MyGames, garantindo o isolamento da infraestrutura sem alterar a rotina de desenvolvimento local no Windows.
+
+1. Exportação do Banco de Dados Atual (Dump)
+Como o Docker levanta uma instância isolada e vazia do banco, é necessário transferir a estrutura atual da máquina local para o container.
+
+Acesse o MySQL instalado no host (Windows 11).
+
+Exporte a estrutura e os dados do banco mygames_dev gerando um arquivo .sql (ex: dump_mygames.sql).
+
+Atenção: Remova comandos como CREATE DATABASE mygames_dev; e USE mygames_dev; do arquivo gerado, pois o próprio Docker já fará a criação inicial do banco. Mantenha apenas as instruções de criação de tabelas e inserção de dados.
+
+2. Preparação da Estrutura no Projeto
+Para que o Docker execute o script SQL automaticamente na primeira vez que subir:
+
+Na raiz do projeto MyGames (junto ao docker-compose.yml), crie uma nova pasta chamada init_db.
+
+Mova o arquivo dump_mygames.sql para dentro desta pasta.
+
+3. Atualização do docker-compose.yml
+Insira o serviço do banco de dados e ajuste a comunicação dos containers web:
+
+Adicionar o serviço db:
+
+Utilizar a imagem mysql:8.0.
+
+Configurar as variáveis de ambiente (MYSQL_ROOT_PASSWORD, MYSQL_DATABASE: mygames_dev, MYSQL_USER, MYSQL_PASSWORD).
+
+Mapear a porta padrão (3306:3306).
+
+Criar um volume nomeado (mygames_db_data:/var/lib/mysql) para garantir a persistência dos dados.
+
+Mapear a pasta de inicialização (./init_db:/docker-entrypoint-initdb.d).
+
+Ajustar os serviços web (mygames-site e mygames-admin):
+
+Alterar a variável de ambiente para DB_HOST=db (apontando para o nome do container do banco, em vez de host.docker.internal).
+
+Adicionar a instrução depends_on: db para garantir que o site e o painel admin só iniciem após o banco estar pronto.
+
+4. Precaução com Conflito de Portas
+O MySQL local da máquina hospedeira roda na porta 3306. O container do Docker também tentará expor a porta 3306.
+
+Se for necessário conectar um cliente SQL (como extensões do VS Code) diretamente ao banco do Docker para inspeção, o serviço do MySQL do Windows precisará ser pausado temporariamente para liberar a porta.
+
+5. Execução (Build e Start)
+Abra o terminal integrado (Linux/Ubuntu) no VS Code.
+
+Execute o comando de build e inicialização em segundo plano:
+docker-compose up -d --build
+
+O Docker baixará a imagem, criará o volume, injetará as tabelas do arquivo .sql automaticamente e subirá as aplicações web já conectadas à nova base isolada.
+
+6. Separação de Ambientes (Regra de Ouro)
+Desenvolvimento: O ambiente local (rodando scripts soltos no terminal) continua usando o .env apontando para DB_HOST=127.0.0.1 e consumindo o banco físico do host.
+
+Homologação: O ambiente encapsulado via docker-compose usa as variáveis injetadas via YAML e consome o banco db da rede interna do Docker.

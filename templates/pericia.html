@@ -20,6 +20,8 @@
   - 03/06/2026: Realinhamento das condicionais do Jinja2 para exibir os formulários extras corretos de Jogos (ID 4) e Acessórios (ID 3).
   - 10/06/2026: Correção de UX no feedback do upload local para exibir "Alterar Seleção" em vez de termos restritivos de substituição de foto única.
   - 10/06/2026: Hotfix - Remoção da função 'Math' inválida no Jinja2 na condicional da categoria 2.
+  - 19/06/2026: Inclusão de validação no Front-end (via JS) para bloquear cotações que ferem as políticas de aceitação de produtos.
+  - 19/06/2026: Condicional Jinja2 no cabeçalho para exibir texto de orientação customizado quando a categoria selecionada for 'Jogo' (ID 4).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -39,10 +41,15 @@
                 {{ produto_nome }}
             </span>
         </div>
-        <p style="color: var(--texto-dim); font-size: 15px;">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+        
+        {% if categoria_id|string == '4' %}
+            <p style="color: var(--texto-dim); font-size: 15px;">Você deve informar apenas a quantidade de jogos que possui em mídia física e mídia digital. Incluir fotos ou o nome dos jogos nos comentários é opcional, mas pode melhorar sua avaliação na perícia técnica.</p>
+        {% else %}
+            <p style="color: var(--texto-dim); font-size: 15px;">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+        {% endif %}
     </header>
 
-    <form action="/cotar" method="POST" enctype="multipart/form-data">
+    <form id="form-pericia" action="/cotar" method="POST" enctype="multipart/form-data">
         
         {% if session.get('is_outros') %}
         <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
@@ -166,7 +173,10 @@
     document.addEventListener("DOMContentLoaded", function() {
         const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
         const campoComentarios = document.getElementById('campo-comentarios');
+        const formPericia = document.getElementById('form-pericia');
+        const categoriaIdStr = "{{ categoria_id|string }}";
 
+        // Lógica de obrigatoriedade de comentários
         radiosOpcoes.forEach(radio => {
             radio.addEventListener('change', function() {
                 const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
@@ -183,6 +193,57 @@
             });
         });
 
+        // -------------------------------------------------------------------------
+        // VALIDAÇÃO DE REGRAS DE NEGÓCIO ANTES DO ENVIO
+        // -------------------------------------------------------------------------
+        formPericia.addEventListener('submit', function(e) {
+            const estadoSelecionado = document.querySelector('input[name="estado_id"]:checked');
+            const perguntaExtraSelecionada = document.querySelector('input[name="pergunta_extra"]:checked');
+            
+            let textoEstado = estadoSelecionado ? estadoSelecionado.nextElementSibling.innerText.trim().toLowerCase() : "";
+            let textoExtra = perguntaExtraSelecionada ? perguntaExtraSelecionada.value.toLowerCase() : "";
+            let mensagemBloqueio = "";
+
+            if (categoriaIdStr === '1') { // Console
+                if (textoEstado.includes('não funciona')) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles que não funcionam.";
+                } else if (textoExtra.includes('desbloqueado')) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles desbloqueados.";
+                }
+            } else if (categoriaIdStr === '2') { // Controle
+                if (textoExtra.includes('pirata')) {
+                    mensagemBloqueio = "Só realizamos a compra de controles originais.";
+                }
+            } else if (categoriaIdStr === '4') { // Jogo
+                if (textoEstado.includes('não funciona')) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra de jogos que não funcionam.";
+                }
+            } else if (categoriaIdStr === '3') { // Acessório
+                if (textoExtra.includes('pirata')) {
+                    mensagemBloqueio = "Só realizamos a compra de acessórios originais.";
+                }
+            }
+
+            // Se violou alguma regra, trava o form e abre o Modal Global
+            if (mensagemBloqueio !== "") {
+                e.preventDefault(); // Impede o envio para o servidor
+                
+                if (typeof abrirModalConfirmacao === 'function') {
+                    abrirModalConfirmacao(
+                        "Avaliação Recusada", 
+                        mensagemBloqueio, 
+                        "ENTENDI", 
+                        function() { fecharModalConfirmacao(); }
+                    );
+                } else {
+                    alert(mensagemBloqueio); // Fallback de segurança
+                }
+            }
+        });
+
+        // -------------------------------------------------------------------------
+        // Lógica de Upload de Fotos (PC vs Mobile QR)
+        // -------------------------------------------------------------------------
         const tabPc = document.getElementById('tab-pc');
         const tabCelular = document.getElementById('tab-celular');
         const areaPc = document.getElementById('area-upload-pc');

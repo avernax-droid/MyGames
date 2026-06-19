@@ -18,6 +18,7 @@
   - 02/06/2026: Alteração do redirecionamento do botão Continuar para a rota de termos_oferta.
   - 02/06/2026: Reestruturação da tabela: Criação de coluna isolada para Quantidade (QTD).
   - 02/06/2026: Correção de quebra de layout de tabela causada por textos contínuos longos.
+  - 19/06/2026: Renomeação dos botões de ação e implementação de Modal Customizado para captura de motivo de desistência (integrado com /descartar-lote-final).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -99,12 +100,52 @@
             <div class="botoes-nav" style="gap: 15px;">
                 <a href="{{ url_for('produto') }}" class="btn-secondary">VOLTAR</a>
                 
-                <button onclick="abrirModalConfirmacao('Descartar Lote Inteiro', 'Atenção! Todas as avaliações deste lote serão descartadas permanentemente. Deseja continuar?', 'SIM, DESCARTAR LOTE', executarDescarteLote)" class="btn-secondary btn-descartar">
-                    DESCARTAR LOTE
+                <button type="button" onclick="abrirModalFeedback()" class="btn-secondary btn-descartar">
+                    NÃO QUERO VENDER
                 </button>
 
-                <a href="{{ url_for('termos_oferta') }}" class="btn-primary">CONTINUAR</a>
+                <a href="{{ url_for('termos_oferta') }}" class="btn-primary">QUERO VENDER</a>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-feedback-recusa" class="modal-overlay-global" style="display: none;">
+    <div class="modal-box-global" style="max-width: 400px;">
+        <div class="modal-icone-global">🤔</div>
+        <h3 class="modal-titulo-global" style="color: var(--texto-br);">Poxa, que pena!</h3>
+        <p class="modal-texto-global" style="margin-bottom: 20px;">Poderia nos contar o motivo? Isso nos ajuda a melhorar nossas ofertas futuras.</p>
+        
+        <div class="lista-motivos" style="text-align: left; margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
+            <label class="motivo-label">
+                <input type="radio" name="motivo_recusa" value="Preço abaixo do que gostaria" required>
+                <span>Preço abaixo do que gostaria</span>
+            </label>
+            <label class="motivo-label">
+                <input type="radio" name="motivo_recusa" value="Não quero enviar produto antes de receber">
+                <span>Não quero enviar produto antes de receber</span>
+            </label>
+            <label class="motivo-label">
+                <input type="radio" name="motivo_recusa" value="Não confio na Troca Game">
+                <span>Não confio na Troca Game</span>
+            </label>
+            <label class="motivo-label">
+                <input type="radio" name="motivo_recusa" value="Vou pensar melhor">
+                <span>Vou pensar melhor.</span>
+            </label>
+            <label class="motivo-label">
+                <input type="radio" name="motivo_recusa" value="Não quero informar!" checked>
+                <span>Não quero informar!</span>
+            </label>
+        </div>
+        
+        <div class="modal-botoes-global">
+            <button onclick="fecharModalFeedback()" class="btn-secondary" style="background: #333; border-color: #555; color: var(--texto-br);">
+                VOLTAR
+            </button>
+            <button onclick="enviarFeedbackEDescartar()" id="btn-confirmar-descarte-motivo" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                CONFIRMAR DESCARTE
+            </button>
         </div>
     </div>
 </div>
@@ -132,14 +173,59 @@
     .acoes-finais { display: flex; flex-direction: column; gap: 15px; }
     .botoes-nav { display: flex; justify-content: space-between; align-items: center; }
     .btn-descartar { border-color: #ff4444 !important; color: #ff4444 !important; }
+
+    /* Estilos do Modal de Motivos */
+    .motivo-label { display: flex; align-items: center; gap: 10px; color: var(--texto-br); font-size: 14px; cursor: pointer; padding: 10px; border: 1px solid #333; border-radius: 8px; transition: 0.2s; }
+    .motivo-label:hover { background: rgba(255, 255, 255, 0.05); }
+    .motivo-label input[type="radio"] { accent-color: #ff4444; width: 16px; height: 16px; cursor: pointer; }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Função de callback para o Modal Global executar a navegação
-    function executarDescarteLote() {
-        window.location.href = "/descartar-lote";
+    function abrirModalFeedback() {
+        document.getElementById('modal-feedback-recusa').style.display = 'flex';
+    }
+
+    function fecharModalFeedback() {
+        document.getElementById('modal-feedback-recusa').style.display = 'none';
+    }
+
+    function enviarFeedbackEDescartar() {
+        const btn = document.getElementById('btn-confirmar-descarte-motivo');
+        const motivoSelecionado = document.querySelector('input[name="motivo_recusa"]:checked');
+        
+        let motivo = motivoSelecionado ? motivoSelecionado.value : 'Não informado';
+
+        btn.innerText = "PROCESSANDO...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
+        fetch('/descartar-lote-final', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ motivo: motivo })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'sucesso') {
+                window.location.href = "/produto"; // Redireciona para recomeçar o fluxo após limpar a sessão
+            } else {
+                alert("Ocorreu um erro. Tente novamente.");
+                btn.innerText = "CONFIRMAR DESCARTE";
+                btn.style.opacity = "1";
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert("Erro de comunicação com o servidor.");
+            btn.innerText = "CONFIRMAR DESCARTE";
+            btn.style.opacity = "1";
+            btn.disabled = false;
+        });
     }
 </script>
 {% endblock %}

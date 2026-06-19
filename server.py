@@ -27,6 +27,7 @@
 # - 10/06/2026: Inclusão dos campos e_ticket e codigo_rastreio no dicionário dados_email para envio por e-mail.
 # - 15/06/2026: Integração da rota /finalizar com a tabela dados_empresa para exibição dinâmica no sucesso.html.
 # - 16/06/2026: Tratamento seguro da variável nome_fantasia na rota /finalizar com fallback para evitar erros de renderização no Jinja2.
+# - 19/06/2026: Inclusão do repasse da variável categoria_nome na rota /cotar para exibição dinâmica no resultado.html.
 # ==============================================================================
 
 import os
@@ -312,7 +313,9 @@ def cotar():
         session['itens_avaliados'] = lista_atual
         session['item_atual'] = novo_item 
         
-        return render_smart_template('resultado.html', cotacao=resultado, fase_atual=2)
+        cat_nome = session.get('categoria_nome', 'Produto')
+        
+        return render_smart_template('resultado.html', cotacao=resultado, fase_atual=2, categoria_nome=cat_nome)
     
     return "Erro ao calcular cotação.", 500
 
