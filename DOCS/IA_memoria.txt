@@ -11,6 +11,7 @@ NUNCA ALTERAR, EXCLUIR, MELHORAR OU MODIFICAR QUALQUER PARTE DO CÓDIGO, ESTRUTU
 ALTERAÇÃO OU PROBLEMA SOLICITADO, SEM AUTORIZAÇÃO EXPRESSA.
 
 Usar o portugues do Brasil.
+Sempre inserir/atualizar registros na base de dados os campos como: CEP, CPF... sem mascara de edção.
 
 1. VISÃO GERAL
 Nome: MyGames

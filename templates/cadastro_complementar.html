@@ -13,6 +13,7 @@
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Inclusão de feedback visual dinâmico no botão de submit.
   - 29/05/2026: Restauração da máscara e busca automática de endereço pelo CEP (ViaCEP).
+  - 19/06/2026: Alteração do título do cabeçalho e do texto do botão de envio.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -23,11 +24,8 @@
 <div class="card-padrao">
     <header style="margin-bottom: 20px;">
         <h2 style="font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-align: center; text-transform: uppercase; margin: 0;">
-            Level 5: Player Profile
+            faça seu cadastro para finalizar a venda
         </h2>
-        <p style="text-align: center; color: var(--texto-dim); font-size: 0.9rem; margin-top: 5px;">
-            Insira seu CPF para identificar seu perfil e finalizar a proposta do lote.
-        </p>
     </header>
 
     <form action="/finalizar-lote" method="POST">
@@ -102,7 +100,7 @@
                 VOLTAR
             </button>
             <button type="submit" class="btn-primary" style="width: max-content;">
-                GERAR PROTOCOLO
+                ENVIAR
             </button>
         </div>
     </form>

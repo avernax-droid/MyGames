@@ -28,6 +28,7 @@
 # - 15/06/2026: Integração da rota /finalizar com a tabela dados_empresa para exibição dinâmica no sucesso.html.
 # - 16/06/2026: Tratamento seguro da variável nome_fantasia na rota /finalizar com fallback para evitar erros de renderização no Jinja2.
 # - 19/06/2026: Inclusão do repasse da variável categoria_nome na rota /cotar para exibição dinâmica no resultado.html.
+# - 20/06/2026: Correção na injeção do dicionário de contatos na rota /finalizar para exibição correta no sucesso.html.
 # ==============================================================================
 
 import os
@@ -507,7 +508,9 @@ def finalizar():
             fase_atual=6,
             e_ticket=e_ticket,
             codigo_rastreio=codigo_rastreio,
-            nome_fantasia=nome_fantasia_seguro # Passando a variável de texto direto e limpa!
+            nome_fantasia=nome_fantasia_seguro,
+            dados_empresa=empresa,
+            empresa=empresa 
         )
     
     return "Erro ao finalizar agendamento.", 500

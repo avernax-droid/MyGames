@@ -30,6 +30,7 @@
 # - 16/06/2026: Correção de autenticação WS-Security na integração SOAP dos Correios e roteamento dinâmico de URL de homologação/produção.
 # - 16/06/2026: Ajuste na URL de homologação da integração Correios (adição do sufixo ?wsdl) para resolver erro HTTP 404.
 # - 19/06/2026: Refatoração da função gerar_logistica_reversa para integração com o Portal Postal via SOAP (PrePostagemXml) e ajuste na chamada em finalizar_proposta.
+# - 20/06/2026: Remoção da exibição do E-Ticket no corpo do e-mail de resumo e atualização das instruções de postagem.
 # ==============================================================================
 
 import mysql.connector
@@ -259,15 +260,12 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         corpo += f"Valor Total do Lote (PIX): R$ {dados_email.get('total_pix', 0.0):.2f}\n\n"
         
         # INCLUSÃO DA SEÇÃO DE LOGÍSTICA REVERSA NO CORPO DO E-MAIL
-        if dados_email.get('e_ticket') or dados_email.get('codigo_rastreio'):
+        if dados_email.get('codigo_rastreio'):
             corpo += "--------------------------------------------------------\n"
             corpo += "📦 DADOS DE POSTAGEM (LOGÍSTICA REVERSA):\n"
-            if dados_email.get('e_ticket'):
-                corpo += f" Código de Postagem (E-Ticket): {dados_email['e_ticket']}\n"
-            if dados_email.get('codigo_rastreio'):
-                corpo += f" Código de Rastreio dos Correios: {dados_email['codigo_rastreio']}\n"
+            corpo += f" Código de Rastreio dos Correios: {dados_email['codigo_rastreio']}\n"
             corpo += "\n Instruções: Embale os itens com segurança, dirija-se\n"
-            corpo += " a uma agência dos Correios e informe o E-Ticket acima.\n"
+            corpo += " a uma agência dos Correios e informe o código de rastreio acima.\n"
             corpo += f" O envio é faturado diretamente para a conta comercial\n"
             corpo += f" da {nome_fantasia}, sendo 100% gratuito para você.\n"
             corpo += "--------------------------------------------------------\n\n"
