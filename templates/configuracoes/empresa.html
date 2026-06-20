@@ -10,6 +10,7 @@
   - 15/06/2026: Melhoria de UX: Navegação com tecla Enter (prevenção de submit), 
                 máscaras no onblur (CNPJ e CEP) e integração com ViaCEP para auto-preenchimento.
   - 15/06/2026: Adição de máscara dinâmica para Telefone/WhatsApp (10 e 11 dígitos) e validação Regex para o campo de E-mail no onblur.
+  - 20/06/2026: Refatoração das máscaras JS (CNPJ, CEP, Telefone) em funções isoladas para aplicação automática no carregamento da página (formatação dos dados puros do banco).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -155,6 +156,31 @@
         const telefoneInput = document.getElementById('telefone_contato');
         const emailInput = document.getElementById('email_contato');
 
+        // FUNÇÕES DE FORMATAÇÃO E MÁSCARA
+        function aplicarMascaraCNPJ(valor) {
+            let v = valor.replace(/\D/g, "");
+            if (v.length === 14) return v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+            return valor;
+        }
+
+        function aplicarMascaraTelefone(valor) {
+            let v = valor.replace(/\D/g, "");
+            if (v.length === 11) return v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+            if (v.length === 10) return v.replace(/^(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+            return valor;
+        }
+
+        function aplicarMascaraCEP(valor) {
+            let v = valor.replace(/\D/g, "");
+            if (v.length === 8) return v.replace(/^(\d{5})(\d{3})/, "$1-$2");
+            return valor;
+        }
+
+        // 0. APLICA AS MÁSCARAS NO CARREGAMENTO DA PÁGINA (Formatação dos dados do banco)
+        if (cnpjInput.value) cnpjInput.value = aplicarMascaraCNPJ(cnpjInput.value);
+        if (telefoneInput.value) telefoneInput.value = aplicarMascaraTelefone(telefoneInput.value);
+        if (cepInput.value) cepInput.value = aplicarMascaraCEP(cepInput.value);
+
         // 1. NAVEGAÇÃO COM TECLA ENTER
         inputsForm.forEach((input, index) => {
             input.addEventListener('keydown', function(e) {
@@ -171,22 +197,12 @@
 
         // 2. MÁSCARA CNPJ ONBLUR
         cnpjInput.addEventListener('blur', function() {
-            let v = this.value.replace(/\D/g, ""); // Remove tudo que não é dígito
-            if (v.length === 14) {
-                this.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
-            }
+            this.value = aplicarMascaraCNPJ(this.value);
         });
 
         // 3. MÁSCARA TELEFONE ONBLUR (Fixo ou Celular)
         telefoneInput.addEventListener('blur', function() {
-            let v = this.value.replace(/\D/g, ""); // Somente números
-            if (v.length === 11) {
-                // Formato Celular (XX) XXXXX-XXXX
-                this.value = v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-            } else if (v.length === 10) {
-                // Formato Fixo (XX) XXXX-XXXX
-                this.value = v.replace(/^(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
-            }
+            this.value = aplicarMascaraTelefone(this.value);
         });
 
         // 4. VALIDAÇÃO DE E-MAIL ONBLUR (Regex)
@@ -205,11 +221,10 @@
         // 5. MÁSCARA CEP E INTEGRAÇÃO VIACEP ONBLUR
         cepInput.addEventListener('blur', function() {
             let v = this.value.replace(/\D/g, "");
+            this.value = aplicarMascaraCEP(this.value);
             
+            // Só consulta o ViaCEP se o CEP estiver completo
             if (v.length === 8) {
-                // Aplica máscara
-                this.value = v.replace(/^(\d{5})(\d{3})/, "$1-$2");
-                
                 // Exibe loading visual nos campos
                 document.getElementById('logradouro').value = 'Buscando...';
                 document.getElementById('bairro').value = 'Buscando...';
@@ -242,7 +257,7 @@
             }
         });
 
-        // LÓGICA DE SUBMISSÃO VIA AJAX
+        // 6. LÓGICA DE SUBMISSÃO VIA AJAX
         formEmpresa.addEventListener('submit', function(e) {
             e.preventDefault();
 

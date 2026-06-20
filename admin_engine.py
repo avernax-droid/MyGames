@@ -35,6 +35,7 @@
 # - 15/06/2026: Adição das funções obter_todos_usuarios, atualizar_permissoes_usuario e registrar_novo_usuario 
 #               para suportar o fluxo de Auto-Cadastro e Aprovação de Usuários Admin.
 # - 15/06/2026: Adição das funções obter_dados_empresa e salvar_dados_empresa para gerenciar os dados corporativos.
+# - 20/06/2026: Implementação de sanitização de dados (remoção de máscaras) na função salvar_dados_empresa.
 # ==============================================================================
 
 import mysql.connector
@@ -643,6 +644,14 @@ def salvar_dados_empresa(dados):
     db = conectar_bd()
     if not db: return False
     try:
+        # Limpeza das máscaras antes de persistir no banco (apenas números)
+        if dados.get('cnpj'):
+            dados['cnpj'] = re.sub(r'\D', '', str(dados['cnpj']))
+        if dados.get('cep'):
+            dados['cep'] = re.sub(r'\D', '', str(dados['cep']))
+        if dados.get('telefone_contato'):
+            dados['telefone_contato'] = re.sub(r'\D', '', str(dados['telefone_contato']))
+
         cursor = db.cursor()
         query = """
             INSERT INTO dados_empresa (id, razao_social, nome_fantasia, cnpj, cep, logradouro, numero, complemento, bairro, cidade, estado_uf, telefone_contato, email_contato)
