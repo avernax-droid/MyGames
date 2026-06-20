@@ -2,17 +2,14 @@
   ==============================================================================
   PROJETO: MyGames
   MÓDULO: mobile/base_mobile.html
-  DATA DE CRIAÇÃO: 04/06/2026
+  DATA DE CRIAÇÃO: 20/06/2026
   TÍTULO: Template Base e Design System (Mobile)
-  FUNÇÃO: Serve como o esqueleto principal para o fluxo de usuários em smartphones. 
-  Contém meta tags exclusivas de viewport para bloquear zoom acidental, 
-  adapta o stepper de navegação e os touch-targets (botões/modais) para telas 
-  menores, mantendo as variáveis do Design System original.
+  FUNÇÃO: Serve como o esqueleto principal para o fluxo de usuários em smartphones.
+  Contém meta tags exclusivas de viewport para bloquear zoom acidental, adapta o 
+  stepper de navegação e os touch-targets (botões/modais) para telas menores.
   
   HISTÓRICO DE ALTERAÇÕES:
-  - 04/06/2026: Criação baseada na estrutura do base.html, com otimização mobile.
-  - 05/06/2026: Inclusão do CSS (flexbox) para alinhamento horizontal das categorias.
-  - 05/06/2026: Correção no motor do Jinja2 com a inclusão do bloco extra_css no head para permitir injeção de estilos dos templates filhos.
+  - 20/06/2026: Criação e estruturação inicial do template mestre mobile otimizado.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -20,15 +17,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1e1e1e">
-    
     <title>{% block title %}{% endblock %}</title>
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* SISTEMA DE DESIGN GLOBAL (Mantido idêntico para coerência) */
+        /* SISTEMA DE DESIGN GLOBAL */
         :root {
             --bg-fundo: #1e1e1e;
             --card-bg: #262626;
@@ -39,168 +34,103 @@
         }
 
         * { box-sizing: border-box; }
+        body { background-color: var(--bg-fundo); color: var(--texto-br); margin: 0; font-family: 'Roboto', sans-serif; }
         
-        /* Ajuste Mobile: Previne barra de rolagem horizontal (overflow-x) acidental */
-        body { 
-            background-color: var(--bg-fundo); 
-            color: var(--texto-br); 
-            margin: 0; 
-            font-family: 'Roboto', sans-serif; 
-            overflow-x: hidden; 
-            -webkit-tap-highlight-color: transparent; /* Remove aquele "piscar" azul chato ao tocar em links no celular */
-        }
-        
-        .logo-header { max-width: 100px; display: block; margin: 0 auto 10px auto; border-radius: 8px; }
+        .logo-header { max-width: 100px; display: block; margin: 0 auto 15px auto; border-radius: 8px; }
 
-        /* COMPONENTES PADRÃO - Ajustados para Mobile */
+        /* COMPONENTES PADRÃO - MOBILE OPTIMIZED */
         .card-padrao {
             background: var(--card-bg);
             border: 2px solid var(--cor-destaque);
-            border-radius: 20px; /* Levemente menor no mobile */
-            padding: 20px 15px; /* Menos respiro lateral para aproveitar a tela */
+            border-radius: 16px;
+            padding: 20px 15px;
             width: 100%;
             margin: 0 auto;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.15);
         }
 
-        /* Botões - Touch Targets Otimizados */
-        .btn-primary, .btn-secondary {
-            width: 100%; /* No mobile, botões principais costumam ocupar 100% da largura */
-            padding: 16px 20px; /* Altura ideal para o dedo */
-            border-radius: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-            cursor: pointer;
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 16px; 
-            transition: 0.2s;
-        }
-
+        /* TOUCH-TARGETS MAXIMIZADOS */
         .btn-primary {
             background: var(--cor-destaque);
             color: #000;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: center;
+            cursor: pointer;
             border: none;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px; 
+            transition: 0.3s;
         }
-        .btn-primary:active { background: #00cc00; transform: scale(0.98); } /* Feedback visual instantâneo ao tocar */
+        .btn-primary:active { transform: scale(0.98); }
 
         .btn-secondary {
             background: transparent;
             border: 1px solid var(--cor-destaque);
             color: var(--cor-destaque);
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: center;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            transition: 0.3s;
         }
         .btn-secondary:active { background: rgba(0, 255, 0, 0.1); transform: scale(0.98); }
 
-        /* ESTRUTURA DE FASES (STEPPER) - Otimizado para telas estreitas */
-        .fases-container { 
-            display: flex; 
-            justify-content: space-between; 
-            width: 100%; 
-            margin: 15px auto 20px auto; 
-            position: relative; 
-            padding: 0 5px; 
-        }
-        .fases-container::before { 
-            content: ""; 
-            position: absolute; 
-            top: 10px; 
-            left: 20px; 
-            right: 20px; 
-            height: 2px; 
-            background: #333; 
-            z-index: 1; 
-        }
+        /* ESTRUTURA DE FASES (STEPPER) - MOBILE OPTIMIZED */
+        .fases-container { display: flex; justify-content: space-between; width: 100%; margin: 15px auto 20px auto; position: relative; padding: 0; }
+        .fases-container::before { content: ""; position: absolute; top: 12px; left: 15px; right: 15px; height: 2px; background: #333; z-index: 1; }
         .fase-item { flex: 1; display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative; }
-        .circulo-externo { width: 22px; height: 22px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+        .circulo-externo { width: 24px; height: 24px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 5px; }
         .circulo-interno { width: 8px; height: 8px; background: transparent; border-radius: 50%; }
-        /* Texto reduzido no mobile para não encavalar */
-        .fase-nome { font-family: 'Rajdhani', sans-serif; font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;}
+        .fase-nome { font-family: 'Rajdhani', sans-serif; font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; line-height: 1.1; }
         
         .fase-item.concluida .circulo-externo { border-color: var(--cor-destaque); }
-        .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 6px var(--cor-destaque); }
+        .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
         .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
 
-        .container { width: 100%; padding: 0 15px; }
+        .container { width: 100%; margin: 0 auto; padding: 0 15px; }
 
-        /* ============================================================================== */
-        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS - Ajustado para toque vertical */
-        /* ============================================================================== */
-        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 25px 15px; width: 92%; max-width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS - EMPILHAMENTO MOBILE */
+        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 25px 15px; width: 92%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .modal-icone-global { font-size: 40px; margin-bottom: 10px; line-height: 1; }
         .modal-titulo-global { color: #ff4444; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
-        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 20px; line-height: 1.4; }
+        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 25px; line-height: 1.4; }
         
-        /* No mobile, botões do modal ficam um em cima do outro para evitar toques errados */
-        .modal-botoes-global { display: flex; flex-direction: column; gap: 10px; }
-        .modal-botoes-global button { width: 100%; padding: 14px; font-size: 14px; cursor: pointer; border-radius: 8px;}
-
-        /* ============================================================================== */
-        /* CSS DE CATEGORIAS (AJUSTE MOBILE: ÍCONE E TEXTO NA MESMA LINHA) */
-        /* ============================================================================== */
-        .categorias-lista-mobile {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            width: 100%;
-            margin-top: 15px;
-        }
-
-        .categoria-card-linha {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            background: var(--card-bg);
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 16px 20px;
-            width: 100%;
-            text-decoration: none;
-            color: var(--texto-br);
-            transition: background 0.2s, border-color 0.2s;
-        }
-
-        .categoria-card-linha:active {
-            background: rgba(0, 255, 0, 0.05);
-            border-color: var(--cor-destaque);
-        }
-
-        .categoria-icone-mobile {
-            font-size: 24px;
-            margin-right: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .categoria-texto-mobile {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        .modal-botoes-global { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+        .modal-botoes-global button { width: 100%; padding: 15px; font-size: 15px; cursor: pointer; border-radius: 8px; }
     </style>
-
-    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="container">
-        <header>
-            <div style="text-align: center; margin-top: 15px; margin-bottom: 10px;">
-                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
-            </div>
-        </header>
-
+        
+        {% if fase_atual|default(0) > 0 %}
         <div class="fases-container">
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Cadastro</span></div>
-            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Fim</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
         </div>
+        {% endif %}
+
+        <header>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
+            </div>
+        </header>
 
         <main>
             {% block content %}{% endblock %}
@@ -233,6 +163,7 @@
             document.getElementById('modal-titulo-global').innerText = titulo;
             document.getElementById('modal-texto-global').innerText = mensagem;
             document.getElementById('modal-btn-confirmar-global').innerText = textoBotao;
+            
             modalConfirmacaoAcao = acao;
             
             const modal = document.getElementById('modal-confirmacao-global');
@@ -244,7 +175,7 @@
             modalConfirmacaoAcao = null;
         }
 
-        function executarAcaoModal() {
+        function ejecutarAcaoModal() {
             if (typeof modalConfirmacaoAcao === 'function') {
                 modalConfirmacaoAcao();
             } else if (typeof modalConfirmacaoAcao === 'string') {

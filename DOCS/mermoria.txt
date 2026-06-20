@@ -57,4 +57,65 @@ enviar_email_resumo.
 Motivo do Descarte: Descartado em conjunto com o template sucesso.html para evitar inconsistências entre o front-end (onde o E-Ticket 
 voltará a ser exibido) e o disparo de e-mails do back-end. O código foi revertido para a versão original.
 
+=================
+
+20/06
+
+RESUMO DA SESSÃO: OTIMIZAÇÃO MOBILE (V3.0)
+
+O Que Fizemos Hoje (Módulos Concluídos)
+
+Definição Arquitetural e Setup Mobile
+
+Mantivemos a arquitetura de roteamento dinâmico (render_smart_template), preservando a pasta /mobile isolada para garantir a melhor performance e evitar conflito de código com a versão desktop.
+
+Módulo mobile/base_mobile.html: Adicionamos a meta tag de bloqueio de auto-zoom (essencial para inputs no iOS/Android), reajustamos a barra de progresso (stepper) e configuramos o Modal Global de confirmação para empilhar seus botões verticalmente (largura 100%), facilitando o clique com uma mão.
+
+Landing Page e Captação de Localização
+
+Módulo mobile/boas_vindas.html: Superamos o problema de roteamento e cache agressivo de navegadores mobile aplicando CSS Inline forçado na camada de apresentação.
+
+Centralizamos o título principal, ajustando-o dinamicamente para caber em uma única linha (usando clamp e white-space: nowrap).
+
+Transformamos a exibição das vantagens (30 anos, 5 lojas, etc.) em uma lista perfeitamente empilhada, com ícone e texto na mesma linha, para facilitar a leitura.
+
+Otimizamos os touch-targets (áreas de toque) do campo de busca de cidades (IBGE).
+
+Navegação do Catálogo
+
+Módulo mobile/produto.html: Quebramos a estrutura original em grade (Grid-View) que ficava espremida em telas pequenas.
+
+Implementamos uma Lista Vertical Fluida (List-View) tanto para a seleção de categorias quanto para o resultado da busca de produtos, com imagens à esquerda e textos à direita, permitindo rolagem confortável mesmo com o teclado virtual aberto.
+
+O botão "Voltar" foi ajustado para ocupar toda a largura superior da tela.
+
+Perícia Técnica e Handoff
+
+Módulo mobile/pericia.html: Fizemos a maior alteração de UX do dia. Removemos a necessidade de QR Code, já que o usuário está no próprio celular.
+
+Separamos a ação de upload em dois botões explícitos ("Tirar Foto" acionando a câmera via capture="environment" e "Abrir Galeria"), resolvendo bugs nativos do iOS/Android que ignoravam a galeria.
+
+Criamos uma lógica avançada de JavaScript (DataTransfer) que acumula as fotos sem sobrepor os arquivos anteriores.
+
+Implementamos a exibição em tempo real de miniaturas (thumbnails) com botão para exclusão individual de fotos.
+
+Transformamos opções de estado de conservação e perguntas extras em "Cards" clicáveis grandes.
+
+Resultado da Cotação
+
+Módulo mobile/resultado.html: Focamos na proteção de conversão.
+
+Ajustamos o tamanho das fontes da oferta monetária para caber na viewport.
+
+Empilhamos todo o grupo de ações finais ("Quero Vender", "Inserir Mais", "Não Quero Vender") em uma coluna única, eliminando cliques acidentais e guiando o usuário com segurança para a próxima fase.
+
+O Que Falta Fazer (Próximos Passos)
+
+mobile/resumo_lote.html: Precisamos eliminar a estrutura de tabela (table) do desktop, que quebra em telas estreitas, e transformá-la em uma lista de "Cards" de itens do carrinho, empilhando as ações de remoção individual e finalização.
+
+mobile/termos_oferta.html: Otimizar a leitura das cláusulas contratuais (reduzir fadiga visual) e transformar os pequenos checkboxes de aceite em blocos acionáveis grandes ("Cards Acionáveis").
+
+mobile/cadastro_complementar.html: Desfazer o layout de colunas do desktop e colocar todos os inputs (nome, e-mail, PIX, endereço) em 100% da largura. Também será necessário injetar atributos como inputmode="numeric" para que o teclado nativo de números do celular abra automaticamente em campos como CPF e CEP.
+
+mobile/sucesso.html: Ajustar o tamanho e a quebra de linha (word-break) do código do protocolo para que ele não vaze da tela do celular, além de redimensionar os alertas de itens que ficaram "sob consulta".
 

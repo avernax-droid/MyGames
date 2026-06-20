@@ -1,0 +1,188 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/boas_vindas.html
+  DATA DE CRIAÇÃO: 20/06/2026
+  TÍTULO: Landing Page e Captura de Localização (Mobile)
+  FUNÇÃO: Ponto de entrada do sistema MyGames otimizado para smartphones. 
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 20/06/2026: Criação da versão mobile. 
+  - 20/06/2026: Ajuste final de layout - Centralização do título principal,
+    mantendo a responsividade e o alinhamento da lista de benefícios.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Bem-vindo ao MyGames{% endblock %}
+
+{% block content %}
+<style>
+    .logo-header { max-width: 150px !important; }
+
+    .como-funciona-section { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; margin-bottom: 25px; width: 100%; }
+    
+    .video-cta { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--texto-br); text-decoration: none; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: bold; text-transform: uppercase; padding: 14px 15px; border: 1px solid #333; border-radius: 8px; width: 100%; transition: 0.3s; }
+    .video-cta:active { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); transform: scale(0.98); }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .form-group { margin-bottom: 15px; position: relative; width: 100%; }
+    input, select { width: 100%; padding: 16px 14px; background: #222; border: var(--borda-fina); color: #fff; border-radius: 8px; font-size: 16px; transition: border 0.3s; }
+    input:focus, select:focus { outline: none; border-color: var(--cor-destaque); }
+    
+    #lista-cidades { 
+        position: absolute; top: 100%; left: 0; right: 0; 
+        background: #222; border: 1px solid var(--cor-destaque); 
+        border-top: none; z-index: 1000; max-height: 250px; 
+        overflow-y: auto; display: none; border-radius: 0 0 8px 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    #lista-cidades div { padding: 16px 15px; cursor: pointer; color: #ddd; border-bottom: 1px solid #333; font-size: 16px; }
+    #lista-cidades div:active { background: var(--cor-destaque); color: #000; }
+    
+    #secao-canal-overlay { 
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+        background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; 
+    }
+    .modal-canal-box { 
+        background: var(--bg-fundo); border: 2px solid var(--cor-destaque); border-radius: 12px; 
+        padding: 25px 15px; width: 92%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    #btn-entrar { display: none; margin-top: 15px; animation: fadeIn 0.5s; width: 100%; }
+</style>
+
+<div style="margin-top: -10px; padding-left: 0; animation: fadeIn 0.8s ease-in-out;">
+    
+    <h1 style="text-align: center; width: 100%; font-family: 'Roboto', sans-serif; font-size: clamp(14px, 4.2vw, 19px); letter-spacing: -0.5px; white-space: nowrap; font-weight: 700; color: #ffffff; margin-bottom: 25px; line-height: 1;">
+        Transforme seu game usado em <span style="color: #00ff00; text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);">DINHEIRO</span>
+    </h1>
+    
+    <div style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="font-size: 26px; color: #00ff00; width: 35px; text-align: center;">🏆</span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">30 anos de mercado</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="width: 35px; text-align: center; display: flex; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="26" height="26" fill="#00ff00">
+                    <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/>
+                </svg>
+            </span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">5 lojas em SP e região</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="font-size: 26px; color: #00ff00; width: 35px; text-align: center;">🤝</span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">Milhares de clientes</span>
+        </div>
+
+    </div>
+</div>
+
+<div class="como-funciona-section">
+    <a href="https://youtu.be/zPKOP8_BUwI" target="_blank" class="video-cta">
+        <span style="font-size: 24px; color: #ff0000;">▶</span>
+        COMO FUNCIONA
+    </a>
+</div>
+
+<div class="card-padrao">
+    <p style="text-align: center; color: var(--texto-dim); margin-bottom: 25px; font-size: 14px;">
+        Informe sua localização
+    </p>
+    
+    <form action="{{ url_for('definir_regiao') }}" method="POST">
+        <div class="form-group">
+            <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
+            <div id="lista-cidades"></div>
+        </div>
+        <div class="form-group">
+            <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
+        </div>
+
+        <div id="secao-canal-overlay">
+            <div class="modal-canal-box">
+                <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 20px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
+                    Como você nos conheceu?
+                </h3>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
+                        <option value="" disabled selected>Selecione uma opção...</option>
+                        {% for canal in canais %}
+                        <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" id="btn-entrar" class="btn-primary">INICIAR COTAÇÃO</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const inputCidade = document.getElementById('campo-cidade');
+    const listaCidades = document.getElementById('lista-cidades');
+    const inputUf = document.getElementById('campo-uf');
+    const modalCanal = document.getElementById('secao-canal-overlay');
+    const btnEntrar = document.getElementById('btn-entrar');
+
+    inputCidade.addEventListener('input', async () => {
+        const termo = inputCidade.value;
+        if (termo.length < 3) { listaCidades.style.display = 'none'; return; }
+
+        const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
+        const dados = await response.json();
+
+        listaCidades.innerHTML = '';
+        if (dados.length > 0) {
+            dados.forEach(item => {
+                const div = document.createElement('div');
+                div.textContent = `${item.cidade} - ${item.uf}`;
+                
+                const selectCity = (e) => {
+                    e.preventDefault();
+                    inputCidade.value = item.cidade;
+                    inputUf.value = item.uf;
+                    listaCidades.style.display = 'none';
+                    modalCanal.style.display = 'flex';
+                };
+                
+                div.addEventListener('mousedown', selectCity);
+                div.addEventListener('touchstart', selectCity, {passive: false});
+                
+                listaCidades.appendChild(div);
+            });
+            listaCidades.style.display = 'block';
+        } else {
+            listaCidades.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target !== inputCidade) listaCidades.style.display = 'none';
+    });
+    document.addEventListener('touchstart', (e) => {
+        if (e.target !== inputCidade) listaCidades.style.display = 'none';
+    }, {passive: true});
+
+    function selecionouCanal() {
+        const select = document.getElementById('canal_id_input');
+        if (select.value !== "") {
+            modalCanal.style.display = 'none';
+            btnEntrar.style.display = 'block';
+            
+            setTimeout(() => {
+                btnEntrar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    }
+</script>
+{% endblock %}
