@@ -18,6 +18,8 @@
   - 19/06/2026: Atualização dos rótulos (labels) dos botões de ação final para maior clareza na UX.
   - 19/06/2026: Inclusão de alerta sobre jogos digitais e cotação por média exclusivo para a categoria de Jogos.
   - 19/06/2026: Ajuste de UX pós-descarte individual: Ocultação dos botões de fluxo e exibição de um botão único "VOLTAR" para a seleção de produtos.
+  - 22/06/2026: Ajuste de layout do cabeçalho (ícone alinhado à esquerda do título), formatação de moeda em BRL (vírgula) e destaque laranja no aviso de reavaliação.
+  - 22/06/2026: Ajuste na mensagem de reavaliação (destaque laranja e aumento de fonte aplicados a todo o texto) e aplicação do filtro moeda_real.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -55,7 +57,7 @@
             
             <div class="valor-container">
                 <span class="simbolo-monetario">R$</span>
-                <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
+                <span class="valor-pix">{{ cotacao.valor_final | moeda_real }}</span>
             </div>
             
             {% endif %}
@@ -137,16 +139,26 @@
 </script>
 
 <style>
-    /* COMPACTAÇÃO DE MARGENS APLICADA */
+    /* COMPACTAÇÃO DE MARGENS E ALINHAMENTO APLICADA */
+    .oferta-header {
+        display: flex; 
+        align-items: center; 
+        justify-content: flex-start; /* Alinha à esquerda */
+        gap: 15px; 
+        margin-bottom: 20px; 
+        text-align: left;
+    }
+
     .produto-thumb-wrapper {
-        width: 90px; height: 90px; margin: 0 auto 10px;
+        width: 80px; height: 80px; margin: 0; /* Removido margin auto para alinhar à esquerda */
         display: flex; align-items: center; justify-content: center;
         background: rgba(0, 0, 0, 0.2); border: var(--borda-fina);
         border-radius: 12px; padding: 5px;
+        flex-shrink: 0;
     }
 
     .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
-    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 17px; font-weight: bold; }
+    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 17px; font-weight: bold; text-align: left; }
     
     .valor-container { margin: 5px 0; }
     .simbolo-monetario { color: var(--cor-destaque); font-size: 16px; vertical-align: top; font-weight: bold; margin-top: 5px; display: inline-block; }
@@ -155,8 +167,9 @@
     .info-estado { margin-bottom: 15px; }
     
     .texto-reavaliacao {
-        color: var(--texto-dim);
-        font-size: 12px;
+        color: #ffaa00;
+        font-weight: 500;
+        font-size: 14px;
         line-height: 1.4;
         margin: 0 auto;
         max-width: 80%;

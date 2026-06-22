@@ -14,6 +14,8 @@
   - 22/06/2026: Refatoração da UI de Upload (Desktop). Remoção de textos inúteis, 
     botão PC abrindo o explorador diretamente e criação de galeria unificada.
   - 22/06/2026: Correção de UX: Ocultar QR Code ao clicar em Upload do PC.
+  - 22/06/2026: Correção de roteamento de imagens no preview do handoff mobile para utilizar caminho com token antes da submissão.
+  - 22/06/2026: Melhoria de UX: Ocultar área do QR Code automaticamente após receber as fotos via celular.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -297,13 +299,20 @@
                         .then(data => {
                             if (data.status === 'concluido') {
                                 clearInterval(pollingInterval);
-                                qrContainer.style.opacity = "0.2"; 
+                                
+                                // Oculta a área do QR Code inteira
+                                areaCelular.style.display = 'none';
+                                
+                                // Reseta o visual do botão "Usar Câmera do Celular"
+                                btnQrCode.style.borderColor = '#333';
+                                btnQrCode.style.color = 'var(--texto-br)';
+                                
                                 msgVazia.style.display = 'none';
                                 
                                 if (data.fotos && data.fotos.length > 0) {
                                     data.fotos.forEach(fotoUrl => {
                                         const img = document.createElement('img');
-                                        img.src = `/media/pericia/${fotoUrl}`;
+                                        img.src = fotoUrl; 
                                         img.className = 'thumb-galeria';
                                         galeriaFotos.appendChild(img);
                                     });

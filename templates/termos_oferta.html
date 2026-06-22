@@ -13,6 +13,7 @@
   - 02/06/2026: Substituição do Modal de Recusa por Checkbox inline (Vermelho) com 
                 exibição condicional da caixa de texto e redirecionamento para Home.
   - 19/06/2026: Atualização do texto da política de Devolução, Divergências e responsabilidade de frete, com quebra de linha para leitura.
+  - 22/06/2026: Destaque visual na instrução de leitura e ocultação do botão DESCARTAR até que a recusa seja explicitamente selecionada.
   ============================================================================== #}
 
 {% extends 'base.html' %}
@@ -22,7 +23,7 @@
     <div class="card-padrao" style="max-width: 800px; width: 100%;">
         <header style="text-align: center; margin-bottom: 25px;">
             <h2 class="titulo-pagina">Termos da Oferta</h2>
-            <p style="color: var(--texto-dim); font-size: 14px;">Antes de prosseguirmos, por favor, leia nossa política de recompra.</p>
+            <p style="color: #ffaa00; font-size: 16px; font-weight: 500;">Antes de prosseguirmos, por favor, leia nossa política de recompra.</p>
         </header>
 
         <div class="tabela-container" style="padding: 20px; margin-bottom: 25px; max-height: none; overflow: visible;">
@@ -70,13 +71,13 @@
             </div>
 
             <div class="acoes-finais">
-                <div class="botoes-nav" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div class="botoes-nav" style="display: flex; justify-content: center; align-items: center; width: 100%;">
                     
-                    <button type="button" id="btn-descartar" class="btn-secondary btn-descartar" disabled style="width: auto; color: #ff4444; border-color: #ff4444; opacity: 0.5; cursor: not-allowed;">
-                        DESCARTAR
+                    <button type="button" id="btn-descartar" class="btn-secondary btn-descartar" style="width: 100%; color: #ff4444; border-color: #ff4444; display: none;">
+                        DESCARTAR LOTE
                     </button>
 
-                    <button type="submit" id="btn-continuar" class="btn-primary" disabled style="width: auto; opacity: 0.5; cursor: not-allowed;">
+                    <button type="submit" id="btn-continuar" class="btn-primary" disabled style="width: 100%; opacity: 0.5; cursor: not-allowed;">
                         CONTINUAR
                     </button>
 
@@ -107,16 +108,16 @@
                     if(checkRecusa) checkRecusa.checked = false;
                     if(areaMotivo) areaMotivo.style.display = 'none';
                     
-                    // Desativa botão descartar
-                    btnDescartar.disabled = true;
-                    btnDescartar.style.opacity = '0.5';
-                    btnDescartar.style.cursor = 'not-allowed';
+                    // Oculta botão descartar
+                    btnDescartar.style.display = 'none';
 
-                    // Ativa botão continuar
+                    // Exibe e ativa botão continuar
+                    btnContinuar.style.display = 'block';
                     btnContinuar.disabled = false;
                     btnContinuar.style.opacity = '1';
                     btnContinuar.style.cursor = 'pointer';
                 } else {
+                    // Bloqueia botão continuar se desmarcar
                     btnContinuar.disabled = true;
                     btnContinuar.style.opacity = '0.5';
                     btnContinuar.style.cursor = 'not-allowed';
@@ -134,20 +135,23 @@
                     // Exibe a área de motivo
                     if(areaMotivo) areaMotivo.style.display = 'block';
                     
-                    // Desativa botão continuar
-                    btnContinuar.disabled = true;
-                    btnContinuar.style.opacity = '0.5';
-                    btnContinuar.style.cursor = 'not-allowed';
+                    // Oculta botão continuar
+                    btnContinuar.style.display = 'none';
 
-                    // Ativa botão descartar
+                    // Exibe e ativa botão descartar
+                    btnDescartar.style.display = 'block';
                     btnDescartar.disabled = false;
                     btnDescartar.style.opacity = '1';
                     btnDescartar.style.cursor = 'pointer';
                 } else {
+                    // Restaura estado inicial se desmarcar
                     if(areaMotivo) areaMotivo.style.display = 'none';
-                    btnDescartar.disabled = true;
-                    btnDescartar.style.opacity = '0.5';
-                    btnDescartar.style.cursor = 'not-allowed';
+                    btnDescartar.style.display = 'none';
+                    
+                    btnContinuar.style.display = 'block';
+                    btnContinuar.disabled = true;
+                    btnContinuar.style.opacity = '0.5';
+                    btnContinuar.style.cursor = 'not-allowed';
                 }
             });
         }
@@ -174,13 +178,13 @@
                     } else {
                         alert("Ocorreu um erro ao processar o descarte. Tente novamente.");
                         btnDescartar.disabled = false;
-                        btnDescartar.innerText = "DESCARTAR";
+                        btnDescartar.innerText = "DESCARTAR LOTE";
                     }
                 } catch (error) {
                     console.error("Erro de comunicação ao descartar:", error);
                     alert("Falha de conexão. Verifique sua internet e tente novamente.");
                     btnDescartar.disabled = false;
-                    btnDescartar.innerText = "DESCARTAR";
+                    btnDescartar.innerText = "DESCARTAR LOTE";
                 }
             });
         }

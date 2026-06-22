@@ -162,3 +162,7 @@ Próximos Passos Sugeridos para Documentação
 Validação de API: Certifique-se de que a rota /api/status-upload/<token> esteja retornando um JSON limpo contendo apenas a lista de arquivos (ex: {"status": "concluido", "fotos": ["foto1.jpg", "foto2.jpg"]}).
 
 Padronização CSS: Todos os novos componentes mobile utilizam a variável --cor-destaque e o tom #d48806 para ênfases, garantindo a identidade visual.
+
+=====================
+
+substituir a formatação antiga do valor (replace('.', ',')) pelo uso limpo do novo filtro global | moeda_real que criamos no server.py.

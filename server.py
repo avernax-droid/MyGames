@@ -29,6 +29,7 @@
 # - 16/06/2026: Tratamento seguro da variável nome_fantasia na rota /finalizar com fallback para evitar erros de renderização no Jinja2.
 # - 19/06/2026: Inclusão do repasse da variável categoria_nome na rota /cotar para exibição dinâmica no resultado.html.
 # - 20/06/2026: Correção na injeção do dicionário de contatos na rota /finalizar para exibição correta no sucesso.html.
+# - 22/06/2026: Criação do filtro customizado Jinja2 'moeda_real' para formatação global de valores monetários.
 # ==============================================================================
 
 import os
@@ -78,6 +79,15 @@ def from_json_filter(value):
         except (ValueError, TypeError):
             return []
     return value
+
+# NOVO FILTRO: Formatação global de moeda para o padrão brasileiro
+@app.template_filter('moeda_real')
+def moeda_real_filter(valor):
+    try:
+        # Força conversão para float, formata com 2 casas decimais e troca ponto por vírgula
+        return f"{float(valor):.2f}".replace('.', ',')
+    except (ValueError, TypeError):
+        return "0,00"
 
 # --- CONFIGURAÇÃO DE UPLOADS ---
 UPLOAD_FOLDER = os.getenv("DIRETORIO_UPLOADS_PERICIA", 'static/uploads/pericia')
