@@ -9,19 +9,11 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
-  - 28/05/2026: Remoção da lógica de upload local, agora centralizada no main.js.
-  - 30/05/2026: Inclusão de abas para upload remoto (QR Code Mobile) vs Local.
-  - 30/05/2026: Correção de UX no upload local com feedback visual.
-  - 30/05/2026: Correção do bug de reinicialização do polling de escuta do QR Code.
-  - 01/06/2026: Preparação do frontend para receber caminhos de mídia via .env.
-  - 02/06/2026: Inserção do contexto de categoria e produto no cabeçalho da página.
-  - 02/06/2026: Ajuste de layout dos botões de ação (Voltar/Avaliar).
-  - 02/06/2026: Bloqueio do input de quantidade física para exigir valor maior que zero.
-  - 03/06/2026: Realinhamento das condicionais do Jinja2 para exibir os formulários extras corretos de Jogos (ID 4) e Acessórios (ID 3).
-  - 10/06/2026: Correção de UX no feedback do upload local para exibir "Alterar Seleção" em vez de termos restritivos de substituição de foto única.
-  - 10/06/2026: Hotfix - Remoção da função 'Math' inválida no Jinja2 na condicional da categoria 2.
-  - 19/06/2026: Inclusão de validação no Front-end (via JS) para bloquear cotações que ferem as políticas de aceitação de produtos.
-  - 19/06/2026: Condicional Jinja2 no cabeçalho para exibir texto de orientação customizado quando a categoria selecionada for 'Jogo' (ID 4).
+  - 02/06/2026: Ajuste de layout dos botões de ação e bloqueios de quantidade.
+  - 19/06/2026: Inclusão de validação no Front-end e condicionais Jinja2.
+  - 22/06/2026: Refatoração da UI de Upload (Desktop). Remoção de textos inúteis, 
+    botão PC abrindo o explorador diretamente e criação de galeria unificada.
+  - 22/06/2026: Correção de UX: Ocultar QR Code ao clicar em Upload do PC.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -128,27 +120,21 @@
         <div class="upload-section">
             <p class="label-secao">Fotos do Produto (Opcional):</p>
             
-            <div class="upload-tabs">
-                <button type="button" class="btn-tab active" id="tab-pc">Upload do Computador</button>
-                <button type="button" class="btn-tab" id="tab-celular">📸 Usar Câmera do Celular</button>
+            <div class="upload-actions">
+                <button type="button" class="btn-acao-upload" id="btn-upload-pc">💻 Upload do Computador</button>
+                <button type="button" class="btn-acao-upload" id="btn-qr-code">📸 Usar Câmera do Celular</button>
             </div>
 
-            <div class="file-drop-area" id="area-upload-pc">
-                <span class="fake-btn">Escolher Fotos</span>
-                <span class="file-msg" id="file-msg">ou arraste as imagens aqui</span>
-                <input type="file" name="fotos" id="file-input" class="file-input" accept="image/*" multiple>
-            </div>
+            <input type="file" name="fotos" id="file-input" class="file-input" accept="image/*" multiple style="display: none;">
 
-            <div class="qr-code-area" id="area-upload-celular" style="display: none; text-align: center; padding: 25px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px;">
-                <p style="color: var(--texto-dim); margin-bottom: 15px; font-size: 14px;">Escaneie o código com seu celular para tirar as fotos. A tela atualizará sozinha.</p>
-                
-                <div id="qrcode" style="display: inline-block; padding: 15px; background: white; border-radius: 8px;"></div>
-                
-                <p style="color: var(--cor-destaque); margin-top: 15px; font-size: 14px; font-weight: bold; display: none;" id="status-qr">
-                    ✅ Fotos recebidas! Você já pode clicar em Avaliar.
-                </p>
-                
+            <div class="qr-code-area" id="area-upload-celular" style="display: none;">
+                <p class="qr-code-instrucao">Escaneie o código com seu celular para tirar as fotos. Elas aparecerão na galeria abaixo.</p>
+                <div id="qrcode" class="qrcode-display"></div>
                 <input type="hidden" name="token_sessao" id="token_sessao" value="{{ token_sessao }}">
+            </div>
+
+            <div class="galeria-preview" id="galeria-fotos">
+                <p class="galeria-vazia-msg" id="msg-vazia">Nenhuma foto adicionada ainda.</p>
             </div>
 
             <p class="file-hint">Envie fotos nítidas da frente, verso e selos de garantia.</p>
@@ -193,9 +179,7 @@
             });
         });
 
-        // -------------------------------------------------------------------------
         // VALIDAÇÃO DE REGRAS DE NEGÓCIO ANTES DO ENVIO
-        // -------------------------------------------------------------------------
         formPericia.addEventListener('submit', function(e) {
             const estadoSelecionado = document.querySelector('input[name="estado_id"]:checked');
             const perguntaExtraSelecionada = document.querySelector('input[name="pergunta_extra"]:checked');
@@ -204,29 +188,28 @@
             let textoExtra = perguntaExtraSelecionada ? perguntaExtraSelecionada.value.toLowerCase() : "";
             let mensagemBloqueio = "";
 
-            if (categoriaIdStr === '1') { // Console
+            if (categoriaIdStr === '1') { 
                 if (textoEstado.includes('não funciona')) {
                     mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles que não funcionam.";
                 } else if (textoExtra.includes('desbloqueado')) {
                     mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles desbloqueados.";
                 }
-            } else if (categoriaIdStr === '2') { // Controle
+            } else if (categoriaIdStr === '2') { 
                 if (textoExtra.includes('pirata')) {
                     mensagemBloqueio = "Só realizamos a compra de controles originais.";
                 }
-            } else if (categoriaIdStr === '4') { // Jogo
+            } else if (categoriaIdStr === '4') { 
                 if (textoEstado.includes('não funciona')) {
                     mensagemBloqueio = "Infelizmente, não realizamos a compra de jogos que não funcionam.";
                 }
-            } else if (categoriaIdStr === '3') { // Acessório
+            } else if (categoriaIdStr === '3') { 
                 if (textoExtra.includes('pirata')) {
                     mensagemBloqueio = "Só realizamos a compra de acessórios originais.";
                 }
             }
 
-            // Se violou alguma regra, trava o form e abre o Modal Global
             if (mensagemBloqueio !== "") {
-                e.preventDefault(); // Impede o envio para o servidor
+                e.preventDefault(); 
                 
                 if (typeof abrirModalConfirmacao === 'function') {
                     abrirModalConfirmacao(
@@ -236,55 +219,78 @@
                         function() { fecharModalConfirmacao(); }
                     );
                 } else {
-                    alert(mensagemBloqueio); // Fallback de segurança
+                    alert(mensagemBloqueio); 
                 }
             }
         });
 
         // -------------------------------------------------------------------------
-        // Lógica de Upload de Fotos (PC vs Mobile QR)
+        // LÓGICA DE UPLOAD VISUAL E GALERIA
         // -------------------------------------------------------------------------
-        const tabPc = document.getElementById('tab-pc');
-        const tabCelular = document.getElementById('tab-celular');
-        const areaPc = document.getElementById('area-upload-pc');
+        const btnUploadPc = document.getElementById('btn-upload-pc');
+        const btnQrCode = document.getElementById('btn-qr-code');
+        const fileInput = document.getElementById('file-input');
         const areaCelular = document.getElementById('area-upload-celular');
-        const statusQr = document.getElementById('status-qr');
+        const galeriaFotos = document.getElementById('galeria-fotos');
+        const msgVazia = document.getElementById('msg-vazia');
         const token = document.getElementById("token_sessao").value;
         
         let pollingInterval;
 
-        tabPc.addEventListener('click', () => {
-            tabPc.classList.add('active');
-            tabCelular.classList.remove('active');
-            areaPc.style.display = 'flex';
+        // Ação: Abrir Explorador de Arquivos (PC)
+        btnUploadPc.addEventListener('click', () => {
+            // Oculta a área do QR Code se estiver aberta e reseta o estilo do botão
             areaCelular.style.display = 'none';
+            btnQrCode.style.borderColor = '#333';
+            btnQrCode.style.color = 'var(--texto-br)';
             clearInterval(pollingInterval);
+
+            // Aciona o input de arquivo
+            fileInput.click();
         });
 
-        tabCelular.addEventListener('click', () => {
-            tabCelular.classList.add('active');
-            tabPc.classList.remove('active');
-            areaCelular.style.display = 'block';
-            areaPc.style.display = 'none';
-            
-            const qrContainer = document.getElementById("qrcode");
-            
-            if (qrContainer.innerHTML === "") {
-                const urlBase = window.location.origin; 
-                const urlMobile = `${urlBase}/upload-remoto/${token}`;
-                
-                new QRCode(qrContainer, {
-                    text: urlMobile,
-                    width: 160,
-                    height: 160,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff"
+        // Renderização de miniaturas locais
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                msgVazia.style.display = 'none';
+                Array.from(this.files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'thumb-galeria';
+                        galeriaFotos.appendChild(img);
+                    }
+                    reader.readAsDataURL(file);
                 });
             }
+        });
 
-            clearInterval(pollingInterval);
-            
-            if (statusQr.style.display !== "block") {
+        // Ação: Alternar visibilidade do QR Code
+        btnQrCode.addEventListener('click', () => {
+            if (areaCelular.style.display === 'none') {
+                areaCelular.style.display = 'block';
+                btnQrCode.style.borderColor = 'var(--cor-destaque)';
+                btnQrCode.style.color = 'var(--cor-destaque)';
+                
+                const qrContainer = document.getElementById("qrcode");
+                
+                if (qrContainer.innerHTML === "") {
+                    const urlBase = window.location.origin; 
+                    const urlMobile = `${urlBase}/upload-remoto/${token}`;
+                    
+                    new QRCode(qrContainer, {
+                        text: urlMobile,
+                        width: 160,
+                        height: 160,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff"
+                    });
+                }
+
+                clearInterval(pollingInterval);
+                
+                // Inicia o polling aguardando as fotos do celular
                 pollingInterval = setInterval(() => {
                     fetch(`/api/status-upload/${token}`)
                         .then(response => response.json())
@@ -292,36 +298,32 @@
                             if (data.status === 'concluido') {
                                 clearInterval(pollingInterval);
                                 qrContainer.style.opacity = "0.2"; 
-                                statusQr.style.display = "block";
+                                msgVazia.style.display = 'none';
+                                
+                                if (data.fotos && data.fotos.length > 0) {
+                                    data.fotos.forEach(fotoUrl => {
+                                        const img = document.createElement('img');
+                                        img.src = `/media/pericia/${fotoUrl}`;
+                                        img.className = 'thumb-galeria';
+                                        galeriaFotos.appendChild(img);
+                                    });
+                                } else {
+                                    const successText = document.createElement('p');
+                                    successText.style.color = 'var(--cor-destaque)';
+                                    successText.style.fontWeight = 'bold';
+                                    successText.innerText = "✅ Fotos recebidas via celular!";
+                                    galeriaFotos.appendChild(successText);
+                                }
                             }
                         })
                         .catch(err => console.error("Erro na checagem:", err));
                 }, 3000);
-            }
-        });
 
-        const fileInputPc = document.getElementById('file-input');
-        const fileMsgPc = document.getElementById('file-msg');
-        const fakeBtn = document.querySelector('.fake-btn');
-
-        fileInputPc.addEventListener('change', function() {
-            const qtd = this.files.length;
-            
-            if (qtd === 1) {
-                fileMsgPc.innerText = "1 foto selecionada";
-                fileMsgPc.style.color = "var(--cor-destaque)";
-                fileMsgPc.style.fontWeight = "bold";
-                fakeBtn.innerText = "Alterar Seleção";
-            } else if (qtd > 1) {
-                fileMsgPc.innerText = `${qtd} fotos selecionadas`;
-                fileMsgPc.style.color = "var(--cor-destaque)";
-                fileMsgPc.style.fontWeight = "bold";
-                fakeBtn.innerText = "Alterar Seleção";
             } else {
-                fileMsgPc.innerText = "ou arraste as imagens aqui";
-                fileMsgPc.style.color = "#888";
-                fileMsgPc.style.fontWeight = "normal";
-                fakeBtn.innerText = "Escolher Fotos";
+                areaCelular.style.display = 'none';
+                btnQrCode.style.borderColor = '#333';
+                btnQrCode.style.color = 'var(--texto-br)';
+                clearInterval(pollingInterval);
             }
         });
     });
@@ -346,22 +348,27 @@
     .input-qtd { width: 80px; padding: 10px; background: var(--bg-fundo); border: 1px solid #555; border-radius: 8px; color: var(--texto-br); font-size: 16px; text-align: center; outline: none; transition: 0.3s; }
     .input-qtd:focus { border-color: var(--cor-destaque); box-shadow: 0 0 10px rgba(0,255,0,0.1); }
     
-    /* Upload Section & Tabs */
+    /* Upload Section - UI Refatorada */
     .upload-section { margin-bottom: 30px; }
-    .upload-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
-    .btn-tab { flex: 1; padding: 12px; background: var(--bg-fundo); border: 2px solid #333; color: #888; border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; }
-    .btn-tab.active { background: #252525; color: var(--cor-destaque); border-color: var(--cor-destaque); }
-    .file-drop-area { position: relative; display: flex; align-items: center; padding: 25px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; transition: 0.3s; text-align: center; justify-content: center; }
-    .file-input { position: absolute; left: 0; top: 0; height: 100%; width: 100%; opacity: 0; cursor: pointer; z-index: 2; }
-    .fake-btn { background: #333; color: var(--texto-br); padding: 8px 15px; border-radius: 5px; font-size: 13px; margin-right: 10px; }
-    .file-msg { color: #888; font-size: 14px; }
-    .file-hint { color: #555; font-size: 12px; margin-top: 8px; }
+    .upload-actions { display: flex; gap: 10px; margin-bottom: 15px; }
+    
+    .btn-acao-upload { flex: 1; padding: 14px; background: #252525; border: 2px solid #333; color: var(--texto-br); border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 14px; }
+    .btn-acao-upload:hover { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); }
+    
+    .qr-code-area { text-align: center; padding: 20px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; margin-bottom: 15px; }
+    .qr-code-instrucao { color: var(--texto-dim); margin-bottom: 15px; font-size: 14px; }
+    .qrcode-display { display: inline-block; padding: 15px; background: white; border-radius: 8px; }
+    
+    .galeria-preview { display: flex; flex-wrap: wrap; gap: 10px; min-height: 120px; padding: 15px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; align-items: center; justify-content: center; }
+    .galeria-vazia-msg { color: #666; font-size: 14px; margin: 0; font-style: italic; }
+    .thumb-galeria { width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid var(--cor-destaque); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+    .file-hint { color: #555; font-size: 12px; margin-top: 10px; text-align: center; }
     
     .obs-section { margin-bottom: 30px; }
     .text-obs { width: 100%; height: 100px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px; color: var(--texto-br); font-family: inherit; resize: none; transition: 0.3s; }
     .text-obs:focus { border-color: var(--cor-destaque); outline: none; background: #252525; }
     
-    /* Botões de Ação */
     .btn-secondary { background: transparent; border: 2px solid #555; color: var(--texto-br); padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; text-align: center; cursor: pointer; transition: 0.3s; }
     .btn-secondary:hover { border-color: #888; background: #252525; color: #fff; }
     .btn-primary { padding: 12px 24px; cursor: pointer; border: none; font-weight: bold; border-radius: 8px; transition: 0.3s; }

@@ -119,3 +119,46 @@ mobile/cadastro_complementar.html: Desfazer o layout de colunas do desktop e col
 
 mobile/sucesso.html: Ajustar o tamanho e a quebra de linha (word-break) do código do protocolo para que ele não vaze da tela do celular, além de redimensionar os alertas de itens que ficaram "sob consulta".
 
+===============
+
+22/06
+
+O Que Estávamos Testando (Escopo Mobile V3.0)
+Estamos implementando a Otimização Mobile para o sistema MyGames, focada em converter layouts rígidos (tabelas e grids de desktop) para interfaces fluidas e focadas em conversão (Mobile First).
+
+Arquitetura de Roteamento: Uso de render_smart_template para alternar dinamicamente entre templates /desktop e /mobile.
+
+UX Mobile: Bloqueio de auto-zoom em inputs, botões de ação empilhados verticalmente e touch-targets amplos para facilitar o uso com uma mão.
+
+Perícia e Upload: Implementação de upload nativo via capture="environment" (Câmera) e multiple (Galeria), com galeria de miniaturas em tempo real via JavaScript (FileReader e DataTransfer).
+
+Fluxo de Finalização: Implementação de Cards Acionáveis em Termos de Oferta e um fluxo de cadastro simplificado (com campos numéricos nativos e busca de CEP via ViaCEP).
+
+Diagnóstico de Erros e Como Corrigir
+1. Erro de Rota/Caminho Duplicado nas Imagens (Log: 404 Not Found)
+Problema: O log mostrava GET /media/pericia/media/pericia/.... Isso ocorre porque a função que serve as imagens está recebendo um caminho já prefixado duas vezes.
+
+Correção: No seu templates/pericia.html (ou no js que processa o polling do QR Code), identifique onde o src da imagem é montado.
+
+Se a API retorna apenas o nome do arquivo, mantenha o prefixo /media/pericia/.
+
+Se a API retorna o caminho completo, remova o prefixo manual do JavaScript.
+
+Dica: Use console.log(fotoUrl) no seu JS para inspecionar exatamente o que está chegando antes de atribuir ao src.
+
+2. Erro de Sintaxe Jinja2 (jinja2.exceptions.TemplateSyntaxError)
+Problema: O Flask não conseguiu compilar o template porque uma tag de bloco estava aberta mas não foi fechada ({% block %} sem o respectivo {% endblock %}).
+
+Correção: Verifique sempre a paridade das tags:
+
+Cada {% block content %} deve ter um {% endblock %} logo após o conteúdo daquela seção e antes de abrir um novo bloco (como o {% block scripts %}).
+
+3. UX do Fluxo de Upload (Upload PC vs. QR Code)
+Problema: Botões concorrentes não limpavam o estado visual (ex: quadro do QR Code persistindo após o clique em Upload PC).
+
+Correção: Certifique-se de que a função de clique do "Upload do Computador" chame explicitamente a ocultação do elemento area-upload-celular (style.display = 'none') e limpe o clearInterval(pollingInterval) para evitar que o código tente buscar fotos via rede quando o usuário decidiu fazer upload direto.
+
+Próximos Passos Sugeridos para Documentação
+Validação de API: Certifique-se de que a rota /api/status-upload/<token> esteja retornando um JSON limpo contendo apenas a lista de arquivos (ex: {"status": "concluido", "fotos": ["foto1.jpg", "foto2.jpg"]}).
+
+Padronização CSS: Todos os novos componentes mobile utilizam a variável --cor-destaque e o tom #d48806 para ênfases, garantindo a identidade visual.

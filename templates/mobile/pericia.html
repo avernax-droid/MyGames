@@ -10,9 +10,8 @@
   HISTÓRICO DE ALTERAÇÕES:
   - 20/06/2026: Criação da versão mobile com inputs adaptados para toque.
   - 20/06/2026: Refatoração da lógica de Upload de Fotos (DataTransfer).
-  - 20/06/2026: Divisão explícita da UX de upload em dois botões separados 
-    ("Tirar Foto" com capture nativo e "Acessar Galeria" com multiple nativo), 
-    resolvendo conflitos de navegadores mobile que pulavam a câmera.
+  - 22/06/2026: Alinhamento do cabeçalho do produto (ícone e nome na mesma linha)
+    e inclusão do texto de ênfase discreta sobre o pagamento via PIX.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -22,15 +21,25 @@
 {% block content %}
 <div class="card-padrao">
     <header style="text-align: center; margin-bottom: 25px;">
-        <h2 style="color: var(--cor-destaque); font-family: 'Rajdhani', sans-serif; font-size: 24px; text-transform: uppercase; margin-bottom: 10px;">Estado de Conservação</h2>
+        <h2 style="color: var(--cor-destaque); font-family: 'Rajdhani', sans-serif; font-size: 24px; text-transform: uppercase; margin-bottom: 15px;">Estado de Conservação</h2>
         
-        <div class="produto-contexto-topo" style="margin-bottom: 15px; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 5px;">
-            <span class="badge-categoria" style="text-transform: uppercase; font-weight: bold; color: #fff; background-color: #333; padding: 4px 12px; border-radius: 6px; font-size: 11px; border: 1px solid #555;">
-                {{ categoria_nome }}
-            </span>
-            <span class="nome-produto" style="color: var(--texto-br); font-weight: bold; text-align: center; line-height: 1.2;">
-                {{ produto_nome }}
-            </span>
+        <!-- NOVO: Cabeçalho do Produto (Ícone e Nome na mesma linha) -->
+        <div class="item-cabecalho-mobile">
+            <div class="foto-thumb-mobile">
+                {% if produto_foto and produto_foto != 'None' %}
+                    <img src="{{ produto_foto }}" alt="{{ produto_nome }}">
+                {% else %}
+                    <span>🎮</span>
+                {% endif %}
+            </div>
+            <div class="produto-info-header">
+                <span class="badge-categoria">
+                    {{ categoria_nome }}
+                </span>
+                <span class="produto-nome-mobile">
+                    {{ produto_nome }}
+                </span>
+            </div>
         </div>
         
         {% if categoria_id|string == '4' %}
@@ -150,6 +159,9 @@
         </div>
 
         <div class="botoes-acao-mobile">
+            <!-- NOVO: Ênfase discreta adicionada acima do botão de ação principal -->
+            <div class="texto-enfase-discreta">O valor informado se refere para pagamento via PIX</div>
+            
             <button type="submit" class="btn-primary" style="margin-bottom: 15px;">AVALIAR PRODUTO</button>
             <a href="/produto" class="btn-secondary">VOLTAR PARA A BUSCA</a>
         </div>
@@ -223,25 +235,21 @@
         
         let fotosAcumuladas = [];
 
-        // Função que processa os arquivos de qualquer um dos botões auxiliares
         function processarNovosArquivos(inputAuxiliar) {
             const novosArquivos = Array.from(inputAuxiliar.files);
             if (novosArquivos.length === 0) return;
 
             fotosAcumuladas = fotosAcumuladas.concat(novosArquivos);
 
-            // Atualiza o input principal que vai pro servidor
             const dt = new DataTransfer();
             fotosAcumuladas.forEach(file => dt.items.add(file));
             fileInput.files = dt.files;
 
             atualizarInterfaceDeFotos();
             
-            // Limpa o input auxiliar para permitir selecionar o mesmo arquivo/tirar nova foto
             inputAuxiliar.value = ""; 
         }
 
-        // Adiciona os eventos aos dois botões
         fileCamera.addEventListener('change', function() { processarNovosArquivos(this); });
         fileGaleria.addEventListener('change', function() { processarNovosArquivos(this); });
 
@@ -277,7 +285,6 @@
             }
         }
 
-        // Função global para o botão "X" de remover foto
         window.removerFoto = function(index, event) {
             event.preventDefault(); 
             event.stopPropagation();
@@ -296,6 +303,19 @@
 <style>
     .label-secao { color: var(--texto-dim); font-size: 13px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;}
     
+    /* NOVO: Estilos do Cabeçalho Alinhado e Texto Discreto */
+    .item-cabecalho-mobile { display: flex; align-items: center; gap: 15px; background: rgba(255, 255, 255, 0.03); border: var(--borda-fina); border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+    .foto-thumb-mobile { flex-shrink: 0; width: 60px; height: 60px; background: #000; border: var(--borda-fina); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .foto-thumb-mobile img { width: 100%; height: 100%; object-fit: cover; }
+    .foto-thumb-mobile span { font-size: 24px; }
+    
+    .produto-info-header { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+    .badge-categoria { text-transform: uppercase; font-weight: bold; color: #fff; background-color: #333; padding: 4px 10px; border-radius: 6px; font-size: 10px; border: 1px solid #555; margin-bottom: 6px; display: inline-block; }
+    .produto-nome-mobile { color: var(--texto-br); font-weight: bold; font-size: 15px; text-transform: uppercase; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+
+    .texto-enfase-discreta { color: var(--texto-dim); font-size: 11px; font-style: italic; opacity: 0.75; text-align: center; margin-bottom: 12px; }
+
+    /* ESTILOS ORIGINAIS MANTIDOS */
     .opcoes-wrapper { display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px; }
     .alert-error { color: #ff4444; text-align: center; padding: 15px; border: 1px dashed #ff4444; border-radius: 12px; background: rgba(255, 68, 68, 0.05); }
     
@@ -324,16 +344,13 @@
     .upload-section-mobile { margin-bottom: 25px; }
     .file-drop-area-mobile { position: relative; display: flex; flex-direction: column; align-items: center; padding: 25px 15px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; text-align: center; transition: 0.3s; }
     
-    /* Botões Duplos de Upload */
     .btn-upload-split { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #333; color: var(--texto-br); padding: 15px 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: 1px solid #555; cursor: pointer; transition: 0.2s; flex: 1; }
     .btn-upload-split:active { transform: scale(0.95); background: #444; border-color: var(--cor-destaque); }
     
-    /* Container que guarda as fotos selecionadas */
     .preview-container { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; width: 100%; margin-top: 5px; }
     .thumb-wrapper { position: relative; width: 70px; height: 70px; border-radius: 8px; border: 2px solid var(--cor-destaque); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
     .thumb-img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
     
-    /* Botão X vermelho no canto da miniatura */
     .btn-remover-foto { position: absolute; top: -8px; right: -8px; background: #ff4444; color: white; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; border: 2px solid #1e1e1e; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
     .btn-remover-foto:active { transform: scale(0.9); }
     

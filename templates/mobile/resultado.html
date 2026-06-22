@@ -8,9 +8,10 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 20/06/2026: Criação da versão mobile. 
-  - 20/06/2026: Reorganização dos botões de ação final (Avançar, Adicionar Mais, 
-    Descartar) em uma pilha vertical (column) para evitar toques acidentais e 
-    melhorar a fluidez da UX em telas estreitas, conforme diretrizes do projeto.
+  - 20/06/2026: Reorganização dos botões de ação final em uma pilha vertical.
+  - 22/06/2026: Alinhamento do cabeçalho do produto (ícone e nome na mesma linha).
+  - 22/06/2026: Ajuste no realce do texto explicativo de valor, alterando de 
+    itálico cinza para uma fonte normal em tom de laranja discreto.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -23,11 +24,14 @@
     <div class="card-padrao" style="text-align: center;">
         
         <div id="dados-avaliacao-container">
-            <header class="oferta-header">
-                <div class="produto-thumb-wrapper">
+            
+            <header class="item-cabecalho-mobile">
+                <div class="foto-thumb-mobile">
                     <img src="{{ cotacao.foto_url or 'https://via.placeholder.com/150' }}" alt="{{ cotacao.produto }}" class="produto-mini-foto">
                 </div>
-                <div class="produto-nome-display">{{ cotacao.produto }}</div>
+                <div class="produto-info-header">
+                    <div class="produto-nome-mobile">{{ cotacao.produto }}</div>
+                </div>
             </header>
 
             {% if categoria_nome in ['Jogo', 'Jogos'] %}
@@ -54,7 +58,7 @@
             {% endif %}
             
             <div class="info-estado">
-                <p class="texto-reavaliacao">
+                <p class="texto-enfase-discreta">
                     O valor informado se refere para {{ categoria_nome }} em Perfeito Estado de Funcionamento e Sem Itens Faltantes. Seu item será reavaliado na perícia técnica.
                 </p>
             </div>
@@ -87,7 +91,6 @@
         </div>
 
         <div class="acoes-finais">
-            <!-- BOTÕES EMPILHADOS NA VERTICAL PARA MOBILE -->
             <div id="grupo-botoes-originais" class="grupo-botoes-mobile">
                 
                 <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 16px; font-size: 15px;">
@@ -118,11 +121,9 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sucesso') {
-                    // Esconde os dados da avaliação e a pilha de botões
                     document.getElementById('dados-avaliacao-container').style.display = 'none';
                     document.getElementById('grupo-botoes-originais').style.display = 'none'; 
                     
-                    // Exibe a mensagem e o botão único
                     document.getElementById('feedback-descarte').style.display = 'block';
                     document.getElementById('grupo-botao-voltar-descarte').style.display = 'block';
                 }
@@ -136,16 +137,27 @@
         display: flex; justify-content: center; align-items: flex-start; padding: 10px; min-height: calc(100vh - 150px);
     }
     
-    .produto-thumb-wrapper {
-        width: 80px; height: 80px; margin: 0 auto 15px;
-        display: flex; align-items: center; justify-content: center;
-        background: #1e1e1e; border: 1px solid #333;
-        border-radius: 12px; padding: 5px;
+    /* Cabeçalho Alinhado */
+    .item-cabecalho-mobile { display: flex; align-items: center; gap: 15px; background: rgba(255, 255, 255, 0.03); border: var(--borda-fina); border-radius: 12px; padding: 12px; margin-bottom: 20px; text-align: left; }
+    .foto-thumb-mobile { flex-shrink: 0; width: 60px; height: 60px; background: #000; border: var(--borda-fina); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px; }
+    .produto-mini-foto { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+    
+    .produto-info-header { display: flex; flex-direction: column; align-items: flex-start; flex-grow: 1; }
+    .produto-nome-mobile { color: var(--texto-br); font-weight: bold; font-size: 15px; text-transform: uppercase; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+
+    /* ESTILO ALTERADO: Laranja discreto, sem itálico */
+    .texto-enfase-discreta { 
+        color: #d48806; /* Laranja suave e elegante */
+        font-size: 11px; 
+        font-style: normal; 
+        text-align: center; 
+        margin: 0 auto; 
+        width: 100%; 
+        padding: 0 10px; 
+        line-height: 1.4; 
     }
 
-    .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
-    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 16px; font-weight: bold; line-height: 1.3; margin-bottom: 5px; padding: 0 10px; }
-    
+    /* ESTILOS ORIGINAIS MANTIDOS */
     .alerta-jogos-digital {
         margin: 15px auto 10px auto; padding: 12px; 
         background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.5); border-radius: 8px; width: 100%;
@@ -164,14 +176,9 @@
     
     .valor-container { margin: 10px 0; display: flex; align-items: flex-start; justify-content: center; gap: 4px; }
     .simbolo-monetario { color: var(--cor-destaque); font-size: 18px; font-weight: bold; margin-top: 4px; }
-    /* Ajuste de tamanho da fonte do preço para Mobile */
     .valor-pix { color: var(--cor-destaque); font-size: 40px; font-weight: bold; line-height: 1; font-family: monospace; letter-spacing: -1px; }
 
     .info-estado { margin-bottom: 20px; }
-    
-    .texto-reavaliacao {
-        color: var(--texto-dim); font-size: 12px; line-height: 1.4; margin: 0 auto; width: 100%; padding: 0 5px;
-    }
 
     .revisao-pericia { 
         background: #1e1e1e; border-radius: 12px; padding: 15px; 
@@ -195,7 +202,6 @@
     .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 8px 0; font-size: 16px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif;}
     .msg-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 13px; }
 
-    /* PILHA DE BOTÕES MOBILE */
     .acoes-finais { margin-top: 10px; width: 100%; }
     .grupo-botoes-mobile { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 </style>
