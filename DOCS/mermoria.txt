@@ -166,3 +166,7 @@ Padronização CSS: Todos os novos componentes mobile utilizam a variável --cor
 =====================
 
 substituir a formatação antiga do valor (replace('.', ',')) pelo uso limpo do novo filtro global | moeda_real que criamos no server.py.
+
+
+
+    

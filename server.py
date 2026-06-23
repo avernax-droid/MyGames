@@ -30,6 +30,8 @@
 # - 19/06/2026: Inclusão do repasse da variável categoria_nome na rota /cotar para exibição dinâmica no resultado.html.
 # - 20/06/2026: Correção na injeção do dicionário de contatos na rota /finalizar para exibição correta no sucesso.html.
 # - 22/06/2026: Criação do filtro customizado Jinja2 'moeda_real' para formatação global de valores monetários.
+# - 22/06/2026: Criação do filtro customizado Jinja2 'mascara_telefone' para formatação de telefone/whatsapp na camada visual.
+# - 22/06/2026: Implementação do Flask-Session (filesystem) para resolver estouro de limite de cookies e persistir o carrinho no servidor.
 # ==============================================================================
 
 import os
@@ -39,7 +41,8 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from user_agents import parse # NOVO: Biblioteca para detecção precisa do dispositivo
+from user_agents import parse # Biblioteca para detecção precisa do dispositivo
+from flask_session import Session # NOVO: Importação para gerenciamento de sessão no servidor
 
 # 1. Carrega variáveis de ambiente ANTES de importar o engine
 load_dotenv()
@@ -49,6 +52,12 @@ import engine
 
 app = Flask(__name__)
 app.secret_key = 'mygames_key_2026'
+
+# --- NOVA CONFIGURAÇÃO DE SESSÃO NO SERVIDOR ---
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
+Session(app)
 
 # --- FUNÇÃO CORE DE ROTEAMENTO MOBILE ---
 def render_smart_template(template_name, **context):
@@ -88,6 +97,26 @@ def moeda_real_filter(valor):
         return f"{float(valor):.2f}".replace('.', ',')
     except (ValueError, TypeError):
         return "0,00"
+
+# NOVO FILTRO: Formatação de máscara para telefone/whatsapp na camada visual
+@app.template_filter('mascara_telefone')
+def mascara_telefone_filter(valor):
+    if not valor:
+        return ""
+    
+    # Remove tudo que não for número (garantia extra)
+    numero_limpo = ''.join(filter(str.isdigit, str(valor)))
+    
+    # Máscara para celular com 11 dígitos: (XX) XXXXX-XXXX
+    if len(numero_limpo) == 11:
+        return f"({numero_limpo[:2]}) {numero_limpo[2:7]}-{numero_limpo[7:]}"
+    
+    # Máscara para telefone fixo com 10 dígitos: (XX) XXXX-XXXX
+    elif len(numero_limpo) == 10:
+        return f"({numero_limpo[:2]}) {numero_limpo[2:6]}-{numero_limpo[6:]}"
+    
+    # Retorna o valor original se não bater o tamanho esperado
+    return valor
 
 # --- CONFIGURAÇÃO DE UPLOADS ---
 UPLOAD_FOLDER = os.getenv("DIRETORIO_UPLOADS_PERICIA", 'static/uploads/pericia')
@@ -456,7 +485,7 @@ def finalizar_lote():
         
         return redirect(url_for('finalizar'))
         
-    return "Erro na identification do lote.", 500
+    return "Erro na identificacao do lote.", 500
 
 # 6ª TELA: PROCESSAMENTO DE PROTOCOLO E FINALIZAÇÃO
 @app.route('/finalizar', methods=['GET', 'POST'])

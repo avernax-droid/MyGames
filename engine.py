@@ -467,11 +467,11 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
     Utiliza o método PrePostagemXml (Sem Sequência Lógica).
     """
     # Credenciais fixas da agência (Portal Postal)
-    cod_agencia = 98
-    login_ws = "trocagames"
-    senha_ws = "@123456"
-    url_soap = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
-    ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
+    cod_agencia = os.getenv('CORREIOS_AGENCIA')
+    login_ws    = os.getenv('CORREIOS_USER')
+    senha_ws    = os.getenv('CORREIOS_PASS')
+    url_soap    = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
+    ambiente = os.getenv('CORREIOS_AMBIENTE')
     
     if ambiente == "fake":
         logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")

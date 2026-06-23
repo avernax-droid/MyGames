@@ -16,6 +16,7 @@
   - 20/06/2026: Integração do botão de suporte via WhatsApp com ícone SVG nativo.
   - 20/06/2026: Alteração para Deep Link Nativo (whatsapp://).
   - 20/06/2026: Refatoração da UI de Contato: Uso de Flexbox para alinhar ícone circular gigante do WhatsApp à direita na mesma linha dos textos.
+  - 22/06/2026: Aplicação do filtro Jinja2 'mascara_telefone' na exibição do telefone de contato.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -97,7 +98,7 @@
             <div>
                 <p style="margin: 3px 0;"><i class="fas fa-envelope"></i> {{ v_email }}</p>
                 {% if v_tel %}
-                    <p style="margin: 3px 0;"><i class="fas fa-phone"></i> {{ v_tel }}</p>
+                    <p style="margin: 3px 0;"><i class="fas fa-phone"></i> {{ v_tel | mascara_telefone }}</p>
                 {% else %}
                     <p style="margin: 3px 0;"><i class="fas fa-phone"></i> (00) 00000-0000</p>
                 {% endif %}

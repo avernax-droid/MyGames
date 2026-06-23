@@ -13,6 +13,7 @@
   - 22/06/2026: Extração de todos os estilos inline para tags CSS estruturadas.
   - 22/06/2026: Injeção de 'word-break: break-all' para impedir quebra de layout 
     horizontal no protocolo e código de rastreio.
+  - 22/06/2026: Aplicação do filtro Jinja2 'mascara_telefone' na exibição do telefone de contato.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -96,7 +97,7 @@
                 <div class="contato-dados-mobile">
                     <p><i class="fas fa-envelope"></i> {{ v_email }}</p>
                     {% if v_tel %}
-                        <p><i class="fas fa-phone"></i> {{ v_tel }}</p>
+                        <p><i class="fas fa-phone"></i> {{ v_tel | mascara_telefone }}</p>
                     {% else %}
                         <p><i class="fas fa-phone"></i> (00) 00000-0000</p>
                     {% endif %}
