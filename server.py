@@ -32,6 +32,7 @@
 # - 22/06/2026: Criação do filtro customizado Jinja2 'moeda_real' para formatação global de valores monetários.
 # - 22/06/2026: Criação do filtro customizado Jinja2 'mascara_telefone' para formatação de telefone/whatsapp na camada visual.
 # - 22/06/2026: Implementação do Flask-Session (filesystem) para resolver estouro de limite de cookies e persistir o carrinho no servidor.
+# - 23/06/2026: Atualização da rota /cotar para capturar 'pergunta_extra' do frontend e tratamento de exceção (ValueError) para a dupla barreira de validação do motor.
 # ==============================================================================
 
 import os
@@ -213,6 +214,7 @@ def cotar():
     produto_id = session.get('produto_selecionado_id')
     estado_id = request.form.get('estado_id')
     comentarios = request.form.get('comentarios', '')
+    pergunta_extra = request.form.get('pergunta_extra', '') # NOVO: Captura a pergunta extra do form
     
     qtd_fisica_str = str(request.form.get('qtd_fisica', '1')).strip()
     qtd_digital_str = str(request.form.get('qtd_digital', '0')).strip()
@@ -281,7 +283,11 @@ def cotar():
             except ValueError:
                 est_id_int = 0
 
-            resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo)
+            # NOVO: Tratamento de exceção da dupla barreira do motor
+            try:
+                resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo, pergunta_extra=pergunta_extra)
+            except ValueError as e:
+                return f"Bloqueio de Segurança: {str(e)}", 403
             
             if resultado_unitario and resultado_unitario.get('valor_final') is not None:
                  valor_lote = float(resultado_unitario['valor_final'])
@@ -313,7 +319,12 @@ def cotar():
             prod_id_int = produto_id
             est_id_int = estado_id
 
-        resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo)
+        # NOVO: Tratamento de exceção da dupla barreira do motor
+        try:
+            resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo, pergunta_extra=pergunta_extra)
+        except ValueError as e:
+            return f"Bloqueio de Segurança: {str(e)}", 403
+            
         produto_info = engine.obter_produto_por_id(prod_id_int)
         categoria_id = produto_info.get('categoria_id') if produto_info else 1
         foto_url_final = produto_info.get('foto_oficial_url') if produto_info else None

@@ -12,6 +12,8 @@
   - 22/06/2026: Refatoração do layout do card (ícone e nome na mesma linha).
   - 22/06/2026: Agrupamento de todos os itens em um único quadro (container único)
     com divisórias internas sutis.
+  - 23/06/2026: Reordenação dos botões finais e alteração da cor do botão 
+    "Adicionar mais produtos" para branco.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -85,12 +87,12 @@
         </div>
         
         <div class="acoes-finais-mobile">
+            <a href="{{ url_for('produto') }}" class="btn-secondary" style="width: 100%; text-align: center; display: block; padding: 15px 0; color: #ffffff; border-color: #ffffff;">
+                ADICIONAR MAIS PRODUTOS
+            </a>
+
             <a href="{{ url_for('termos_oferta') }}" class="btn-primary" style="width: 100%; text-align: center; display: block; padding: 15px 0;">
                 QUERO VENDER
-            </a>
-            
-            <a href="{{ url_for('produto') }}" class="btn-secondary" style="width: 100%; text-align: center; display: block; padding: 15px 0;">
-                ADICIONAR MAIS PRODUTOS
             </a>
             
             <button type="button" onclick="abrirModalFeedback()" class="btn-secondary btn-descartar-mobile" style="width: 100%; padding: 15px 0;">

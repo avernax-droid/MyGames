@@ -11,6 +11,9 @@
   - 20/06/2026: Criação da versão mobile. Transformação das grades (Grid-View) 
     em listas verticais fluidas (List-View) para maximizar as áreas de toque 
     e otimizar a leitura quando o teclado virtual é acionado.
+  - 23/06/2026: Ajuste na renderização de itens "Outros". O sistema agora funde 
+    o produto "Outros" do banco de dados com o comportamento da rota de fuga manual,
+    evitando a exibição de duas opções duplicadas na tela.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -73,7 +76,7 @@
 
     function voltarCategorias() {
         document.getElementById('stepProdutos').style.display = 'none';
-        document.getElementById('stepCategorias').style.display = 'flex'; // Volta para o layout de lista
+        document.getElementById('stepCategorias').style.display = 'flex'; 
         document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
         document.getElementById('subTituloEtapa').style.display = 'block';
         document.getElementById('inputBusca').value = '';
@@ -89,7 +92,7 @@
         try {
             const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
             produtosDaCategoria = await response.json();
-            filtrarProdutos(); // Chama o filtro vazio para mostrar todos da categoria inicialmente
+            filtrarProdutos(); 
         } catch (error) {
             console.error("Erro na busca:", error);
             container.innerHTML = '<p style="color: #ff4444; text-align: center;">Erro ao carregar o catálogo.</p>';
@@ -101,7 +104,6 @@
         const container = document.getElementById('listaProdutos');
         container.innerHTML = ''; 
 
-        // Se o usuário apagar a busca, não retorna vazio. Mostra os produtos iniciais
         let produtosFiltrados = produtosDaCategoria;
 
         if (termo !== '') {
@@ -122,38 +124,56 @@
             });
         }
 
+        let possuiOutrosNaTela = false;
+
         produtosFiltrados.forEach(p => {
+            const isOutros = p.nome_produto.toLowerCase().includes('outro');
+            if (isOutros) {
+                possuiOutrosNaTela = true;
+            }
+
             const card = document.createElement('div');
             card.className = 'card-produto-list-view';
-            card.onclick = () => window.location.href = `/pericia/${p.id}`;
             
-            // O layout List-View usa a imagem na esquerda e os dados na direita
+            // Intercepta o clique se for o item "Outros" do catálogo
+            if (isOutros) {
+                card.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
+            } else {
+                card.onclick = () => window.location.href = `/pericia/${p.id}`;
+            }
+            
             card.innerHTML = `
                 <div class="list-img-wrapper">
                     <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
                 </div>
                 <div class="list-data-wrapper">
                     <h4>${p.nome_produto}</h4>
-                    <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+                    ${isOutros 
+                        ? `<span style="font-size: 11px; color: var(--texto-dim);">Clique aqui para avaliar manualmente</span>`
+                        : `<span class="plataforma-badge">${p.plataforma || 'N/A'}</span>`
+                    }
                 </div>
             `;
             container.appendChild(card);
         });
 
-        // Adiciona a rota de fuga ao final da lista
-        const cardOutro = document.createElement('div');
-        cardOutro.className = 'card-produto-list-view card-outro-mobile';
-        cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
-        cardOutro.innerHTML = `
-            <div class="list-img-wrapper" style="font-size: 30px; color: var(--cor-destaque); text-align: center;">
-                ➕
-            </div>
-            <div class="list-data-wrapper">
-                <h4>Outro produto não listado</h4>
-                <span style="font-size: 11px; color: var(--texto-dim);">Clique aqui para avaliar manualmente</span>
-            </div>
-        `;
-        container.appendChild(cardOutro);
+        // Se nenhum item "Outros" estiver na tela (ex: foi filtrado pela busca),
+        // reexibimos a caixa fixa para garantir a rota de fuga.
+        if (!possuiOutrosNaTela) {
+            const cardOutro = document.createElement('div');
+            cardOutro.className = 'card-produto-list-view card-outro-mobile';
+            cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
+            cardOutro.innerHTML = `
+                <div class="list-img-wrapper" style="font-size: 30px; color: var(--cor-destaque); text-align: center;">
+                    ➕
+                </div>
+                <div class="list-data-wrapper">
+                    <h4>Outro produto não listado</h4>
+                    <span style="font-size: 11px; color: var(--texto-dim);">Clique aqui para avaliar manualmente</span>
+                </div>
+            `;
+            container.appendChild(cardOutro);
+        }
     }
 </script>
 
@@ -172,7 +192,6 @@
         padding: 0 10px;
     }
 
-    /* CSS ADAPTADO PARA MOBILE: Lista de Categorias Empilhada */
     .lista-categorias-mobile { display: flex; flex-direction: column; gap: 12px; }
     .card-categoria-mobile {
         background: #222; border: 2px solid #333; border-radius: 12px; padding: 20px;
@@ -182,7 +201,6 @@
     .icone-cat { font-size: 28px; width: 40px; text-align: center; }
     .card-categoria-mobile h3 { color: var(--texto-br); margin: 0; font-size: 18px; text-transform: uppercase; }
 
-    /* CSS ADAPTADO PARA MOBILE: Resultados da Busca em Lista (List-View) */
     .lista-produtos-mobile { display: flex; flex-direction: column; gap: 10px; }
     
     .card-produto-list-view { 
@@ -191,7 +209,7 @@
     }
     .card-produto-list-view:active { border-color: var(--cor-destaque); background: #2a2a2a; }
     
-    .list-img-wrapper { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .list-img-wrapper { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(0,0,0,0.2); border-radius: 8px; }
     .list-img-wrapper img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
     
     .list-data-wrapper { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; overflow: hidden; }

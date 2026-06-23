@@ -31,6 +31,8 @@
 # - 16/06/2026: Ajuste na URL de homologação da integração Correios (adição do sufixo ?wsdl) para resolver erro HTTP 404.
 # - 19/06/2026: Refatoração da função gerar_logistica_reversa para integração com o Portal Postal via SOAP (PrePostagemXml) e ajuste na chamada em finalizar_proposta.
 # - 20/06/2026: Remoção da exibição do E-Ticket no corpo do e-mail de resumo e atualização das instruções de postagem.
+# - 23/06/2026: Implementação da dupla barreira de validação em calcular_cotacao_final (Backend Business Rules).
+# - 23/06/2026: Adição do xml.sax.saxutils (escape) para sanitização rigorosa de caracteres especiais na integração dos Correios.
 # ==============================================================================
 
 import mysql.connector
@@ -41,6 +43,7 @@ import smtplib
 import json
 import requests
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape # NOVO: Sanitização para o SOAP
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -170,7 +173,7 @@ def obter_produto_por_id(produto_id):
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, quantidade=1):
+def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, quantidade=1, pergunta_extra=""):
     db = conectar_bd()
     if not db: return None
     try:
@@ -178,8 +181,34 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         produto = obter_produto_por_id(produto_id)
         if not produto: return None
         
-        cursor.execute("SELECT fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
+        cursor.execute("SELECT descricao, fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
+        
+        # -----------------------------------------------------------------
+        # DUPLA BARREIRA DE VALIDAÇÃO (Regras de Negócio do Backend)
+        # -----------------------------------------------------------------
+        categoria_id_str = str(produto.get('categoria_id'))
+        texto_estado = estado['descricao'].lower() if estado and estado.get('descricao') else ""
+        texto_extra = str(pergunta_extra).lower()
+        
+        if categoria_id_str == '1': # Console
+            if 'não funciona' in texto_estado:
+                raise ValueError("Item recusado pela regra de negócio: Console não funciona.")
+            if 'desbloqueado' in texto_extra:
+                raise ValueError("Item recusado pela regra de negócio: Console desbloqueado.")
+                
+        elif categoria_id_str == '2': # Controle
+            if 'pirata' in texto_extra:
+                raise ValueError("Item recusado pela regra de negócio: Controle não original.")
+                
+        elif categoria_id_str == '4': # Jogo
+            if 'não funciona' in texto_estado:
+                raise ValueError("Item recusado pela regra de negócio: Jogo não funciona.")
+                
+        elif categoria_id_str == '3': # Acessório
+            if 'pirata' in texto_extra:
+                raise ValueError("Item recusado pela regra de negócio: Acessório não original.")
+        # -----------------------------------------------------------------
         
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
@@ -488,33 +517,41 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
         else:
             logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC")
 
-    # 1. Construção dinâmica do conteúdo (Itens Periciados)
+    # 1. Construção dinâmica do conteúdo (Itens Periciados) COM SANITIZAÇÃO
     xml_itens = ""
     for item in itens_avaliados:
-        # A descrição precisa ter pelo menos 5 caracteres alfabéticos e sem especiais
-        descricao_limpa = str(item.get('produto_nome', 'Item MyGames')).replace('<', '').replace('>', '').replace('&', 'e')[:100]
+        # O escape() protege contra &, < e >, convertendo para &amp;, &lt;, &gt;
+        descricao_limpa = escape(str(item.get('produto_nome', 'Item MyGames')))[:100]
         if len(descricao_limpa) < 5:
             descricao_limpa = descricao_limpa.ljust(5, 'x')
             
         xml_itens += f"""
         <item>
             <descricao>{descricao_limpa}</descricao>
-            <quantidade>{item.get('quantidade', 1)}</quantidade>
-            <valor>{item.get('valor_pix_unitario', '0.00')}</valor>
+            <quantidade>{escape(str(item.get('quantidade', 1)))}</quantidade>
+            <valor>{escape(str(item.get('valor_pix_unitario', '0.00')))}</valor>
         </item>"""
 
-    # 2. Construção do XML interno de postagem
+    # 2. Construção do XML interno de postagem COM SANITIZAÇÃO
+    nome_seguro = escape(str(dados_remetente.get('nome', 'Cliente MyGames')))[:100]
+    logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
+    numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
+    complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]
+    bairro_seguro = escape(str(dados_remetente.get('bairro', '')))[:100]
+    cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]
+    uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
+
     xml_dados_postagem = f"""<portalpostal>
     <pre_postagem>
         <chave>{numero_protocolo}</chave>
-        <nome>{dados_remetente.get('nome', 'Cliente MyGames')[:100]}</nome>
+        <nome>{nome_seguro}</nome>
         <cep>{cep_cliente}</cep>
-        <endereco>{dados_remetente.get('logradouro', '')[:100]}</endereco>
-        <numero>{dados_remetente.get('numero', '')[:10]}</numero>
-        <complemento>{dados_remetente.get('complemento', '')[:100]}</complemento>
-        <bairro>{dados_remetente.get('bairro', '')[:100]}</bairro>
-        <cidade>{dados_remetente.get('cidade', '')[:100]}</cidade>
-        <estado>{dados_remetente.get('uf', '')[:2]}</estado>
+        <endereco>{logradouro_seguro}</endereco>
+        <numero>{numero_seguro}</numero>
+        <complemento>{complemento_seguro}</complemento>
+        <bairro>{bairro_seguro}</bairro>
+        <cidade>{cidade_seguro}</cidade>
+        <estado>{uf_seguro}</estado>
         <servico>{servico_correios}</servico>
         <conteudo>{xml_itens}</conteudo>
     </pre_postagem>

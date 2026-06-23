@@ -14,6 +14,8 @@
   - 22/06/2026: Injeção de 'word-break: break-all' para impedir quebra de layout 
     horizontal no protocolo e código de rastreio.
   - 22/06/2026: Aplicação do filtro Jinja2 'mascara_telefone' na exibição do telefone de contato.
+  - 23/06/2026: Alteração do rótulo de instruções para envio para maiúsculas e 
+    aplicação da cor branca no texto explicativo.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -62,7 +64,7 @@
             <div class="passos-box-mobile">
                 <h4 class="passos-titulo-mobile">PRÓXIMOS PASSOS</h4>
                 <div class="passos-texto-mobile">
-                    <strong style="color: var(--texto-br);">Instruções para Envio:</strong> Embale os itens com segurança dentro de uma caixa, dirija-se a qualquer agência dos Correios e informe o <b><i>código de rastreio</i></b>. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.
+                    <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;">Embale os itens com segurança dentro de uma caixa, dirija-se a qualquer agência dos Correios e informe o <b><i>código de rastreio</i></b>. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
                 </div>
             </div>
         </div>

@@ -12,6 +12,13 @@
   - 22/06/2026: Alinhamento do cabeçalho do produto (ícone e nome na mesma linha).
   - 22/06/2026: Ajuste no realce do texto explicativo de valor, alterando de 
     itálico cinza para uma fonte normal em tom de laranja discreto.
+  - 23/06/2026: Reordenação dos botões finais e alteração do texto do botão principal 
+    para "QUERO VENDER ESTE ITEM".
+  - 23/06/2026: Remoção do botão "INSERIR MAIS PRODUTOS NA COTAÇÃO" para focar a 
+    decisão do usuário apenas no aceite ou recusa do item avaliado.
+  - 23/06/2026: Ocultação condicional do bloco de revisão (fotos e comentários) 
+    para evitar a renderização de um "separador" (caixa vazia) quando não há 
+    dados opcionais, otimizando o espaço em tela e reduzindo o scroll.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -63,6 +70,7 @@
                 </p>
             </div>
 
+            {% if (session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]') or session['item_atual']['comentarios'] %}
             <div class="revisao-pericia">
                 {% if session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]' %}
                 <div class="galeria-revisao">
@@ -82,6 +90,7 @@
                 </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
 
         <div id="feedback-descarte" class="msg-feedback-descarte" style="display: none;">
@@ -92,13 +101,9 @@
 
         <div class="acoes-finais">
             <div id="grupo-botoes-originais" class="grupo-botoes-mobile">
-                
+
                 <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 16px; font-size: 15px;">
-                    QUERO VENDER
-                </a>
-                
-                <a href="{{ url_for('produto') }}" class="btn-secondary" style="padding: 16px; font-size: 14px; border-color: #555; color: #ccc;">
-                    INSERIR MAIS PRODUTOS NA COTAÇÃO
+                    QUERO VENDER ESTE ITEM
                 </a>
 
                 <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 16px; font-size: 14px; margin-top: 5px;">
