@@ -14,6 +14,8 @@
     com divisórias internas sutis.
   - 23/06/2026: Reordenação dos botões finais e alteração da cor do botão 
     "Adicionar mais produtos" para branco.
+  - 23/06/2026: Alteração do botão principal para "FECHAR VENDA AGORA!" e 
+    ajuste na formatação da moeda para BRL (vírgula).
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -68,7 +70,7 @@
                             {% if item.is_outros %}
                                 <span class="sob-consulta-badge">Sob Consulta</span>
                             {% else %}
-                                R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
+                                R$ {{ ("%.2f"|format(item.valor_pix_unitario * item.quantidade))|replace('.', ',') }}
                             {% endif %}
                         </div>
                         {% if not item.is_outros %}
@@ -83,7 +85,7 @@
 
         <div class="total-lote-box-mobile">
             <span>TOTAL DO LOTE:</span>
-            <strong>R$ {{ "%.2f"|format(total_lote) }}</strong>
+            <strong>R$ {{ ("%.2f"|format(total_lote))|replace('.', ',') }}</strong>
         </div>
         
         <div class="acoes-finais-mobile">
@@ -92,7 +94,7 @@
             </a>
 
             <a href="{{ url_for('termos_oferta') }}" class="btn-primary" style="width: 100%; text-align: center; display: block; padding: 15px 0;">
-                QUERO VENDER
+                FECHAR VENDA AGORA!
             </a>
             
             <button type="button" onclick="abrirModalFeedback()" class="btn-secondary btn-descartar-mobile" style="width: 100%; padding: 15px 0;">

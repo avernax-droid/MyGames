@@ -19,6 +19,9 @@
   - 02/06/2026: Reestruturação da tabela: Criação de coluna isolada para Quantidade (QTD).
   - 02/06/2026: Correção de quebra de layout de tabela causada por textos contínuos longos.
   - 19/06/2026: Renomeação dos botões de ação e implementação de Modal Customizado para captura de motivo de desistência (integrado com /descartar-lote-final).
+  - 23/06/2026: Alteração do botão principal para "FECHAR VENDA AGORA!" e aplicação do filtro moeda_real (Paridade Mobile).
+  - 23/06/2026: Alteração do rótulo do botão "VOLTAR" para "ADICIONAR MAIS PRODUTOS".
+  - 23/06/2026: Alteração da cor do botão "ADICIONAR MAIS PRODUTOS" para branco para melhorar a hierarquia visual.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -82,7 +85,7 @@
                             {% if item.is_outros %}
                                 <span style="color: #ffaa00; font-size: 11px; text-transform: uppercase; font-weight: bold; border: 1px dashed #ffaa00; padding: 3px 6px; border-radius: 4px; font-family: sans-serif; display: inline-block;">Sob Consulta</span>
                             {% else %}
-                                R$ {{ "%.2f"|format(item.valor_pix_unitario * item.quantidade) }}
+                                R$ {{ (item.valor_pix_unitario * item.quantidade) | moeda_real }}
                             {% endif %}
                         </td>
                     </tr>
@@ -93,18 +96,18 @@
 
         <div class="total-lote-box">
             <span>TOTAL DO LOTE:</span>
-            <strong>R$ {{ "%.2f"|format(total_lote) }}</strong>
+            <strong>R$ {{ total_lote | moeda_real }}</strong>
         </div>
         
         <div class="acoes-finais">
             <div class="botoes-nav" style="gap: 15px;">
-                <a href="{{ url_for('produto') }}" class="btn-secondary">VOLTAR</a>
+                <a href="{{ url_for('produto') }}" class="btn-secondary btn-branco">ADICIONAR MAIS PRODUTOS</a>
                 
                 <button type="button" onclick="abrirModalFeedback()" class="btn-secondary btn-descartar">
                     NÃO QUERO VENDER
                 </button>
 
-                <a href="{{ url_for('termos_oferta') }}" class="btn-primary">QUERO VENDER</a>
+                <a href="{{ url_for('termos_oferta') }}" class="btn-primary">FECHAR VENDA AGORA!</a>
             </div>
         </div>
     </div>
@@ -172,7 +175,11 @@
     
     .acoes-finais { display: flex; flex-direction: column; gap: 15px; }
     .botoes-nav { display: flex; justify-content: space-between; align-items: center; }
+    
+    /* Classes de modificação de botões */
     .btn-descartar { border-color: #ff4444 !important; color: #ff4444 !important; }
+    .btn-branco { border-color: #ffffff !important; color: #ffffff !important; }
+    .btn-branco:hover { background: rgba(255, 255, 255, 0.1) !important; }
 
     /* Estilos do Modal de Motivos */
     .motivo-label { display: flex; align-items: center; gap: 10px; color: var(--texto-br); font-size: 14px; cursor: pointer; padding: 10px; border: 1px solid #333; border-radius: 8px; transition: 0.2s; }

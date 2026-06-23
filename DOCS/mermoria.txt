@@ -168,5 +168,34 @@ Padronização CSS: Todos os novos componentes mobile utilizam a variável --cor
 substituir a formatação antiga do valor (replace('.', ',')) pelo uso limpo do novo filtro global | moeda_real que criamos no server.py.
 
 
+=========================
+23/06
+
+RELATÓRIO DE AJUSTES E MELHORIAS (V3.0 - FLUXO MOBILE/DESKTOP)
+1. Motor de Regras e Segurança (engine.py)
+Dupla Barreira de Validação: Implementada camada de verificação de regras de negócio no backend. Agora, a função calcular_cotacao_final valida as premissas de estado do item (ex: itens "não funcionais" ou "piratas") antes de processar qualquer cálculo ou persistir no banco.
+
+Segurança de Integração (Correios): Adicionada sanitização rigorosa via xml.sax.saxutils.escape em todos os campos de remetente e itens do pedido antes da montagem do XML SOAP. Isso evita que caracteres especiais (como &, <, >) corrompam a requisição aos Correios.
+
+2. Blindagem de Formulários e Segurança de UI (Cadastro)
+Prevenção de Injeção de HTML: Todos os campos de formulário (Mobile e Desktop) receberam a aplicação do filtro Jinja2 |e (escape) nos atributos value. Isso garante que dados recuperados do banco que contenham caracteres especiais não quebrem a estrutura do HTML nem permitam a injeção maliciosa.
+
+3. UX Mobile e Otimização de Interface
+Validação Visual Inteligente: Criada lógica no pericia.html que intercepta o evento invalid do navegador. Em vez de alertas nativos genéricos, o formulário agora destaca visualmente (borda vermelha e animação de tremor) o item faltante e rola a tela automaticamente para ele.
+
+Limpeza de Interface (Resultado): O módulo resultado.html foi otimizado para que o bloco de fotos/comentários só seja renderizado se houver conteúdo, evitando o "espaço morto" na tela e subindo os botões de ação final.
+
+Ordenação de Fluxo: No resumo_lote.html e resultado.html, os botões de ação foram reordenados para priorizar a conversão (venda) e simplificar as escolhas do usuário, removendo elementos redundantes.
+
+Consistência de Design: Corrigidos bugs de nomenclatura (ex: ejecutarAcaoModal vs executarAcaoModal) e uniformizado o comportamento da categoria "Outros" em todos os pontos de entrada.
+
+PRÓXIMOS PASSOS: ADAPTAÇÃO PARA DESKTOP
+O próximo ciclo de trabalho deve focar em replicar essas melhorias de segurança e UX na interface Desktop. Para documentar, seguem os pontos que precisaremos ajustar nos arquivos da pasta templates/ (não mobile):
+
+Uniformização de Validadores: * Levar a lógica de validação visual (borda vermelha/animação) presente no pericia.html (mobile) para o correspondente desktop, garantindo consistência na experiência, mesmo que o layout seja diferente.
+
+Segurança de Inputs: * Revisar todos os arquivos .html da pasta raiz de templates/ para garantir que todos os value="{{ ... }}" tenham o filtro |e aplicado, assim como fizemos no cadastro_complementar.html.
+
+Refinamento de Fluxo: * Ajustar a ordenação dos botões nos módulos de resumo e resultado (Desktop) para que sigam o mesmo padrão de "Adicionar mais produtos" > "Quero vender" > "Não quero vender" que estabelecemos para o Mobile.
 
     

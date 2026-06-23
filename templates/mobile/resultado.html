@@ -19,6 +19,7 @@
   - 23/06/2026: Ocultação condicional do bloco de revisão (fotos e comentários) 
     para evitar a renderização de um "separador" (caixa vazia) quando não há 
     dados opcionais, otimizando o espaço em tela e reduzindo o scroll.
+  - 23/06/2026: Aplicação do filtro Jinja 'moeda_real' para exibição do valor em BRL.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -59,7 +60,7 @@
             
             <div class="valor-container">
                 <span class="simbolo-monetario">R$</span>
-                <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
+                <span class="valor-pix">{{ cotacao.valor_final | moeda_real }}</span>
             </div>
             
             {% endif %}

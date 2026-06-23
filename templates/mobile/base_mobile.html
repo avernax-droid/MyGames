@@ -10,6 +10,8 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 20/06/2026: Criação e estruturação inicial do template mestre mobile otimizado.
+  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote) 
+    abaixo do stepper (visível das fases 1 a 4) e correção do endpoint de rota.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -100,6 +102,36 @@
         .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
         .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
 
+        /* NOVO: COMPONENTE DE ACESSO AO CARRINHO (LOTE) */
+        .carrinho-container {
+            display: flex;
+            justify-content: flex-end;
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 0;
+        }
+        .btn-carrinho-mobile {
+            background: rgba(0, 255, 0, 0.08);
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 255, 0, 0.1);
+        }
+        .btn-carrinho-mobile:active {
+            background: rgba(0, 255, 0, 0.2);
+            transform: scale(0.95);
+        }
+
         .container { width: 100%; margin: 0 auto; padding: 0 15px; }
 
         /* MODAL GLOBAL DE CONFIRMAÇÃO CSS - EMPILHAMENTO MOBILE */
@@ -123,6 +155,15 @@
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Cadastro</span></div>
             <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
+        </div>
+        {% endif %}
+
+        {# Exibe o botão do carrinho apenas nas fases de 1 a 4 #}
+        {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
+        <div class="carrinho-container">
+            <a href="{{ url_for('resumo') }}" class="btn-carrinho-mobile">
+                <span style="font-size: 15px;">🛒</span> VER LOTE
+            </a>
         </div>
         {% endif %}
 

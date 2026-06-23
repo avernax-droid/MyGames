@@ -16,6 +16,8 @@
   - 22/06/2026: Aplicação do filtro Jinja2 'mascara_telefone' na exibição do telefone de contato.
   - 23/06/2026: Alteração do rótulo de instruções para envio para maiúsculas e 
     aplicação da cor branca no texto explicativo.
+  - 23/06/2026: Aplicação do filtro moeda_real no valor total da proposta.
+  - 23/06/2026: Ajuste no alinhamento da classe .contato-flex-mobile para aproximar o ícone do WhatsApp do número de telefone (flex-start com gap).
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -84,7 +86,7 @@
             </p>
             <p class="total-linha-mobile" style="flex-direction: column; align-items: flex-start; gap: 5px;">
                 <strong>{{ 'Valor Parcial da Proposta:' if tem_pendentes else 'Valor Total da Proposta:' }}</strong> 
-                <span class="valor-total-destaque-mobile">R$ {{ "%.2f"|format(total_lote) }}</span>
+                <span class="valor-total-destaque-mobile">R$ {{ total_lote | moeda_real }}</span>
             </p>
         </div>
 
@@ -177,7 +179,7 @@
     .contato-intro-mobile { margin: 0 0 8px 0; font-size: 13px; color: var(--texto-dim); }
     .contato-empresa-mobile { margin: 5px 0 15px 0; color: var(--texto-br); font-size: 15px; }
     
-    .contato-flex-mobile { display: flex; justify-content: space-between; align-items: center; }
+    .contato-flex-mobile { display: flex; justify-content: flex-start; align-items: center; gap: 20px; }
     .contato-dados-mobile p { margin: 4px 0; font-size: 13px; color: var(--texto-dim); display: flex; align-items: center; gap: 8px; }
     
     .btn-whatsapp-mobile { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background-color: #25D366; color: #fff; border-radius: 50%; text-decoration: none; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2); flex-shrink: 0; -webkit-tap-highlight-color: transparent; }

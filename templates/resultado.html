@@ -20,6 +20,10 @@
   - 19/06/2026: Ajuste de UX pós-descarte individual: Ocultação dos botões de fluxo e exibição de um botão único "VOLTAR" para a seleção de produtos.
   - 22/06/2026: Ajuste de layout do cabeçalho (ícone alinhado à esquerda do título), formatação de moeda em BRL (vírgula) e destaque laranja no aviso de reavaliação.
   - 22/06/2026: Ajuste na mensagem de reavaliação (destaque laranja e aumento de fonte aplicados a todo o texto) e aplicação do filtro moeda_real.
+  - 23/06/2026: Remoção do botão de "Inserir mais itens", readequação do texto do botão 
+    principal para "QUERO VENDER ESTE ITEM" e ocultação condicional da caixa de revisão 
+    (Paridade com versão Mobile).
+  - 23/06/2026: Inversão da posição dos botões de ação final (Avançar à direita).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -63,11 +67,12 @@
             {% endif %}
             
             <div class="info-estado">
-                <p class="texto-reavaliacao">
+                <p class="texto-enfase-discreta">
                     O valor informado se refere para {{ categoria_nome }} em Perfeito Estado de Funcionamento e Sem Itens Faltantes. Seu item será reavaliado na perícia técnica.
                 </p>
             </div>
 
+            {% if (session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]') or session['item_atual']['comentarios'] %}
             <div class="revisao-pericia">
                 {% if session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]' %}
                 <div class="galeria-revisao">
@@ -87,6 +92,7 @@
                 </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
 
         <div id="feedback-descarte" class="msg-feedback-descarte" style="display: none;">
@@ -96,18 +102,16 @@
         </div>
 
         <div class="acoes-finais" style="margin-top: 15px;">
-            <div id="grupo-botoes-originais" style="display: flex; justify-content: space-between; gap: 10px;">
-                <a href="{{ url_for('produto') }}" class="btn-secondary" style="padding: 10px; font-size: 13px; text-align: center; display: flex; align-items: center; justify-content: center; flex: 1;">
-                    INSERIR MAIS PRODUTOS NA COTAÇÃO
-                </a>
-
-                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 10px; font-size: 13px; flex: 1;">
+            <div id="grupo-botoes-originais" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                
+                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 12px 20px; font-size: 14px; min-width: 250px;">
                     NÃO QUERO VENDER ESTE ITEM
                 </button>
 
-                <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 10px; font-size: 13px; text-align: center; display: flex; align-items: center; justify-content: center; flex: 1;">
-                    QUERO VENDER
+                <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 12px 20px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; min-width: 250px;">
+                    QUERO VENDER ESTE ITEM
                 </a>
+
             </div>
 
             <div id="grupo-botao-voltar-descarte" style="display: none; justify-content: center; width: 100%;">
@@ -125,7 +129,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sucesso') {
-                    // Esconde os dados da avaliação e o grupo de 3 botões
+                    // Esconde os dados da avaliação e o grupo de botões
                     document.getElementById('dados-avaliacao-container').style.display = 'none';
                     document.getElementById('grupo-botoes-originais').style.display = 'none'; 
                     
@@ -166,10 +170,11 @@
 
     .info-estado { margin-bottom: 15px; }
     
-    .texto-reavaliacao {
-        color: #ffaa00;
+    .texto-enfase-discreta {
+        color: #d48806; /* Laranja suave e elegante */
         font-weight: 500;
         font-size: 14px;
+        font-style: normal;
         line-height: 1.4;
         margin: 0 auto;
         max-width: 80%;
