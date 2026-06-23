@@ -20,4 +20,5 @@ estrutura.txt
 
 # Arquivos temporários e uploads locais
 *:Zone.Identifier
-static/uploads/flask_session/
+static/uploads/
+flask_session/
