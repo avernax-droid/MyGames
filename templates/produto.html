@@ -17,6 +17,8 @@
   - 03/06/2026: Remoção do atalho (bypass) da categoria Jogo no JavaScript para permitir a visualização e seleção dos jogos específicos cadastrados no catálogo.
   - 19/06/2026: Inclusão de texto de orientação (subtítulo) abaixo de "Selecione a categoria" e controle de exibição dinâmica via JS.
   - 19/06/2026: Ajuste na estilização do subtítulo com um tom de verde discreto para destaque visual.
+  - 24/06/2026: Unificação da rota de fuga "Outros". Implementada renderização persistente 
+    do card "Outro produto não listado" e bloqueio de itens duplicados vindos do banco de dados.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -83,12 +85,13 @@
     async function carregarProdutos(catId) {
         categoriaAtualId = catId;
         const container = document.getElementById('listaProdutos');
-        container.innerHTML = ''; 
+        container.innerHTML = '<p style="text-align: center; color: var(--texto-dim); grid-column: 1/-1;">Carregando catálogo...</p>'; 
         document.getElementById('inputBusca').value = ''; 
 
         try {
             const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
             produtosDaCategoria = await response.json();
+            filtrarProdutos(); // Garante a renderização imediata ao abrir a categoria
         } catch (error) {
             console.error("Erro na busca:", error);
             container.innerHTML = '<p style="color: #ff4444; text-align: center; grid-column: 1/-1;">Erro ao comunicar com o servidor.</p>';
@@ -100,25 +103,30 @@
         const container = document.getElementById('listaProdutos');
         container.innerHTML = ''; 
 
-        if (termo === '') return;
+        let produtosFiltrados = produtosDaCategoria;
 
-        const produtosFiltrados = produtosDaCategoria.filter(p => 
-            p.nome_produto.toLowerCase().includes(termo)
-        );
+        if (termo !== '') {
+            produtosFiltrados = produtosDaCategoria.filter(p => 
+                p.nome_produto.toLowerCase().includes(termo)
+            );
 
-        produtosFiltrados.sort((a, b) => {
-            const nomeA = a.nome_produto.toLowerCase();
-            const nomeB = b.nome_produto.toLowerCase();
-            const aComecaComTermo = nomeA.startsWith(termo);
-            const bComecaComTermo = nomeB.startsWith(termo);
+            produtosFiltrados.sort((a, b) => {
+                const nomeA = a.nome_produto.toLowerCase();
+                const nomeB = b.nome_produto.toLowerCase();
+                const aComecaComTermo = nomeA.startsWith(termo);
+                const bComecaComTermo = nomeB.startsWith(termo);
 
-            if (aComecaComTermo && !bComecaComTermo) return -1;
-            if (!aComecaComTermo && bComecaComTermo) return 1;
-            
-            return nomeA.localeCompare(nomeB);
-        });
+                if (aComecaComTermo && !bComecaComTermo) return -1;
+                if (!aComecaComTermo && bComecaComTermo) return 1;
+                
+                return nomeA.localeCompare(nomeB);
+            });
+        }
 
         produtosFiltrados.forEach(p => {
+            // Bloqueia a exibição de qualquer item chamado "Outros" vindo do banco de dados
+            if (p.nome_produto.toLowerCase().includes('outro')) return;
+
             const card = document.createElement('div');
             card.className = 'card-produto';
             card.onclick = () => window.location.href = `/pericia/${p.id}`;
@@ -133,6 +141,7 @@
             container.appendChild(card);
         });
 
+        // Injeção persistente do card unificado ao final da lista
         const cardOutro = document.createElement('div');
         cardOutro.className = 'card-produto card-outro';
         cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
