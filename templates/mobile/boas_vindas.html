@@ -13,6 +13,15 @@
   - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe), adaptado 
     para mobile. Inclusão de correção de copy (clientes satisfeitos) e 
     tentativa de forçar modo horizontal via Screen Orientation API.
+  - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável 
+    dinâmica url_video_como_funciona configurada via .env.
+  - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo (.mp4) 
+    abaixo da Hero Section, utilizando a tag nativa de HTML5 com fallback, 
+    otimizações para mobile (muted, playsinline) e roteamento para a pasta images.
+  - 25/06/2026: Reposicionamento do Banner Dinâmico para o topo (entre o logo 
+    e o título principal) e redução da margem do logo para otimização de espaço.
+  - 25/06/2026: Substituição do arquivo de vídeo do banner para tirinhas-desktop.mp4 
+    e aplicação de margem superior negativa no logo para subir todo o bloco.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -21,7 +30,8 @@
 
 {% block content %}
 <style>
-    .logo-header { max-width: 150px !important; }
+    /* Otimização de espaço: Reduz as margens do logo que vem do base_mobile.html puxando para cima */
+    .logo-header { max-width: 150px !important; margin-top: -20px !important; margin-bottom: 5px !important; }
 
     .como-funciona-section { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; margin-bottom: 25px; width: 100%; }
     
@@ -81,6 +91,13 @@
         position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;
     }
 </style>
+
+<div style="width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 2px solid var(--cor-destaque); box-shadow: 0 0 15px rgba(0, 255, 0, 0.2); animation: fadeIn 0.8s ease-in-out;">
+    <video autoplay loop muted playsinline style="width: 100%; display: block; object-fit: cover; pointer-events: none;">
+        <source src="{{ url_for('static', filename='img/mobile-tirinhas.mp4') }}" type="video/mp4">
+        Seu navegador não suporta a exibição de vídeos.
+    </video>
+</div>
 
 <div style="margin-top: -10px; padding-left: 0; animation: fadeIn 0.8s ease-in-out;">
     
@@ -230,7 +247,9 @@
         const iframe = document.getElementById('iframe-video');
         const overlay = document.getElementById('modal-video-overlay');
         
-        iframe.src = "https://www.youtube.com/embed/zPKOP8_BUwI?autoplay=1";
+        // Injeta a URL do embed tratada vinda dinamicamente do backend Flask
+        iframe.src = "{{ url_video_como_funciona }}";
+
         modal.style.display = 'flex';
 
         // Tenta entrar em fullscreen para habilitar a rotação de tela

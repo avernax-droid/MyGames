@@ -33,6 +33,7 @@
 # - 22/06/2026: Criação do filtro customizado Jinja2 'mascara_telefone' para formatação de telefone/whatsapp na camada visual.
 # - 22/06/2026: Implementação do Flask-Session (filesystem) para resolver estouro de limite de cookies e persistir o carrinho no servidor.
 # - 23/06/2026: Atualização da rota /cotar para capturar 'pergunta_extra' do frontend e tratamento de exceção (ValueError) para a dupla barreira de validação do motor.
+# - 25/06/2026: Extração dinâmica da URL do YouTube do .env na rota index para o modal de vídeo em boas_vindas.html.
 # ==============================================================================
 
 import os
@@ -136,7 +137,22 @@ def allowed_file(filename):
 def index():
     session.clear()
     canais_do_banco = engine.buscar_canais_aquisicao() 
-    return render_smart_template('boas_vindas.html', canais=canais_do_banco)
+    
+    # Captura a URL do .env (fallback de segurança caso não exista no .env)
+    youtube_raw_url = os.getenv('YOUTUBE_URL_COMO_FUNCIONA', 'https://youtu.be/1P4PEJKoAAM')
+    
+    # Extrai o ID do vídeo (pega a última parte da URL e limpa possíveis parâmetros como ?si=...)
+    video_id_raw = youtube_raw_url.split('/')[-1]
+    video_id = video_id_raw.split('?')[0]
+    
+    # Monta a URL no formato embed exigido pelo iframe do HTML
+    url_video_embed = f"https://www.youtube.com/embed/{video_id}?autoplay=1"
+    
+    return render_smart_template(
+        'boas_vindas.html', 
+        canais=canais_do_banco,
+        url_video_como_funciona=url_video_embed
+    )
 
 @app.route('/definir_regiao', methods=['POST'])
 def definir_regiao():

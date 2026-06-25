@@ -18,6 +18,8 @@
   - 19/06/2026: Reposicionamento da seção "Como Funciona" (vídeo CTA) para cima do quadro de localização para melhor visualização na primeira dobra.
   - 19/06/2026: Conversão da seleção de Canal de Aquisição em um Modal Sobreposto para evitar scroll, exibindo o botão Iniciar Cotação na sequência.
   - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe), substituindo o redirecionamento externo para o YouTube para manter a UX fluida.
+  - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável dinâmica url_video_como_funciona configurada via .env.
+  - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo (tirinhas-desktop.mp4) no topo (abaixo do logo), com ajuste de margens negativas para otimização de espaço.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -27,9 +29,10 @@
 {% block content %}
 <style>
     /* Estilos locais específicos para a página de Boas-vindas */
-    .logo-header { max-width: 180px !important; }
+    /* Otimização de espaço: Reduz as margens do logo puxando para cima */
+    .logo-header { max-width: 180px !important; margin-top: -20px !important; margin-bottom: 5px !important; }
 
-    .hero-section { text-align: center; margin-top: 20px; animation: fadeIn 0.8s ease-in-out; }
+    .hero-section { text-align: center; margin-top: 10px; animation: fadeIn 0.8s ease-in-out; }
     
     .hero-title { font-family: 'Roboto', sans-serif; font-size: 28px; font-weight: 700; color: var(--texto-br); margin-bottom: 20px; }
     .hero-title .destaque { color: var(--cor-destaque); font-weight: 700; text-shadow: 0 0 10px rgba(0, 255, 0, 0.3); }
@@ -97,6 +100,13 @@
         position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;
     }
 </style>
+
+<div style="width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 2px solid var(--cor-destaque); box-shadow: 0 0 15px rgba(0, 255, 0, 0.2); animation: fadeIn 0.8s ease-in-out;">
+    <video autoplay loop muted playsinline style="width: 100%; display: block; object-fit: cover; pointer-events: none;">
+        <source src="{{ url_for('static', filename='img/tirinhas-desktop.mp4') }}" type="video/mp4">
+        Seu navegador não suporta a exibição de vídeos.
+    </video>
+</div>
 
 <div class="hero-section">
     <h1 class="hero-title">
@@ -230,8 +240,8 @@
         const modal = document.getElementById('modal-video-overlay');
         const iframe = document.getElementById('iframe-video');
         
-        // Injeta a URL com autoplay dinamicamente para economizar carregamento e dar play na hora
-        iframe.src = "https://www.youtube.com/embed/zPKOP8_BUwI?autoplay=1";
+        // Injeta a URL do embed tratada vinda dinamicamente do backend Flask
+        iframe.src = "{{ url_video_como_funciona }}";
         modal.style.display = 'flex';
     }
 
