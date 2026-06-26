@@ -39,6 +39,7 @@
 # - 25/06/2026: Adição da função enviar_email_recuperacao para suporte ao fluxo de recuperação de senha via SMTP.
 # - 25/06/2026: Inclusão do cliente_email na query e nova função enviar_email_status_pericia para notificar o usuário final.
 # - 25/06/2026: Adição de trava em enviar_email_status_pericia para forçar o valor = 0 caso o status seja Negado ou Recusado.
+# - 25/06/2026: Inclusão da biblioteca werkzeug.security e das funções validar_senha_atual e atualizar_senha_usuario.
 # ==============================================================================
 
 import mysql.connector
@@ -50,6 +51,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 
@@ -164,7 +166,6 @@ def obter_cabecalho_protocolo(protocolo_id):
     if not db: return None
     try:
         cursor = db.cursor(dictionary=True)
-        # Adicionado: c.email as cliente_email para possibilitar o envio do aviso
         query = """
             SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado, p.data_criacao,
                    c.nome_completo as cliente_nome, c.email as cliente_email, c.whatsapp as cliente_whatsapp, c.chave_pix,
@@ -723,6 +724,48 @@ def registrar_novo_usuario(nome_completo, usuario_login, email, senha_hash):
         return True
     except mysql.connector.Error as err:
         print(f"Erro ao registrar novo usuário: {err}")
+        db.rollback()
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def validar_senha_atual(admin_id, senha_atual):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT senha_hash FROM usuarios_admin WHERE id = %s", (admin_id,))
+        usuario = cursor.fetchone()
+        
+        # Verifica se o usuário existe e se a senha digitada bate com o hash salvo
+        if usuario and check_password_hash(usuario['senha_hash'], senha_atual):
+            return True
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def atualizar_senha_usuario(admin_id, nova_senha):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        senha_hash = generate_password_hash(nova_senha)
+        
+        # Atualiza a senha e retira a trava de segurança (requer_nova_senha = 0)
+        query = """
+            UPDATE usuarios_admin 
+            SET senha_hash = %s, requer_nova_senha = 0 
+            WHERE id = %s
+        """
+        cursor.execute(query, (senha_hash, admin_id))
+        db.commit()
+        return True
+    except mysql.connector.Error as err:
+        print(f"Erro ao atualizar senha do usuário: {err}")
         db.rollback()
         return False
     finally:
