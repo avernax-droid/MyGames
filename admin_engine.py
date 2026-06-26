@@ -36,6 +36,9 @@
 #               para suportar o fluxo de Auto-Cadastro e Aprovação de Usuários Admin.
 # - 15/06/2026: Adição das funções obter_dados_empresa e salvar_dados_empresa para gerenciar os dados corporativos.
 # - 20/06/2026: Implementação de sanitização de dados (remoção de máscaras) na função salvar_dados_empresa.
+# - 25/06/2026: Adição da função enviar_email_recuperacao para suporte ao fluxo de recuperação de senha via SMTP.
+# - 25/06/2026: Inclusão do cliente_email na query e nova função enviar_email_status_pericia para notificar o usuário final.
+# - 25/06/2026: Adição de trava em enviar_email_status_pericia para forçar o valor = 0 caso o status seja Negado ou Recusado.
 # ==============================================================================
 
 import mysql.connector
@@ -43,6 +46,9 @@ import os
 import json
 import re
 import unicodedata
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -56,15 +62,112 @@ def conectar_bd():
         database=os.getenv("DB_NAME")
     )
 
+# --- SERVIÇOS DE E-MAIL ---
+def enviar_email_recuperacao(destinatario, nova_senha):
+    """
+    Envia a senha provisória via SMTP utilizando credenciais do .env.
+    """
+    try:
+        sender_email = os.getenv("EMAIL_USER")
+        sender_password = os.getenv("EMAIL_PASS")
+        smtp_server = os.getenv("EMAIL_HOST")
+        smtp_port = int(os.getenv("EMAIL_PORT", 587))
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = destinatario
+        msg['Subject'] = "MyGames - Recuperação de Senha Administrativa"
+
+        corpo = f"""
+        Olá,
+        
+        Recebemos uma solicitação de redefinição de senha para sua conta administrativa.
+        
+        Sua senha provisória é: {nova_senha}
+        
+        Por favor, acesse o painel e altere sua senha imediatamente após o primeiro login.
+        
+        Atenciosamente,
+        Equipe MyGames
+        """
+        
+        msg.attach(MIMEText(corpo, 'plain'))
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de recuperação: {e}")
+        return False
+
+def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, status_nome, laudo_tecnico, valor_avaliado):
+    """
+    Envia notificação ao usuário sobre a decisão da perícia técnica.
+    Injeta o laudo técnico no corpo do e-mail apenas se o status for Parcialmente Aprovado, Negado ou Recusado.
+    Força o valor exibido para 0 caso seja Negado/Recusado.
+    """
+    try:
+        sender_email = os.getenv("EMAIL_USER")
+        sender_password = os.getenv("EMAIL_PASS")
+        smtp_server = os.getenv("EMAIL_HOST")
+        smtp_port = int(os.getenv("EMAIL_PORT", 587))
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = destinatario
+        msg['Subject'] = f"MyGames - Atualização do Protocolo #{numero_protocolo}"
+
+        # Normaliza o status para realizar a regra de negócio com segurança
+        slug_status = unicodedata.normalize('NFKD', status_nome).encode('ASCII', 'ignore').decode('utf-8').lower()
+        
+        texto_laudo = ""
+        # Verifica se contém as palavras-chave para incluir o Laudo Técnico
+        if 'parcial' in slug_status or 'negado' in slug_status or 'recusado' in slug_status:
+            texto_laudo = f"\n\n--- PARECER DA AVALIAÇÃO TÉCNICA ---\n{laudo_tecnico}"
+
+        # REGRA DE NEGÓCIO: Se for negado/recusado, zera o valor exibido no e-mail
+        if 'negado' in slug_status or 'recusado' in slug_status:
+            valor_avaliado = 0.0
+
+        valor_str = f"R$ {valor_avaliado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if valor_avaliado is not None else "Valor sob consulta"
+
+        corpo = f"""Olá, {nome_cliente}!
+        
+Sua solicitação de recompra (Protocolo #{numero_protocolo}) acabou de passar pela nossa perícia técnica.
+
+O status do seu pedido foi atualizado para: {status_nome.upper()}
+Valor da Oferta Atualizada: {valor_str}{texto_laudo}
+
+Acesse o sistema para verificar todos os detalhes ou responda a este e-mail caso tenha dúvidas.
+
+Atenciosamente,
+Equipe MyGames"""
+        
+        msg.attach(MIMEText(corpo, 'plain'))
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de status da perícia: {e}")
+        return False
+
 # [Funções de Protocolo e Esteira de Status]
 def obter_cabecalho_protocolo(protocolo_id):
     db = conectar_bd()
     if not db: return None
     try:
         cursor = db.cursor(dictionary=True)
+        # Adicionado: c.email as cliente_email para possibilitar o envio do aviso
         query = """
             SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado, p.data_criacao,
-                   c.nome_completo as cliente_nome, c.whatsapp as cliente_whatsapp, c.chave_pix,
+                   c.nome_completo as cliente_nome, c.email as cliente_email, c.whatsapp as cliente_whatsapp, c.chave_pix,
                    s.nome_exibicao as status_nome, s.cor_badge, s.slug_tecnico,
                    IFNULL(
                        (SELECT MAX(data_alteracao) FROM historico_status_protocolo WHERE protocolo_id = p.id),

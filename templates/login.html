@@ -12,6 +12,10 @@
   - 30/05/2026: Alteração do campo de credencial de E-mail para Identidade do Usuário.
   - 15/06/2026: Implementação do fluxo de Auto-Cadastro com transição via JS (formulário duplo), 
                 inclusão de validação de confirmação de senha e suporte a flash messages de sucesso.
+  - 25/06/2026: Remoção dos textos de título ("Painel MyGames" e "Acesso restrito...") do login.
+  - 25/06/2026: Inclusão de ícone/toggle para ocultar/mostrar a senha via JavaScript.
+  - 25/06/2026: Adição de formulário triplo em JS para fluxo de Recuperação de Senha (Opção 2 - Senha Provisória).
+  - 25/06/2026: Auto-preenchimento do campo de usuário na tela de recuperação com base no input do login.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -51,14 +55,15 @@
             transition: all 0.3s ease;
         }
 
-        .login-wrapper h2 {
+        /* Estilização dos cabeçalhos dos formulários filhos */
+        .form-header-title {
             text-align: center;
             margin-bottom: 5px;
             color: var(--cor-destaque);
             font-size: 24px;
         }
 
-        .login-wrapper p.subtitle {
+        .form-header-subtitle {
             text-align: center;
             color: var(--texto-dim);
             font-size: 14px;
@@ -126,7 +131,7 @@
         .flash-error { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; color: #ff4444; }
         .flash-success { background: rgba(0, 230, 118, 0.1); border-color: var(--cor-destaque); color: var(--cor-destaque); }
 
-        /* --- TOGGLE LINK --- */
+        /* --- TOGGLE LINK E ESQUECEU A SENHA --- */
         .toggle-container {
             text-align: center;
             margin-top: 20px;
@@ -142,17 +147,35 @@
         }
         .toggle-link:hover { text-decoration: underline; color: #fff; }
 
+        .forgot-password {
+            text-align: right;
+            margin-top: -10px;
+            margin-bottom: 15px;
+        }
+        .forgot-password a { font-size: 13px; }
+
         /* --- UTILITÁRIOS --- */
         .hidden { display: none; }
         .row-dupla { display: flex; gap: 12px; }
         .row-dupla .form-group { flex: 1; }
+        
+        /* Ajuste para o campo de senha ter espaço para o ícone do olho */
+        .input-senha-container .form-control { padding-right: 40px; }
+        .icone-senha { 
+            position: absolute; 
+            right: 15px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            cursor: pointer; 
+            color: var(--texto-dim); 
+            transition: 0.2s;
+        }
+        .icone-senha:hover { color: var(--cor-destaque); }
     </style>
 </head>
 <body>
 
     <div class="login-wrapper">
-        <h2 id="header-titulo">Painel MyGames</h2>
-        <p class="subtitle" id="header-subtitulo">Acesso restrito à equipe</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -169,12 +192,19 @@
             
             <div class="form-group">
                 <label>Identidade do Usuário</label>
-                <input type="text" name="usuario_login" class="form-control" placeholder="ex: antonio.verna" required autofocus>
+                <input type="text" name="usuario_login" id="login_usuario_input" class="form-control" placeholder="ex: antonio.verna" required autofocus>
             </div>
 
-            <div class="form-group">
+            <div class="form-group input-senha-container">
                 <label>Senha de Acesso</label>
-                <input type="password" name="senha" class="form-control" placeholder="••••••••" required>
+                <div style="position: relative;">
+                    <input type="password" id="senha_login" name="senha" class="form-control" placeholder="••••••••" required>
+                    <i class="fas fa-eye icone-senha" id="togglePassword"></i>
+                </div>
+            </div>
+            
+            <div class="forgot-password">
+                <a onclick="alternarFormularios('recuperacao')" class="toggle-link">Esqueceu a senha?</a>
             </div>
 
             <button type="submit" class="btn-submit"><i class="fas fa-sign-in-alt"></i> ACESSAR SISTEMA</button>
@@ -185,6 +215,9 @@
         </form>
 
         <form action="/" method="POST" id="form-registro" class="hidden">
+            <h2 class="form-header-title">Solicitar Acesso</h2>
+            <p class="form-header-subtitle">Preencha seus dados para aprovação</p>
+            
             <input type="hidden" name="acao" value="registrar">
             
             <div class="form-group">
@@ -219,30 +252,60 @@
                 Já possui uma conta? <a class="toggle-link" onclick="alternarFormularios('login')">Fazer Login</a>
             </div>
         </form>
+
+        <form action="/" method="POST" id="form-recuperacao" class="hidden">
+            <h2 class="form-header-title">Recuperar Senha</h2>
+            <p class="form-header-subtitle">Enviaremos uma senha provisória para o seu e-mail cadastrado.</p>
+            
+            <input type="hidden" name="acao" value="recuperar_senha">
+            
+            <div class="form-group">
+                <label>Identidade do Usuário</label>
+                <input type="text" name="usuario_login" id="recuperacao_usuario_input" class="form-control" placeholder="ex: antonio.verna" required>
+            </div>
+
+            <button type="submit" class="btn-submit"><i class="fas fa-key"></i> SOLICITAR NOVA SENHA</button>
+            
+            <div class="toggle-container">
+                Lembrou a senha? <a class="toggle-link" onclick="alternarFormularios('login')">Voltar ao Login</a>
+            </div>
+        </form>
     </div>
 
     <script>
         const formLogin = document.getElementById('form-login');
         const formRegistro = document.getElementById('form-registro');
-        const headerTitulo = document.getElementById('header-titulo');
-        const headerSubtitulo = document.getElementById('header-subtitulo');
+        const formRecuperacao = document.getElementById('form-recuperacao');
 
         function alternarFormularios(alvo) {
+            // Oculta todos inicialmente
+            formLogin.classList.add('hidden');
+            formRegistro.classList.add('hidden');
+            formRecuperacao.classList.add('hidden');
+
+            // Mostra o alvo e foca no primeiro campo relevante
             if (alvo === 'registro') {
-                formLogin.classList.add('hidden');
                 formRegistro.classList.remove('hidden');
-                headerTitulo.innerText = 'Solicitar Acesso';
-                headerSubtitulo.innerText = 'Preencha seus dados para aprovação';
                 document.querySelector('#form-registro input[name="nome_completo"]').focus();
+            } else if (alvo === 'recuperacao') {
+                formRecuperacao.classList.remove('hidden');
+                
+                // Copia o valor do usuário digitado no form de login para o form de recuperação
+                const usuarioDigitado = document.getElementById('login_usuario_input').value;
+                const inputRecuperacao = document.getElementById('recuperacao_usuario_input');
+                
+                if (usuarioDigitado) {
+                    inputRecuperacao.value = usuarioDigitado;
+                }
+                
+                inputRecuperacao.focus();
             } else {
-                formRegistro.classList.add('hidden');
                 formLogin.classList.remove('hidden');
-                headerTitulo.innerText = 'Painel MyGames';
-                headerSubtitulo.innerText = 'Acesso restrito à equipe';
+                document.getElementById('login_usuario_input').focus();
             }
         }
 
-        // Validação de senhas no frontend antes do envio
+        // --- VALIDAÇÃO DE SENHAS DO FORMULÁRIO DE REGISTRO ---
         formRegistro.addEventListener('submit', function(e) {
             const senha = document.getElementById('reg_senha').value;
             const senhaConf = document.getElementById('reg_senha_conf').value;
@@ -252,6 +315,18 @@
                 alert('Atenção: A senha e a confirmação de senha não coincidem. Digite novamente.');
                 document.getElementById('reg_senha_conf').focus();
             }
+        });
+
+        // --- LÓGICA DO ÍCONE DE MOSTRAR/OCULTAR SENHA ---
+        const togglePassword = document.getElementById('togglePassword');
+        const senhaInput = document.getElementById('senha_login');
+
+        togglePassword.addEventListener('click', function () {
+            const type = senhaInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            senhaInput.setAttribute('type', type);
+            
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
         });
     </script>
 </body>

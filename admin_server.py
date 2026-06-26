@@ -21,6 +21,9 @@
 # - 15/06/2026: Implementação das rotas /usuarios e /usuarios/salvar para gestão da equipe.
 # - 15/06/2026: Refatoração da rota raiz (/) para processar o fluxo de Auto-Cadastro com hash de senhas e bloqueio de inativos.
 # - 15/06/2026: Adição das rotas /dados_empresa e /dados_empresa/salvar para gestão corporativa (Remetente/Termos).
+# - 25/06/2026: Implementação do fluxo de recuperação de senha (Opção 2 - geração de senha provisória).
+# - 25/06/2026: Integração real do disparo de e-mail (SMTP) na recuperação de senha.
+# - 25/06/2026: Integração de envio automático de e-mail ao cliente nas rotas de alteração de status da perícia.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -29,6 +32,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import os
 import json
+import string
+import random
 from functools import wraps
 import requests
 from dotenv import load_dotenv
@@ -81,6 +86,21 @@ def requer_permissao(modulo, acao='read'):
         return decorated_function
     return decorator
 
+# --- INTERCEPTADOR GLOBAL DE SEGURANÇA ---
+@app.before_request
+def verificar_troca_senha():
+    """
+    Intercepta todas as requisições. Se o usuário estiver logado com uma senha provisória,
+    força o redirecionamento para a tela de alteração de senha.
+    """
+    if 'admin_id' in session and session.get('requer_troca_senha') == True:
+        # Rotas que o usuário PODE acessar enquanto está bloqueado
+        rotas_permitidas = ['mudar_senha', 'logout', 'static']
+        
+        if request.endpoint not in rotas_permitidas:
+            flash("Por segurança, você precisa redefinir sua senha provisória antes de acessar o painel.", "error")
+            return redirect(url_for('mudar_senha'))
+
 # --- CONTEXT PROCESSOR (INJEÇÃO GLOBAL PARA O BASE.HTML) ---
 @app.context_processor
 def injetar_dados_globais():
@@ -94,7 +114,7 @@ def injetar_dados_globais():
             pass
     return dados
 
-# --- ROTAS CORE (COM AUTO-CADASTRO E LOGIN) ---
+# --- ROTAS CORE (COM AUTO-CADASTRO, RECUPERAÇÃO E LOGIN) ---
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'admin_id' in session: return redirect(url_for('dashboard'))
@@ -122,6 +142,38 @@ def login():
                 flash('Erro ao solicitar acesso. O usuário ou e-mail já pode estar em uso.', 'error')
             return redirect(url_for('login'))
             
+        # Fluxo de Recuperação de Senha (Opção 2)
+        elif acao == 'recuperar_senha':
+            usuario_login = request.form.get('usuario_login')
+            
+            if not usuario_login:
+                flash('Informe a Identidade do Usuário para recuperar a senha.', 'error')
+                return redirect(url_for('login'))
+                
+            db = conectar_bd()
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM usuarios_admin WHERE usuario_login = %s", (usuario_login,))
+            usuario = cursor.fetchone()
+            
+            if usuario:
+                # Gerar senha provisória de 8 caracteres
+                caracteres = string.ascii_letters + string.digits + "@#$%"
+                senha_provisoria = ''.join(random.choice(caracteres) for _ in range(8))
+                senha_hash = generate_password_hash(senha_provisoria)
+                
+                # Atualizar no banco ativando a flag de requisição de nova senha
+                cursor.execute("UPDATE usuarios_admin SET senha_hash = %s, requer_nova_senha = 1 WHERE id = %s", (senha_hash, usuario['id']))
+                db.commit()
+                
+                # Disparo real do e-mail de recuperação
+                admin_engine.enviar_email_recuperacao(usuario['email'], senha_provisoria)
+            
+            db.close()
+            
+            # Mensagem genérica por segurança (anti-enumeração)
+            flash('Se o usuário for válido, uma senha provisória foi enviada para o e-mail cadastrado.', 'success')
+            return redirect(url_for('login'))
+            
         # Fluxo de Login Tradicional
         else:
             usuario_login = request.form.get('usuario_login')
@@ -138,6 +190,10 @@ def login():
                     session['admin_id'] = usuario['id']
                     session['admin_nome'] = usuario['nome_completo']
                     session['admin_nivel'] = usuario['nivel_acesso']
+                    
+                    # Trava de segurança para obrigar a troca da senha provisória
+                    session['requer_troca_senha'] = True if usuario.get('requer_nova_senha') == 1 else False
+                    
                     return redirect(url_for('dashboard'))
                 else:
                     flash('Sua conta está pendente de aprovação pelo Administrador.', 'error')
@@ -145,6 +201,31 @@ def login():
                 flash('Dados incorretos.', 'error')
                 
     return render_template('login.html')
+
+@app.route('/mudar_senha', methods=['GET', 'POST'])
+def mudar_senha():
+    if 'admin_id' not in session:
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        senha_atual = request.form.get('senha_atual')
+        nova_senha = request.form.get('nova_senha')
+        confirmar_senha = request.form.get('confirmar_senha')
+        
+        if nova_senha != confirmar_senha:
+            flash("A nova senha e a confirmação não coincidem.", "error")
+            return render_template('mudar_senha.html')
+            
+        if admin_engine.validar_senha_atual(session['admin_id'], senha_atual):
+            if admin_engine.atualizar_senha_usuario(session['admin_id'], nova_senha):
+                session.pop('requer_troca_senha', None)
+                return redirect(url_for('dashboard'))
+            else:
+                flash("Erro ao gravar a nova senha no banco de dados.", "error")
+        else:
+            flash("A senha atual informada está incorreta.", "error")
+            
+    return render_template('mudar_senha.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -201,7 +282,7 @@ def periciar_na_esteira(protocolo_id):
                            itens=itens_protocolo, 
                            lista_status=lista_status)
 
-# --- ROTA: SALVAR DECISÃO (COM SUPORTE AJAX) ---
+# --- ROTA: SALVAR DECISÃO DA PERÍCIA (INCLUI DISPARO DE E-MAIL) ---
 @app.route('/esteira/salvar_pericia/<int:protocolo_id>', methods=['POST'])
 @requer_permissao('protocolos', 'update')
 def salvar_pericia_esteira(protocolo_id):
@@ -219,6 +300,23 @@ def salvar_pericia_esteira(protocolo_id):
         return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
     sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id)
+
+    if sucesso:
+        # Gatilho de notificação para o usuário
+        protocolo_atualizado = admin_engine.obter_cabecalho_protocolo(protocolo_id)
+        if protocolo_atualizado and protocolo_atualizado.get('cliente_email'):
+            slug = protocolo_atualizado.get('slug_tecnico', '').lower() if protocolo_atualizado.get('slug_tecnico') else ''
+            
+            # Condição para envio: Aprovado, Parcialmente Aprovado, Negado ou Recusado
+            if 'aprovado' in slug or 'negado' in slug or 'recusado' in slug or 'parcial' in slug:
+                admin_engine.enviar_email_status_pericia(
+                    destinatario=protocolo_atualizado['cliente_email'],
+                    nome_cliente=protocolo_atualizado['cliente_nome'],
+                    numero_protocolo=protocolo_atualizado['numero_protocolo'],
+                    status_nome=protocolo_atualizado['status_nome'],
+                    laudo_tecnico=protocolo_atualizado['laudo_tecnico'],
+                    valor_avaliado=protocolo_atualizado['valor_avaliado']
+                )
 
     if is_ajax:
         return jsonify({'sucesso': sucesso})
@@ -275,6 +373,20 @@ def atualizar_status_protocolo(protocolo_id):
     sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, None, admin_id)
 
     if sucesso:
+        # Gatilho de notificação na edição pela listagem geral também
+        protocolo_atualizado = admin_engine.obter_cabecalho_protocolo(protocolo_id)
+        if protocolo_atualizado and protocolo_atualizado.get('cliente_email'):
+            slug = protocolo_atualizado.get('slug_tecnico', '').lower() if protocolo_atualizado.get('slug_tecnico') else ''
+            
+            if 'aprovado' in slug or 'negado' in slug or 'recusado' in slug or 'parcial' in slug:
+                admin_engine.enviar_email_status_pericia(
+                    destinatario=protocolo_atualizado['cliente_email'],
+                    nome_cliente=protocolo_atualizado['cliente_nome'],
+                    numero_protocolo=protocolo_atualizado['numero_protocolo'],
+                    status_nome=protocolo_atualizado['status_nome'],
+                    laudo_tecnico=protocolo_atualizado['laudo_tecnico'],
+                    valor_avaliado=protocolo_atualizado['valor_avaliado']
+                )
         flash('Status do protocolo atualizado com sucesso!', 'success')
     else:
         flash('Erro interno ao atualizar o status do protocolo.', 'error')

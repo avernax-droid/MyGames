@@ -13,6 +13,9 @@
   - 10/06/2026: Integração da coluna Status com a nova tabela status_protocolos.
                 Aplicação de Truncamento Inteligente via CSS e Tooltip nativo
                 para proteção de layout e renderização dinâmica das cores de badge.
+  - 25/06/2026: Remoção do corte visual (ellipsis) na coluna de Protocolo para exibição completa.
+  - 25/06/2026: Inclusão de Popup (Modal) interativo de busca ao carregar a página com 
+                filtro dinâmico via JavaScript (Chaves: Protocolo, Cliente, Data).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -54,11 +57,18 @@
         text-overflow: ellipsis;
     }
 
+    /* Regra específica para não cortar o Protocolo */
+    .td-protocolo {
+        overflow: visible !important;
+        text-overflow: clip !important;
+        font-weight: bold;
+    }
+
     .table-admin tr:hover {
         background-color: rgba(255, 255, 255, 0.02);
     }
 
-    /* Novas Badges de Status Dinâmicas (Alinhadas com detalhes_protocolo.html) */
+    /* Novas Badges de Status Dinâmicas */
     .badge-status { 
         display: inline-block; 
         padding: 6px 12px; 
@@ -90,16 +100,90 @@
         text-decoration: none;
         font-size: 13px;
         transition: 0.3s;
+        border: none;
+        cursor: pointer;
     }
     .btn-action:hover { background: var(--cor-destaque); color: #000; }
+
+    /* Estilos do Popup de Busca (Modal) */
+    .modal-overlay {
+        position: fixed; 
+        top: 0; left: 0; 
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85); 
+        z-index: 9999;
+        display: flex; 
+        justify-content: center; 
+        align-items: center;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease;
+    }
+    .modal-content {
+        background: #1e1e1e; 
+        padding: 30px; 
+        border-radius: 12px;
+        width: 100%; 
+        max-width: 450px; 
+        border: 1px solid #333;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .hidden-modal { 
+        opacity: 0; 
+        visibility: hidden; 
+        pointer-events: none; 
+    }
+    .form-group-modal { margin-bottom: 20px; }
+    .form-group-modal label { display: block; margin-bottom: 8px; color: var(--texto-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+    .form-control-modal { width: 100%; padding: 12px 14px; background: #121212; border: 1px solid #444; border-radius: 8px; color: #fff; font-size: 15px; }
+    .form-control-modal:focus { outline: none; border-color: var(--cor-destaque); background: #252525; }
 </style>
 
+<div id="modalBusca" class="modal-overlay">
+    <div class="modal-content">
+        <h3 style="color: var(--cor-destaque); margin-bottom: 10px; font-size: 22px;">
+            <i class="fas fa-search"></i> Localizar Protocolos
+        </h3>
+        <p style="color: var(--texto-dim); font-size: 14px; margin-bottom: 25px;">
+            Selecione uma chave de busca e digite o termo. <br><strong>Dê &lt;Enter&gt; com o campo vazio para ver todos os registros.</strong>
+        </p>
+        
+        <div class="form-group-modal">
+            <label>Buscar por (Chave):</label>
+            <select id="chaveBusca" class="form-control-modal">
+                <option value="0">Código do Protocolo</option>
+                <option value="1">Nome do Cliente</option>
+                <option value="3">Data de Criação</option>
+            </select>
+        </div>
+        
+        <div class="form-group-modal">
+            <label>Termo da busca:</label>
+            <input type="text" id="termoBusca" class="form-control-modal" placeholder="Digite aqui ou deixe em branco para ver todos..." autocomplete="off">
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 25px;">
+            <button id="btnFecharModal" class="btn-action" style="flex: 1; background: #444; padding: 12px; font-weight: bold;">Ver Todos</button>
+            <button id="btnBuscarModal" class="btn-action" style="flex: 2; background: var(--cor-destaque); color: #000; padding: 12px; font-weight: bold;">Aplicar Filtro <i class="fas fa-check"></i></button>
+        </div>
+    </div>
+</div>
+
 <div class="card-admin">
-    <table class="table-admin">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0; font-size: 18px; color: var(--texto-dim);">
+            <i class="fas fa-list"></i> Registros Encontrados
+        </h3>
+        <button id="btnReabrirBusca" class="btn-action" style="background: #222; border: 1px solid #444;">
+            <i class="fas fa-filter"></i> Refazer Busca
+        </button>
+    </div>
+
+    <table class="table-admin" id="tabelaProtocolos">
         <thead>
             <tr>
-                <th width="12%">Protocolo</th>
-                <th width="23%">Cliente</th>
+                <th width="15%">Protocolo</th>
+                <th width="20%">Cliente</th>
                 <th width="15%">Telefone</th>
                 <th width="15%">Data</th>
                 <th width="10%">Valor (PIX)</th>
@@ -109,8 +193,8 @@
         </thead>
         <tbody>
             {% for prot in protocolos %}
-            <tr>
-                <td title="#{{ prot.numero_protocolo }}"><strong>#{{ prot.numero_protocolo }}</strong></td>
+            <tr class="linha-dado">
+                <td class="td-protocolo" title="#{{ prot.numero_protocolo }}">#{{ prot.numero_protocolo }}</td>
                 <td title="{{ prot.cliente_nome }}">{{ prot.cliente_nome }}</td>
                 <td style="color: #ccc; font-family: monospace; font-size: 15px;">
                     {% if prot.cliente_telefone %}
@@ -140,13 +224,87 @@
                 </td>
             </tr>
             {% else %}
-            <tr>
+            <tr id="linhaVaziaBanco">
                 <td colspan="7" style="text-align: center; padding: 30px; color: var(--texto-dim);">
                     Nenhum protocolo encontrado no banco de dados.
                 </td>
             </tr>
             {% endfor %}
+            <tr id="linhaVaziaFiltro" style="display: none;">
+                <td colspan="7" style="text-align: center; padding: 30px; color: #ff4444;">
+                    Nenhum protocolo corresponde à busca realizada.
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const modal = document.getElementById('modalBusca');
+        const btnBuscar = document.getElementById('btnBuscarModal');
+        const btnFechar = document.getElementById('btnFecharModal');
+        const btnReabrir = document.getElementById('btnReabrirBusca');
+        const inputTermo = document.getElementById('termoBusca');
+        const selectChave = document.getElementById('chaveBusca');
+        const tabelaLinhas = document.querySelectorAll('.linha-dado');
+        const linhaVaziaFiltro = document.getElementById('linhaVaziaFiltro');
+
+        // Foca automaticamente no input quando a página carrega
+        setTimeout(() => inputTermo.focus(), 100);
+
+        function executarFiltro() {
+            const termo = inputTermo.value.trim().toLowerCase();
+            const chaveIdx = parseInt(selectChave.value);
+            let encontrouAlgum = false;
+
+            tabelaLinhas.forEach(linha => {
+                const celulas = linha.querySelectorAll('td');
+                if (celulas.length > chaveIdx) {
+                    const textoCelula = celulas[chaveIdx].textContent.toLowerCase();
+                    
+                    // Se o termo estiver vazio ou contido na célula, mostra a linha
+                    if (termo === "" || textoCelula.includes(termo)) {
+                        linha.style.display = "";
+                        encontrouAlgum = true;
+                    } else {
+                        linha.style.display = "none";
+                    }
+                }
+            });
+
+            // Gerencia a mensagem de 'Nenhum resultado' do filtro
+            if (!encontrouAlgum && tabelaLinhas.length > 0) {
+                linhaVaziaFiltro.style.display = "";
+            } else if (linhaVaziaFiltro) {
+                linhaVaziaFiltro.style.display = "none";
+            }
+
+            // Oculta o modal
+            modal.classList.add('hidden-modal');
+        }
+
+        // Gatilhos de Ação
+        btnBuscar.addEventListener('click', executarFiltro);
+        
+        btnFechar.addEventListener('click', () => {
+            inputTermo.value = ""; // Limpa a busca para exibir todos
+            executarFiltro();
+        });
+
+        // Executa busca ao pressionar Enter
+        inputTermo.addEventListener('keypress', function(e) {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                executarFiltro();
+            }
+        });
+
+        // Botão na tabela para reabrir a busca
+        btnReabrir.addEventListener('click', () => {
+            modal.classList.remove('hidden-modal');
+            inputTermo.focus();
+        });
+    });
+</script>
 {% endblock %}

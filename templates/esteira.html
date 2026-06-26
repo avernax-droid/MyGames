@@ -7,6 +7,10 @@
   - 11/06/2026: Refatoração da UX - Substituição das "gavetas" por um Dropdown Select.
   - 11/06/2026: Refinamento de UI - Ajuste de textos no label, remoção de option 
                 vazio e limpeza do cabeçalho da tabela de dados.
+  - 25/06/2026: Implementação de Popup (Modal) interativo de busca após a seleção
+                de status. Filtro dinâmico via JS (Chaves: Protocolo, Cliente, Data).
+  - 25/06/2026: Implementação de persistência de filtro via sessionStorage para 
+                evitar reabertura indesejada do Modal no retorno (botão Voltar).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -83,6 +87,7 @@
         padding: 15px;
         border-bottom: 1px solid #2a2a2a;
         font-size: 14px;
+        vertical-align: middle;
     }
 
     .btn-pericia {
@@ -105,11 +110,79 @@
         padding: 50px;
         color: var(--texto-dim);
     }
+
+    /* Estilos do Popup de Busca (Modal) */
+    .modal-overlay {
+        position: fixed; 
+        top: 0; left: 0; 
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85); 
+        z-index: 9999;
+        display: flex; 
+        justify-content: center; 
+        align-items: center;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease;
+    }
+    .modal-content {
+        background: #1e1e1e; 
+        padding: 30px; 
+        border-radius: 12px;
+        width: 100%; 
+        max-width: 450px; 
+        border: 1px solid #333;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .hidden-modal { 
+        opacity: 0; 
+        visibility: hidden; 
+        pointer-events: none; 
+    }
+    .form-group-modal { margin-bottom: 20px; }
+    .form-group-modal label { display: block; margin-bottom: 8px; color: var(--texto-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+    .form-control-modal { width: 100%; padding: 12px 14px; background: #121212; border: 1px solid #444; border-radius: 8px; color: #fff; font-size: 15px; }
+    .form-control-modal:focus { outline: none; border-color: var(--cor-destaque); background: #252525; }
+    .btn-modal-action {
+        background: #333; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-size: 13px; transition: 0.3s; border: none; cursor: pointer; font-weight: bold;
+    }
 </style>
+
+<!-- MODAL DE BUSCA (Inicia oculto, o JS decide se exibe) -->
+<div id="modalBusca" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 style="color: var(--cor-destaque); margin-bottom: 10px; font-size: 22px;">
+            <i class="fas fa-search"></i> Localizar na Fila
+        </h3>
+        <p style="color: var(--texto-dim); font-size: 14px; margin-bottom: 25px;">
+            Filtre os registros do status atual. <br><strong>Dê &lt;Enter&gt; com o campo vazio para ver toda a fila.</strong>
+        </p>
+        
+        <div class="form-group-modal">
+            <label>Buscar por (Chave):</label>
+            <select id="chaveBusca" class="form-control-modal">
+                <option value="0">Código do Protocolo</option>
+                <option value="1">Nome do Cliente</option>
+                <option value="2">Data de Entrada</option>
+            </select>
+        </div>
+        
+        <div class="form-group-modal">
+            <label>Termo da busca:</label>
+            <input type="text" id="termoBusca" class="form-control-modal" placeholder="Digite aqui ou deixe em branco para ver todos..." autocomplete="off">
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 25px;">
+            <button id="btnFecharModal" class="btn-modal-action" style="flex: 1; background: #444;">Ver Todos</button>
+            <button id="btnBuscarModal" class="btn-modal-action" style="flex: 2; background: var(--cor-destaque); color: #000;">Aplicar Filtro <i class="fas fa-check"></i></button>
+        </div>
+    </div>
+</div>
 
 <div class="esteira-seletor-container">
     <label for="statusSelect"><i class="fas fa-filter"></i> Selecione o status:</label>
-    <select id="statusSelect" class="select-status" onchange="if(this.value) window.location.href=this.value;">
+    <!-- Adicionada a flag '?filtro=novo' para forçar a abertura do modal -->
+    <select id="statusSelect" class="select-status" onchange="if(this.value) window.location.href=this.value + '?filtro=novo';">
         {% if not status_selecionado %}
             <option value="" disabled selected>Selecione uma fase de trabalho abaixo</option>
         {% endif %}
@@ -124,19 +197,26 @@
 
 <div class="card-admin">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h3 style="font-size: 16px; text-transform: uppercase; color: var(--cor-destaque);">
+        <h3 style="font-size: 16px; text-transform: uppercase; color: var(--cor-destaque); margin: 0;">
             {% if status_selecionado %}
                 {{ protocolos[0].status_nome if protocolos else 'Lista Vazia' }}
             {% else %}
                 Nenhum status selecionado
             {% endif %}
         </h3>
-        <span style="font-size: 12px; color: var(--texto-dim);">
-            <i class="fas fa-list"></i> {{ protocolos | length }} protocolo(s) listado(s)
-        </span>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <span style="font-size: 12px; color: var(--texto-dim);">
+                <i class="fas fa-list"></i> {{ protocolos | length }} protocolo(s) listado(s)
+            </span>
+            {% if status_selecionado and protocolos|length > 0 %}
+            <button id="btnReabrirBusca" class="btn-modal-action" style="padding: 8px 12px; font-size: 12px;">
+                <i class="fas fa-search"></i> Buscar na Fila
+            </button>
+            {% endif %}
+        </div>
     </div>
 
-    <table class="table-esteira">
+    <table class="table-esteira" id="tabelaEsteira">
         <thead>
             <tr>
                 <th>Protocolo</th>
@@ -148,7 +228,7 @@
         </thead>
         <tbody>
             {% for p in protocolos %}
-            <tr>
+            <tr class="linha-dado">
                 <td><strong>#{{ p.numero_protocolo }}</strong></td>
                 <td>{{ p.cliente_nome }}</td>
                 {% set data_str = p.data_criacao | string %}
@@ -161,7 +241,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr>
+            <tr id="linhaVaziaBanco">
                 <td colspan="5">
                     <div class="empty-state">
                         <i class="fas fa-check-circle" style="font-size: 40px; margin-bottom: 15px; display: block; color: var(--cor-destaque);"></i>
@@ -170,7 +250,115 @@
                 </td>
             </tr>
             {% endfor %}
+            <tr id="linhaVaziaFiltro" style="display: none;">
+                <td colspan="5" style="text-align: center; padding: 30px; color: #ff4444;">
+                    Nenhum protocolo nesta fila corresponde à busca realizada.
+                </td>
+            </tr>
         </tbody>
     </table>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const modal = document.getElementById('modalBusca');
+        const btnBuscar = document.getElementById('btnBuscarModal');
+        const btnFechar = document.getElementById('btnFecharModal');
+        const btnReabrir = document.getElementById('btnReabrirBusca');
+        const inputTermo = document.getElementById('termoBusca');
+        const selectChave = document.getElementById('chaveBusca');
+        const tabelaLinhas = document.querySelectorAll('.linha-dado');
+        const linhaVaziaFiltro = document.getElementById('linhaVaziaFiltro');
+
+        // Variáveis de Estado
+        const hasStatus = {{ 'true' if status_selecionado else 'false' }};
+        const hasProtocolos = {{ 'true' if protocolos|length > 0 else 'false' }};
+        const pathAtual = window.location.pathname;
+        const urlParams = new URLSearchParams(window.location.search);
+        const isNovoFiltro = urlParams.get('filtro') === 'novo';
+
+        function executarFiltro() {
+            const termo = inputTermo.value.trim().toLowerCase();
+            const chaveIdx = parseInt(selectChave.value);
+            let encontrouAlgum = false;
+
+            // Salva estado na sessão para lembrar em caso de clique no 'Voltar'
+            sessionStorage.setItem('esteira_termo', inputTermo.value);
+            sessionStorage.setItem('esteira_chave', selectChave.value);
+            sessionStorage.setItem('esteira_path', pathAtual);
+
+            tabelaLinhas.forEach(linha => {
+                const celulas = linha.querySelectorAll('td');
+                if (celulas.length > chaveIdx) {
+                    const textoCelula = celulas[chaveIdx].textContent.toLowerCase();
+                    if (termo === "" || textoCelula.includes(termo)) {
+                        linha.style.display = "";
+                        encontrouAlgum = true;
+                    } else {
+                        linha.style.display = "none";
+                    }
+                }
+            });
+
+            if (!encontrouAlgum && tabelaLinhas.length > 0) {
+                linhaVaziaFiltro.style.display = "";
+            } else if (linhaVaziaFiltro) {
+                linhaVaziaFiltro.style.display = "none";
+            }
+
+            modal.classList.add('hidden-modal');
+        }
+
+        // Lógica Principal de Abertura do Modal e Persistência
+        if (hasStatus && hasProtocolos) {
+            if (isNovoFiltro) {
+                // Usuário selecionou ativamente no dropdown: Limpa memória e abre modal
+                sessionStorage.removeItem('esteira_termo');
+                sessionStorage.setItem('esteira_path', pathAtual);
+                
+                modal.classList.remove('hidden-modal');
+                setTimeout(() => inputTermo.focus(), 100);
+                
+                // Limpa o '?filtro=novo' da URL sem recarregar a página (Evita modal no F5)
+                window.history.replaceState(null, '', pathAtual);
+            } else {
+                // É um retorno pelo botão "Voltar" ou atualização F5
+                const savedPath = sessionStorage.getItem('esteira_path');
+                if (savedPath === pathAtual) {
+                    // Tem memória salva! Restaura os dados e filtra direto (não abre modal)
+                    inputTermo.value = sessionStorage.getItem('esteira_termo') || "";
+                    selectChave.value = sessionStorage.getItem('esteira_chave') || "0";
+                    executarFiltro();
+                } else {
+                    // Acesso direto pela URL sem parâmetro. Abre modal.
+                    modal.classList.remove('hidden-modal');
+                    setTimeout(() => inputTermo.focus(), 100);
+                }
+            }
+        }
+
+        if (btnBuscar) btnBuscar.addEventListener('click', executarFiltro);
+        
+        if (btnFechar) btnFechar.addEventListener('click', () => {
+            inputTermo.value = ""; 
+            executarFiltro();
+        });
+
+        if (inputTermo) {
+            inputTermo.addEventListener('keypress', function(e) {
+                if(e.key === 'Enter') {
+                    e.preventDefault();
+                    executarFiltro();
+                }
+            });
+        }
+
+        if (btnReabrir) {
+            btnReabrir.addEventListener('click', () => {
+                modal.classList.remove('hidden-modal');
+                inputTermo.focus();
+            });
+        }
+    });
+</script>
 {% endblock %}
