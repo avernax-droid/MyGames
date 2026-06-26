@@ -41,6 +41,7 @@
 # - 25/06/2026: Adição de trava em enviar_email_status_pericia para forçar o valor = 0 caso o status seja Negado ou Recusado.
 # - 25/06/2026: Inclusão da biblioteca werkzeug.security e das funções validar_senha_atual e atualizar_senha_usuario.
 # - 26/06/2026: Dinamização do nome fantasia (via obter_dados_empresa) nos cabeçalhos e assinaturas de e-mail.
+# - 26/06/2026: Conversão dos templates de e-mail de status (Aprovado, Parcial e Negado) para HTML rico com busca de itens do protocolo.
 # ==============================================================================
 
 import mysql.connector
@@ -51,6 +52,7 @@ import unicodedata
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr 
 from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -81,7 +83,7 @@ def enviar_email_recuperacao(destinatario, nova_senha):
         smtp_port = int(os.getenv("EMAIL_PORT", 587))
 
         msg = MIMEMultipart()
-        msg['From'] = sender_email
+        msg['From'] = formataddr((nome_empresa, sender_email))
         msg['To'] = destinatario
         msg['Subject'] = f"{nome_empresa} - Recuperação de Senha Administrativa"
 
@@ -112,12 +114,10 @@ def enviar_email_recuperacao(destinatario, nova_senha):
 
 def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, status_nome, laudo_tecnico, valor_avaliado):
     """
-    Envia notificação ao usuário sobre a decisão da perícia técnica.
-    Injeta o laudo técnico no corpo do e-mail apenas se o status for Parcialmente Aprovado, Negado ou Recusado.
-    Força o valor exibido para 0 caso seja Negado/Recusado.
+    Envia notificação em HTML ao usuário sobre a decisão da perícia técnica.
+    Formata o e-mail dinamicamente para Aprovado, Reprovado ou Parcialmente Aprovado.
     """
     try:
-        # Busca o nome fantasia da empresa para injetar no e-mail
         dados_empresa = obter_dados_empresa()
         nome_empresa = dados_empresa['nome_fantasia'] if dados_empresa and 'nome_fantasia' in dados_empresa else "MyGames"
 
@@ -126,38 +126,110 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         smtp_server = os.getenv("EMAIL_HOST")
         smtp_port = int(os.getenv("EMAIL_PORT", 587))
 
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = destinatario
-        msg['Subject'] = f"{nome_empresa} - Atualização do Protocolo #{numero_protocolo}"
-
         # Normaliza o status para realizar a regra de negócio com segurança
         slug_status = unicodedata.normalize('NFKD', status_nome).encode('ASCII', 'ignore').decode('utf-8').lower()
-        
-        texto_laudo = ""
-        # Verifica se contém as palavras-chave para incluir o Laudo Técnico
-        if 'parcial' in slug_status or 'negado' in slug_status or 'recusado' in slug_status:
-            texto_laudo = f"\n\n--- PARECER DA AVALIAÇÃO TÉCNICA ---\n{laudo_tecnico}"
+
+        # Tratamento seguro para quebra de linhas do HTML
+        laudo_formatado = laudo_tecnico.replace('\n', '<br>') if laudo_tecnico else 'Não informado.'
 
         # REGRA DE NEGÓCIO: Se for negado/recusado, zera o valor exibido no e-mail
-        if 'negado' in slug_status or 'recusado' in slug_status:
+        if 'negado' in slug_status or 'recusado' in slug_status or 'reprovado' in slug_status:
             valor_avaliado = 0.0
 
-        valor_str = f"R$ {valor_avaliado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if valor_avaliado is not None else "Valor sob consulta"
+        # BUSCA DOS ITENS DO PROTOCOLO PARA LISTAGEM NO E-MAIL
+        itens_avaliados = []
+        db = conectar_bd()
+        if db:
+            try:
+                cursor = db.cursor(dictionary=True)
+                cursor.execute("SELECT id FROM protocolos_recompra WHERE numero_protocolo = %s", (numero_protocolo,))
+                prot = cursor.fetchone()
+                if prot:
+                    itens_avaliados = obter_itens_protocolo(prot['id'])
+            finally:
+                db.close()
 
-        corpo = f"""Olá, {nome_cliente}!
+        # MONTANDO A LISTA HTML DOS PRODUTOS
+        html_itens = "<strong>ÍTENS INCLUÍDOS NA VENDA:</strong><br><br>"
+        for item in itens_avaliados:
+            nome_produto = item.get('nome_produto', 'Produto não identificado')
+            valor_item = float(item.get('valor_pix_unitario', 0.0))
+            
+            status_item = ""
+            if 'parcial' in slug_status:
+                # Regra Futura: não define o status por linha no modelo parcial ainda
+                status_item = ""
+            elif 'negado' in slug_status or 'recusado' in slug_status or 'reprovado' in slug_status:
+                status_item = " - REPROVADO"
+            else:
+                status_item = " - APROVADO"
+
+            html_itens += f"<strong>Produto:</strong> {nome_produto}{status_item}<br>"
+            html_itens += f"<strong>Valor:</strong> R$ {valor_item:.2f}<br><br>"
+
+
+        # MONTANDO O CORPO DO E-MAIL BASEADO NO STATUS
+        corpo_html = ""
+
+        if 'parcial' in slug_status:
+            corpo_html = f"""
+            <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+                <p>Olá {nome_cliente},</p>
+                <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
+                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
+                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
+                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <br>
+                {html_itens}
+                <p>Como pode notar no laudo, alguns de seus itens foram aprovados na perícia técnica e estão marcados como <strong>APROVADOS</strong> enquanto outros foram <strong>REPROVADOS</strong>.</p>
+                <p>Nossa equipe entrará em contato com você para definirmos o que fazer com os ítens reprovados para que possamos seguir com o PAGAMENTO!</p>
+                <p>Está sendo um grande prazer fazer negócio com você e tê-lo como nosso cliente.</p>
+                <br>
+                <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
+            </div>
+            """
+
+        elif 'negado' in slug_status or 'recusado' in slug_status or 'reprovado' in slug_status:
+            corpo_html = f"""
+            <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+                <p>Olá {nome_cliente},</p>
+                <p>Muito obrigado por realizar a sua cotação de venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
+                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
+                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
+                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <br>
+                {html_itens}
+                <p>Infelizmente, <strong>TODOS</strong> os seus itens foram <strong>REPROVADOS</strong> na perícia técnica. O Laudo explica o que aconteceu.</p>
+                <p>Nossa equipe entrará em contato com você para definirmos como podemos avançar com a nossa negociação ou para acertar detalhes da devolução dos produtos para você!</p>
+                <br>
+                <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
+            </div>
+            """
+
+        else: # TOTALMENTE APROVADO
+            corpo_html = f"""
+            <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+                <p>Olá {nome_cliente},</p>
+                <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
+                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
+                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
+                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <br>
+                {html_itens}
+                <p>Todos os seus itens aprovados na perícia técnica estão marcados como <strong>APROVADOS</strong> e vamos realizar o PAGAMENTO destes itens em até 48 horas úteis.</p>
+                <p>Foi um grande prazer fazer negócio com você e tê-lo como nosso cliente.</p>
+                <br>
+                <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
+            </div>
+            """
+
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr((nome_empresa, sender_email))
+        msg['To'] = destinatario
+        msg['Subject'] = f"{nome_empresa} - Atualização do Protocolo #{numero_protocolo}"
         
-Sua solicitação de recompra (Protocolo #{numero_protocolo}) acabou de passar pela nossa perícia técnica.
-
-O status do seu pedido foi atualizado para: {status_nome.upper()}
-Valor da Oferta Atualizada: {valor_str}{texto_laudo}
-
-Acesse o sistema para verificar todos os detalhes ou responda a este e-mail caso tenha dúvidas.
-
-Atenciosamente,
-Equipe {nome_empresa}"""
-        
-        msg.attach(MIMEText(corpo, 'plain'))
+        # Anexa o HTML na mensagem
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
 
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
@@ -166,7 +238,7 @@ Equipe {nome_empresa}"""
         server.quit()
         return True
     except Exception as e:
-        print(f"Erro ao enviar e-mail de status da perícia: {e}")
+        print(f"Erro ao enviar e-mail de status da perícia (HTML): {e}")
         return False
 
 # [Funções de Protocolo e Esteira de Status]
