@@ -40,6 +40,7 @@
 # - 25/06/2026: Inclusão do cliente_email na query e nova função enviar_email_status_pericia para notificar o usuário final.
 # - 25/06/2026: Adição de trava em enviar_email_status_pericia para forçar o valor = 0 caso o status seja Negado ou Recusado.
 # - 25/06/2026: Inclusão da biblioteca werkzeug.security e das funções validar_senha_atual e atualizar_senha_usuario.
+# - 26/06/2026: Dinamização do nome fantasia (via obter_dados_empresa) nos cabeçalhos e assinaturas de e-mail.
 # ==============================================================================
 
 import mysql.connector
@@ -70,6 +71,10 @@ def enviar_email_recuperacao(destinatario, nova_senha):
     Envia a senha provisória via SMTP utilizando credenciais do .env.
     """
     try:
+        # Busca o nome fantasia da empresa para injetar no e-mail
+        dados_empresa = obter_dados_empresa()
+        nome_empresa = dados_empresa['nome_fantasia'] if dados_empresa and 'nome_fantasia' in dados_empresa else "MyGames"
+
         sender_email = os.getenv("EMAIL_USER")
         sender_password = os.getenv("EMAIL_PASS")
         smtp_server = os.getenv("EMAIL_HOST")
@@ -78,7 +83,7 @@ def enviar_email_recuperacao(destinatario, nova_senha):
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = destinatario
-        msg['Subject'] = "MyGames - Recuperação de Senha Administrativa"
+        msg['Subject'] = f"{nome_empresa} - Recuperação de Senha Administrativa"
 
         corpo = f"""
         Olá,
@@ -90,7 +95,7 @@ def enviar_email_recuperacao(destinatario, nova_senha):
         Por favor, acesse o painel e altere sua senha imediatamente após o primeiro login.
         
         Atenciosamente,
-        Equipe MyGames
+        Equipe {nome_empresa}
         """
         
         msg.attach(MIMEText(corpo, 'plain'))
@@ -112,6 +117,10 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
     Força o valor exibido para 0 caso seja Negado/Recusado.
     """
     try:
+        # Busca o nome fantasia da empresa para injetar no e-mail
+        dados_empresa = obter_dados_empresa()
+        nome_empresa = dados_empresa['nome_fantasia'] if dados_empresa and 'nome_fantasia' in dados_empresa else "MyGames"
+
         sender_email = os.getenv("EMAIL_USER")
         sender_password = os.getenv("EMAIL_PASS")
         smtp_server = os.getenv("EMAIL_HOST")
@@ -120,7 +129,7 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = destinatario
-        msg['Subject'] = f"MyGames - Atualização do Protocolo #{numero_protocolo}"
+        msg['Subject'] = f"{nome_empresa} - Atualização do Protocolo #{numero_protocolo}"
 
         # Normaliza o status para realizar a regra de negócio com segurança
         slug_status = unicodedata.normalize('NFKD', status_nome).encode('ASCII', 'ignore').decode('utf-8').lower()
@@ -146,7 +155,7 @@ Valor da Oferta Atualizada: {valor_str}{texto_laudo}
 Acesse o sistema para verificar todos os detalhes ou responda a este e-mail caso tenha dúvidas.
 
 Atenciosamente,
-Equipe MyGames"""
+Equipe {nome_empresa}"""
         
         msg.attach(MIMEText(corpo, 'plain'))
 
