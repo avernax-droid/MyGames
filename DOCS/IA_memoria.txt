@@ -382,6 +382,7 @@ usuarios_admin              id                      INT                         
                             ativo                   TINYINT(1)                                                          -           usuarios_admin              7           0
                             data_criacao            DATETIME                                                            -           usuarios_admin              8           0
                             ultimo_login            DATETIME                                                            -           usuarios_admin              9           0
+                            requer_nova_senha       TINYINT(1) 
 ----------                  ----------              ----------                                                          ----------  usuarios_admin              999         1
 
 5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES

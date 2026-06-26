@@ -197,4 +197,63 @@ O clique neste card unificado deve redirecionar invariavelmente para a URL:
 Consistência de Interface (UI):
 Remover qualquer lógica que exiba ícones genéricos ou textos variantes (como apenas "Outros"), mantendo a estética idêntica ao card de "escape" da versão Mobile.
 
-    
+====================
+25/06
+
+📋 DOCUMENTAÇÃO TÉCNICA: FLUXO DE SENHA E E-MAIL (BACKOFFICE)
+1. O QUE FOI IMPLEMENTADO (STATUS: CONCLUÍDO)
+Interface de Recuperação (Front-end):
+
+Atualizado o arquivo login.html com a inclusão do formulário oculto (#form-recuperacao).
+
+Implementada a lógica JavaScript alternarFormularios para gerenciar a transição entre as telas de Login, Registro e Recuperação.
+
+Adicionada segurança contra enumeração de usuários: a mensagem exibida ao usuário é genérica ("Se o usuário for válido..."), protegendo a base de dados de ataques de descoberta de e-mails.
+
+Integração de Back-end (Server & Engine):
+
+Rota recuperar_senha (admin_server.py): Intercepta o POST, localiza o usuário no banco, gera uma senha provisória aleatória de 8 caracteres (alfa-numérica + símbolos) e atualiza o senha_hash.
+
+Função enviar_email_recuperacao (admin_engine.py): Criada utilizando smtplib e MIMEMultipart. Gerencia o envio de e-mails via SMTP com autenticação TLS.
+
+Tratamento de Erros: Corrigido o erro de conexão (please run connect() first) através da configuração correta das variáveis de ambiente e inicialização do smtplib.
+
+Configuração de Ambiente (.env):
+
+Adicionadas as variáveis obrigatórias no arquivo .env da pasta MyGames_Admin:
+
+EMAIL_HOST (Servidor SMTP).
+
+EMAIL_PORT (Porta do servidor, ex: 587).
+
+EMAIL_USER (E-mail remetente).
+
+EMAIL_PASS (Senha de App gerada no provedor de e-mail).
+
+2. PENDÊNCIAS TÉCNICAS (PRÓXIMOS PASSOS)
+Para encerrar o ciclo de segurança, é necessário implementar a troca de senha provisória pelo próprio usuário.
+
+Ações Necessárias:
+
+Back-end (admin_engine.py):
+
+Implementar validar_senha_atual(user_id, senha_digitada): Verifica se a senha provisória informada pelo usuário está correta.
+
+Implementar atualizar_senha_usuario(user_id, nova_senha_hash): Persiste a nova senha definitiva no banco de dados.
+
+Controller (admin_server.py):
+
+Criar a rota /mudar_senha (GET/POST) para processar a alteração, garantindo que o usuário esteja autenticado (session['admin_id']).
+
+Interface (templates/mudar_senha.html):
+
+Criar o formulário de alteração contendo os campos: Senha Atual, Nova Senha e Confirmar Nova Senha.
+
+Aplicar o padrão visual "Dark Mode" para manter a consistência do sistema.
+
+3. NOTAS DE SEGURANÇA E DEBUG
+Senha de App: O campo EMAIL_PASS no .env não deve receber a sua senha pessoal do e-mail. Utilize sempre uma Senha de App (App Password) gerada no painel de segurança do seu provedor (ex: Google, Outlook).
+
+Validação de Ambiente: Caso o e-mail não seja disparado, verifique no terminal se há mensagens de erro da biblioteca smtplib. Se necessário, use print() no início da função de envio para confirmar se as variáveis EMAIL_HOST e EMAIL_USER estão sendo lidas corretamente pelo sistema.
+
+Boas Práticas: Em produção, utilize uma conta de e-mail dedicada ao sistema (ex: suporte@mygames.com) para evitar bloqueios de SPAM e manter a organização das comunicações automáticas.

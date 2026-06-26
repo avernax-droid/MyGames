@@ -22,6 +22,8 @@
     e o título principal) e redução da margem do logo para otimização de espaço.
   - 25/06/2026: Substituição do arquivo de vídeo do banner para tirinhas-desktop.mp4 
     e aplicação de margem superior negativa no logo para subir todo o bloco.
+  - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização") 
+    com destaque visual e tipográfico na palavra COMEÇAR.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -138,7 +140,7 @@
 
 <div class="card-padrao">
     <p style="text-align: center; color: var(--texto-dim); margin-bottom: 25px; font-size: 14px;">
-        Informe sua localização
+        <span style="color: #ffffff; font-weight: bold; font-size: 16px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">COMEÇAR</span> -> Informe sua localização
     </p>
     
     <form action="{{ url_for('definir_regiao') }}" method="POST">

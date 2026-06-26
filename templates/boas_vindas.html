@@ -20,6 +20,8 @@
   - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe), substituindo o redirecionamento externo para o YouTube para manter a UX fluida.
   - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável dinâmica url_video_como_funciona configurada via .env.
   - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo (tirinhas-desktop.mp4) no topo (abaixo do logo), com ajuste de margens negativas para otimização de espaço.
+  - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização") 
+    com destaque visual e tipográfico na palavra COMEÇAR.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -143,7 +145,7 @@
 
 <div class="card-padrao">
     <p style="text-align: center; color: var(--texto-dim); margin-bottom: 30px; font-size: 14px;">
-        Informe sua localização
+        <span style="color: #ffffff; font-weight: bold; font-size: 16px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">COMEÇAR</span> -> Informe sua localização
     </p>
     
     <form action="{{ url_for('definir_regiao') }}" method="POST">

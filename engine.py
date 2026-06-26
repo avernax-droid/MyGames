@@ -33,6 +33,7 @@
 # - 20/06/2026: Remoção da exibição do E-Ticket no corpo do e-mail de resumo e atualização das instruções de postagem.
 # - 23/06/2026: Implementação da dupla barreira de validação em calcular_cotacao_final (Backend Business Rules).
 # - 23/06/2026: Adição do xml.sax.saxutils (escape) para sanitização rigorosa de caracteres especiais na integração dos Correios.
+# - 26/06/2026: Validação da dinamização do nome fantasia no e-mail (enviar_email_resumo) e remoção de strings "MyGames" hardcoded na integração dos Correios.
 # ==============================================================================
 
 import mysql.connector
@@ -272,7 +273,7 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
     try:
         # Busca dados da empresa para dinamizar o envio
         empresa = obter_dados_empresa()
-        nome_fantasia = empresa.get('nome_fantasia', 'MyGames') if empresa else 'MyGames'
+        nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
         
         # Mantemos o login com a conta base do SMTP configurada
         remetente_login, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
@@ -506,6 +507,10 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
         logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
         return "888888888", "BR987654321BR"
 
+    # Busca nome da empresa para aplicar nas variáveis genéricas caso necessário
+    empresa = obter_dados_empresa()
+    nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
+
     # Roteamento Dinâmico de Serviço (CEP)
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
     servico_correios = "PAC" # Fallback padrão
@@ -521,7 +526,8 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
     xml_itens = ""
     for item in itens_avaliados:
         # O escape() protege contra &, < e >, convertendo para &amp;, &lt;, &gt;
-        descricao_limpa = escape(str(item.get('produto_nome', 'Item MyGames')))[:100]
+        # Substituí o "Item MyGames" por "Item {nome_fantasia}"
+        descricao_limpa = escape(str(item.get('produto_nome', f'Item {nome_fantasia}')))[:100]
         if len(descricao_limpa) < 5:
             descricao_limpa = descricao_limpa.ljust(5, 'x')
             
@@ -533,7 +539,8 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
         </item>"""
 
     # 2. Construção do XML interno de postagem COM SANITIZAÇÃO
-    nome_seguro = escape(str(dados_remetente.get('nome', 'Cliente MyGames')))[:100]
+    # Substituí o "Cliente MyGames" por "Cliente {nome_fantasia}"
+    nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
     logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
     numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
     complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]
