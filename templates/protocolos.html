@@ -16,6 +16,8 @@
   - 25/06/2026: Remoção do corte visual (ellipsis) na coluna de Protocolo para exibição completa.
   - 25/06/2026: Inclusão de Popup (Modal) interativo de busca ao carregar a página com 
                 filtro dinâmico via JavaScript (Chaves: Protocolo, Cliente, Data).
+  - 26/06/2026: Adição do botão "X" de fechamento livre no modal e suporte à tecla ESC 
+                para melhorar a navegação do usuário.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -127,7 +129,23 @@
         max-width: 450px; 
         border: 1px solid #333;
         box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        position: relative; /* Necessário para posicionar o botão X */
     }
+    
+    /* Botão X para fechar modal livremente */
+    .btn-fechar-x {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        color: var(--texto-dim);
+        font-size: 20px;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+    .btn-fechar-x:hover {
+        color: #ff4444;
+    }
+
     .hidden-modal { 
         opacity: 0; 
         visibility: hidden; 
@@ -141,6 +159,9 @@
 
 <div id="modalBusca" class="modal-overlay">
     <div class="modal-content">
+        <!-- Botão X no topo direito -->
+        <i class="fas fa-times btn-fechar-x" id="btnFecharX" title="Fechar aba de busca"></i>
+
         <h3 style="color: var(--cor-destaque); margin-bottom: 10px; font-size: 22px;">
             <i class="fas fa-search"></i> Localizar Protocolos
         </h3>
@@ -244,6 +265,7 @@
         const modal = document.getElementById('modalBusca');
         const btnBuscar = document.getElementById('btnBuscarModal');
         const btnFechar = document.getElementById('btnFecharModal');
+        const btnFecharX = document.getElementById('btnFecharX');
         const btnReabrir = document.getElementById('btnReabrirBusca');
         const inputTermo = document.getElementById('termoBusca');
         const selectChave = document.getElementById('chaveBusca');
@@ -287,9 +309,22 @@
         // Gatilhos de Ação
         btnBuscar.addEventListener('click', executarFiltro);
         
+        // Limpa tudo e exibe a lista completa
         btnFechar.addEventListener('click', () => {
-            inputTermo.value = ""; // Limpa a busca para exibir todos
+            inputTermo.value = ""; 
             executarFiltro();
+        });
+
+        // Apenas oculta o modal deixando a tabela como está
+        btnFecharX.addEventListener('click', () => {
+            modal.classList.add('hidden-modal');
+        });
+
+        // Fecha o modal ao apertar a tecla ESC (Melhor UX)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden-modal')) {
+                modal.classList.add('hidden-modal');
+            }
         });
 
         // Executa busca ao pressionar Enter

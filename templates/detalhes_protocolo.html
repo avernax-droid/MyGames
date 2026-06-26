@@ -15,6 +15,13 @@
                 fluida das fotos de perícia na mesma tela.
   - 08/06/2026: Adição de formatação visual (máscara) dinâmica via JS para 
                 o número de WhatsApp do cliente.
+  - 26/06/2026: Atualização do card "Dados do Cliente" para incluir Endereço,
+                Chave PIX e o painel integrado de Rastreio dos Correios.
+  - 26/06/2026: Ajuste no CSS inline das labels de Endereço e Status Correios 
+                para evitar quebra de linha indesejada.
+  - 26/06/2026: Inclusão de destaque visual discreto (badge translúcida monoespaçada) 
+                para o Código de Rastreio.
+  - 26/06/2026: Inclusão de formatação visual (máscara) via Jinja2 para exibição do CEP.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -122,10 +129,57 @@
 
 <div class="grid-detalhes">
     <div class="card-admin info-section">
-        <h3>Dados do Cliente</h3>
+        <h3><i class="fas fa-user"></i> Dados do Cliente</h3>
         <div class="info-row"><strong>Nome:</strong> {{ protocolo.cliente_nome }}</div>
+        <div class="info-row"><strong>E-mail:</strong> {{ protocolo.cliente_email }}</div>
         <div class="info-row"><strong>WhatsApp:</strong> <span class="mascara-telefone">{{ protocolo.cliente_whatsapp | default('Não informado') }}</span></div>
-        <div class="info-row"><strong>Status:</strong> {{ protocolo.status }}</div>
+        <div class="info-row"><strong>Chave PIX:</strong> <span style="color: var(--cor-destaque);">{{ protocolo.chave_pix if protocolo.chave_pix else 'Não informada' }}</span></div>
+        
+        <hr style="border: 1px solid #2a2a2a; margin: 15px 0;">
+        
+        <div class="info-row" style="display: flex; flex-direction: column;">
+            <strong style="margin-bottom: 5px; width: auto; white-space: nowrap;">Endereço:</strong>
+            {% if protocolo.endereco %}
+                <span style="color: #ccc; line-height: 1.4;">
+                    {{ protocolo.endereco }}, {{ protocolo.numero }} 
+                    {% if protocolo.complemento %} - {{ protocolo.complemento }}{% endif %}<br>
+                    {{ protocolo.bairro }} - {{ protocolo.cidade }}/{{ protocolo.estado_uf }}<br>
+                    CEP: 
+                    {% if protocolo.cep and protocolo.cep|string|length == 8 %}
+                        {{ (protocolo.cep|string)[:5] }}-{{ (protocolo.cep|string)[5:] }}
+                    {% else %}
+                        {{ protocolo.cep | default('Não informado') }}
+                    {% endif %}
+                </span>
+            {% else %}
+                <span style="color: #ff4444;">Endereço não cadastrado</span>
+            {% endif %}
+        </div>
+
+        <hr style="border: 1px solid #2a2a2a; margin: 15px 0;">
+
+        <div class="info-row">
+            <strong>Rastreio:</strong> 
+            {% if protocolo.codigo_rastreio %}
+                <span style="color: var(--cor-destaque); background-color: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.2); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; letter-spacing: 1px;">
+                    {{ protocolo.codigo_rastreio }}
+                </span>
+            {% else %}
+                <span style="color: var(--texto-dim); font-style: italic;">Não gerado</span>
+            {% endif %}
+        </div>
+        
+        <div class="info-row" style="display: flex; flex-direction: column; margin-top: 5px;">
+            <strong style="margin-bottom: 5px; width: auto; white-space: nowrap;"><i class="fas fa-shipping-fast"></i> Status Correios:</strong>
+            {% if historico_rastreio and historico_rastreio|length > 0 %}
+                <span style="background-color: #0dcaf0; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase; width: fit-content;">
+                    {{ historico_rastreio[0].status }}
+                </span>
+                <small style="color: var(--texto-dim); margin-top: 5px;">Atualizado em: {{ historico_rastreio[0].data }}<br><i class="fas fa-map-marker-alt"></i> {{ historico_rastreio[0].local }}</small>
+            {% else %}
+                <span style="color: var(--texto-dim);">Aguardando postagem / Sem atualizações</span>
+            {% endif %}
+        </div>
     </div>
 
     <div class="card-admin info-section">

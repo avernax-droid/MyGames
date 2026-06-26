@@ -42,6 +42,8 @@
 # - 25/06/2026: Inclusão da biblioteca werkzeug.security e das funções validar_senha_atual e atualizar_senha_usuario.
 # - 26/06/2026: Dinamização do nome fantasia (via obter_dados_empresa) nos cabeçalhos e assinaturas de e-mail.
 # - 26/06/2026: Conversão dos templates de e-mail de status (Aprovado, Parcial e Negado) para HTML rico com busca de itens do protocolo.
+# - 26/06/2026: Inclusão das bibliotecas base64, requests e logging, e criação da função consultar_historico_rastreio para a API REST dos Correios.
+# - 26/06/2026: Inclusão dos campos de endereço completo, CEP e bairro na query da função obter_cabecalho_protocolo.
 # ==============================================================================
 
 import mysql.connector
@@ -50,6 +52,9 @@ import json
 import re
 import unicodedata
 import smtplib
+import base64
+import requests
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr 
@@ -57,6 +62,9 @@ from dotenv import load_dotenv
 from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
+
+# Configuração de log para validação via terminal
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [RASTREIO] %(levelname)s - %(message)s')
 
 def conectar_bd():
     return mysql.connector.connect(
@@ -248,8 +256,9 @@ def obter_cabecalho_protocolo(protocolo_id):
     try:
         cursor = db.cursor(dictionary=True)
         query = """
-            SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado, p.data_criacao,
+            SELECT p.id, p.numero_protocolo, p.status, p.status_id, p.laudo_tecnico, p.valor_total_pix, p.valor_avaliado, p.data_criacao, p.codigo_rastreio,
                    c.nome_completo as cliente_nome, c.email as cliente_email, c.whatsapp as cliente_whatsapp, c.chave_pix,
+                   c.endereco, c.numero, c.complemento, c.bairro, c.cidade, c.estado_uf, c.cep,
                    s.nome_exibicao as status_nome, s.cor_badge, s.slug_tecnico,
                    IFNULL(
                        (SELECT MAX(data_alteracao) FROM historico_status_protocolo WHERE protocolo_id = p.id),
@@ -908,3 +917,100 @@ def salvar_dados_empresa(dados):
         if db and db.is_connected():
             cursor.close()
             db.close()
+
+
+# --- INTEGRAÇÃO CORREIOS (LOGÍSTICA REVERSA) ---
+
+def consultar_historico_rastreio(codigo_rastreio):
+    """
+    Consulta o histórico de eventos de um objeto na API REST Oficial dos Correios (SRO).
+    """
+    ambiente = os.getenv('CORREIOS_AMBIENTE', 'homologacao')
+    
+    # 1. Interceptador Mock (Fake) para testes locais no Admin
+    if ambiente == "fake":
+        logging.info(f"MODO FAKE ATIVADO: Simulando rastreio para o código {codigo_rastreio}")
+        return [
+            {"data": "26/06/2026 14:30", "local": "Unidade de Tratamento - São Paulo/SP", "status": "Objeto em trânsito - por favor aguarde"},
+            {"data": "26/06/2026 10:00", "local": "Agência dos Correios - São Paulo/SP", "status": "Objeto postado pelo cliente"},
+            {"data": "25/06/2026 15:45", "local": "Sistema MyGames", "status": "Logística Reversa Gerada"}
+        ]
+
+    if not codigo_rastreio:
+        return []
+
+    usuario = os.getenv('CORREIOS_USER')
+    senha = os.getenv('CORREIOS_PASS')
+    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM')
+    
+    if not all([usuario, senha, cartao_postagem]):
+        logging.error("Credenciais dos Correios incompletas no arquivo .env do Admin.")
+        return []
+
+    try:
+        # 2. Geração do Token de Autenticação (Bearer Token)
+        url_token = "https://api.correios.com.br/token/v1/autentica/cartaopostagem"
+        auth_string = f"{usuario}:{senha}"
+        auth_bytes = auth_string.encode("utf-8")
+        auth_base64 = base64.b64encode(auth_bytes).decode("utf-8")
+
+        headers_token = {
+            "Authorization": f"Basic {auth_base64}",
+            "Content-Type": "application/json"
+        }
+        
+        payload_token = {"numero": cartao_postagem}
+        
+        resp_token = requests.post(url_token, json=payload_token, headers=headers_token, timeout=10)
+        
+        if resp_token.status_code not in (200, 201):
+            logging.error(f"Falha na autenticação dos Correios: HTTP {resp_token.status_code} - {resp_token.text}")
+            return []
+            
+        token = resp_token.json().get('token')
+
+        # 3. Consulta de Rastreio (SRO)
+        url_sro = f"https://api.correios.com.br/sro-rastro/v1/objetos/{codigo_rastreio}?resultado=T"
+        headers_sro = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        resp_sro = requests.get(url_sro, headers=headers_sro, timeout=15)
+        
+        if resp_sro.status_code == 200:
+            dados_sro = resp_sro.json()
+            eventos_formatados = []
+            
+            # O JSON retorna uma lista de objetos pesquisados. Pegamos o primeiro.
+            objetos = dados_sro.get('objetos', [])
+            if objetos and 'eventos' in objetos[0]:
+                eventos_crus = objetos[0]['eventos']
+                
+                # Parse dos eventos para um formato simplificado e limpo para o front-end
+                for evento in eventos_crus:
+                    cidade = evento.get('unidade', {}).get('endereco', {}).get('cidade', '')
+                    uf = evento.get('unidade', {}).get('endereco', {}).get('uf', '')
+                    local = f"{cidade}/{uf}" if cidade and uf else evento.get('unidade', {}).get('nome', 'Local não informado')
+                    
+                    eventos_formatados.append({
+                        "data": evento.get('dtHrCriado', '').replace('T', ' ')[:16], # Formata Data e Hora
+                        "local": local,
+                        "status": evento.get('descricao', 'Status Indefinido')
+                    })
+                
+                logging.info(f"Rastreio do código {codigo_rastreio} obtido com sucesso.")
+                return eventos_formatados
+            else:
+                logging.warning(f"Nenhum evento encontrado para o rastreio {codigo_rastreio}.")
+                return []
+        else:
+            logging.error(f"Erro na consulta do rastreio: HTTP {resp_sro.status_code}")
+            return []
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Erro de conexão com a API dos Correios: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Erro interno no processamento do rastreio: {e}")
+        return []

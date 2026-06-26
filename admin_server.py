@@ -24,6 +24,7 @@
 # - 25/06/2026: Implementação do fluxo de recuperação de senha (Opção 2 - geração de senha provisória).
 # - 25/06/2026: Integração real do disparo de e-mail (SMTP) na recuperação de senha.
 # - 25/06/2026: Integração de envio automático de e-mail ao cliente nas rotas de alteração de status da perícia.
+# - 26/06/2026: Integração da consulta de rastreio da Logística Reversa (Correios) na rota detalhes_protocolo.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -356,7 +357,18 @@ def detalhes_protocolo(protocolo_id):
                 pass
                 
     lista_status = admin_engine.buscar_status_ativos()
-    return render_template('detalhes_protocolo.html', protocolo=dados_protocolo, itens=itens_protocolo, lista_status=lista_status)
+    
+    # NOVA LÓGICA DE CONSULTA AO RASTREIO DA LOGÍSTICA REVERSA
+    historico_rastreio = []
+    codigo_rastreio = dados_protocolo.get('codigo_rastreio')
+    if codigo_rastreio:
+        historico_rastreio = admin_engine.consultar_historico_rastreio(codigo_rastreio)
+        
+    return render_template('detalhes_protocolo.html', 
+                           protocolo=dados_protocolo, 
+                           itens=itens_protocolo, 
+                           lista_status=lista_status,
+                           historico_rastreio=historico_rastreio)
 
 @app.route('/protocolos/atualizar_status/<int:protocolo_id>', methods=['POST'])
 @requer_permissao('protocolos', 'update')
