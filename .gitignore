@@ -7,7 +7,7 @@ venv/
 .vscode/
 
 # Pasta de utilitários e scripts (Não enviar para o GitHub)
-utils/
+#utils/
 
 # Arquivos de dados e scripts de carga
 *.xlsx
