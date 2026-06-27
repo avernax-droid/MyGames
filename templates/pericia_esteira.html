@@ -17,6 +17,9 @@
   - 12/06/2026: UX UI: Adição da exibição da data_status_atual no cabeçalho do lote do cliente.
   - 12/06/2026: UX Fluxo: Implementação do parâmetro 'origem' via query string para fixar a 
                 fila correta no botão Voltar pós-recarregamento da página.
+  - 27/06/2026: UX UI: Inclusão do painel de Dados Complementares (Endereço, PIX, 
+                formatação de CEP via Jinja2 e status de Rastreio dos Correios) utilizando 
+                o mesmo padrão visual em Grid da tela de Detalhes.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -70,6 +73,69 @@
                 <i class="fas fa-clock" style="margin-right: 5px;"></i> Status atual desde: {{ protocolo.data_status_atual.strftime('%d/%m/%Y às %H:%M') if protocolo.data_status_atual else 'N/A' }}
             </span>
         </h3>
+
+        <!-- INÍCIO: PAINEL DE DADOS COMPLEMENTARES -->
+        <div class="dados-complementares" style="background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
+            <h4 style="color: var(--texto-dim); font-size: 12px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;">Dados do Cliente e Logística</h4>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <!-- Bloco Cliente/Financeiro -->
+                <div>
+                    <p style="font-size: 13px; color: #ccc; margin-bottom: 5px; line-height: 1.4;">
+                        <i class="fas fa-map-marker-alt" style="color: #888; width: 16px;"></i> 
+                        {% if protocolo.endereco %}
+                            {{ protocolo.endereco }}, {{ protocolo.numero }}
+                            {% if protocolo.complemento %} - {{ protocolo.complemento }}{% endif %}<br>
+                            <span style="margin-left: 20px;">{{ protocolo.bairro }} - {{ protocolo.cidade }}/{{ protocolo.estado_uf }}</span><br>
+                            <span style="margin-left: 20px;">CEP: 
+                                {% if protocolo.cep and protocolo.cep|string|length == 8 %}
+                                    {{ (protocolo.cep|string)[:5] }}-{{ (protocolo.cep|string)[5:] }}
+                                {% else %}
+                                    {{ protocolo.cep | default('Não informado') }}
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span style="font-style: italic; color: #ff4444;">Endereço não cadastrado</span>
+                        {% endif %}
+                    </p>
+                    <p style="font-size: 13px; color: #ccc; margin-top: 10px;">
+                        <i class="fab fa-pix" style="color: var(--cor-destaque); width: 16px;"></i> Chave PIX: 
+                        {% if protocolo.chave_pix %}
+                            <span style="color: var(--cor-destaque);">{{ protocolo.chave_pix }}</span>
+                        {% else %}
+                            <span style="color: var(--texto-dim); font-style: italic;">Não informada</span>
+                        {% endif %}
+                    </p>
+                </div>
+
+                <!-- Bloco Logística Reversa -->
+                <div style="border-left: 1px solid #333; padding-left: 15px;">
+                    <p style="font-size: 13px; color: #ccc; margin-bottom: 10px;">
+                        <i class="fas fa-box" style="color: #888; width: 16px;"></i> Rastreio: 
+                        {% if protocolo.codigo_rastreio %}
+                            <span style="color: var(--cor-destaque); background-color: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.2); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; letter-spacing: 1px;">
+                                {{ protocolo.codigo_rastreio }}
+                            </span>
+                        {% else %}
+                            <span style="color: var(--texto-dim); font-style: italic;">Sem rastreio vinculado</span>
+                        {% endif %}
+                    </p>
+                    
+                    <div style="display: flex; flex-direction: column;">
+                        <strong style="font-size: 13px; color: #ccc; margin-bottom: 5px; width: auto; white-space: nowrap;"><i class="fas fa-shipping-fast" style="color: #888; width: 16px;"></i> Status Correios:</strong>
+                        {% if historico_rastreio and historico_rastreio|length > 0 %}
+                            <span style="background-color: #0dcaf0; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase; width: fit-content; margin-left: 20px;">
+                                {{ historico_rastreio[0].status }}
+                            </span>
+                            <small style="color: var(--texto-dim); margin-top: 5px; margin-left: 20px;">Atualizado em: {{ historico_rastreio[0].data }}<br><i class="fas fa-map-marker-alt"></i> {{ historico_rastreio[0].local }}</small>
+                        {% else %}
+                            <span style="color: var(--texto-dim); font-size: 13px; margin-left: 20px;">Aguardando postagem / Sem atualizações</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- FIM: PAINEL DE DADOS COMPLEMENTARES -->
         
         {% set total_pix = namespace(value=0) %}
         <div class="lista-itens" style="max-height: 550px; overflow-y: auto; padding-right: 10px;">

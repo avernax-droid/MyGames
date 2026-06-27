@@ -18,6 +18,8 @@
                 filtro dinâmico via JavaScript (Chaves: Protocolo, Cliente, Data).
   - 26/06/2026: Adição do botão "X" de fechamento livre no modal e suporte à tecla ESC 
                 para melhorar a navegação do usuário.
+  - 27/06/2026: Implementação de ordenação dinâmica (Crescente/Decrescente) via JS 
+                para a coluna de "Data Entrada", com feedback visual no cabeçalho.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -155,6 +157,16 @@
     .form-group-modal label { display: block; margin-bottom: 8px; color: var(--texto-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
     .form-control-modal { width: 100%; padding: 12px 14px; background: #121212; border: 1px solid #444; border-radius: 8px; color: #fff; font-size: 15px; }
     .form-control-modal:focus { outline: none; border-color: var(--cor-destaque); background: #252525; }
+    
+    /* Hover e efeito visual na coluna de ordenação */
+    #th-data-criacao {
+        cursor: pointer;
+        user-select: none;
+        transition: color 0.2s;
+    }
+    #th-data-criacao:hover {
+        color: var(--cor-destaque);
+    }
 </style>
 
 <div id="modalBusca" class="modal-overlay">
@@ -206,7 +218,9 @@
                 <th width="15%">Protocolo</th>
                 <th width="20%">Cliente</th>
                 <th width="15%">Telefone</th>
-                <th width="15%">Data</th>
+                <th width="15%" id="th-data-criacao" title="Clique para ordenar por data">
+                    Data Entrada <i id="icone-sort-data" class="fas fa-sort" style="margin-left: 5px; font-size: 14px; opacity: 0.8;"></i>
+                </th>
                 <th width="10%">Valor (PIX)</th>
                 <th width="15%">Status</th>
                 <th width="10%" style="text-align: center;">Ações</th>
@@ -269,12 +283,62 @@
         const btnReabrir = document.getElementById('btnReabrirBusca');
         const inputTermo = document.getElementById('termoBusca');
         const selectChave = document.getElementById('chaveBusca');
+        
+        // Elementos da Tabela
+        const tabelaBody = document.querySelector('#tabelaProtocolos tbody');
         const tabelaLinhas = document.querySelectorAll('.linha-dado');
         const linhaVaziaFiltro = document.getElementById('linhaVaziaFiltro');
+        
+        // Elementos de Ordenação
+        const thDataCriacao = document.getElementById('th-data-criacao');
+        const iconeSortData = document.getElementById('icone-sort-data');
+        let ordemDataDesc = false;
 
         // Foca automaticamente no input quando a página carrega
         setTimeout(() => inputTermo.focus(), 100);
 
+        // --- LÓGICA DE ORDENAÇÃO DINÂMICA DA TABELA ---
+        if (thDataCriacao && tabelaLinhas.length > 0) {
+            thDataCriacao.addEventListener('click', () => {
+                ordemDataDesc = !ordemDataDesc; // Alterna a ordem
+                
+                // Atualiza o ícone de feedback visual
+                iconeSortData.className = ordemDataDesc ? 'fas fa-sort-down' : 'fas fa-sort-up';
+                iconeSortData.style.color = 'var(--cor-destaque)';
+                iconeSortData.style.opacity = '1';
+
+                // Captura as linhas de dados atuais para o array
+                const linhasTr = Array.from(tabelaLinhas);
+
+                linhasTr.sort((a, b) => {
+                    // O índice 3 refere-se à 4ª coluna (Data) na tabela desta view
+                    const textoDataA = a.querySelectorAll('td')[3].textContent.trim();
+                    const textoDataB = b.querySelectorAll('td')[3].textContent.trim();
+                    
+                    // Função interna para transformar DD/MM/YYYY HH:MM em valor comparável (Timestamp)
+                    const converterParaTimestamp = (strData) => {
+                        if (!strData || strData === '--') return 0;
+                        const partes = strData.split(' ');
+                        if (partes.length !== 2) return 0;
+                        const [dia, mes, ano] = partes[0].split('/');
+                        const [hora, min] = partes[1].split(':');
+                        return new Date(ano, mes - 1, dia, hora, min).getTime();
+                    };
+
+                    const valA = converterParaTimestamp(textoDataA);
+                    const valB = converterParaTimestamp(textoDataB);
+
+                    return ordemDataDesc ? (valB - valA) : (valA - valB);
+                });
+
+                // Reanexa as linhas ordenadas na tabela. O insertBefore garante que o modal vazio continue no fim.
+                linhasTr.forEach(linha => {
+                    tabelaBody.insertBefore(linha, linhaVaziaFiltro);
+                });
+            });
+        }
+
+        // --- LÓGICA DO FILTRO ---
         function executarFiltro() {
             const termo = inputTermo.value.trim().toLowerCase();
             const chaveIdx = parseInt(selectChave.value);

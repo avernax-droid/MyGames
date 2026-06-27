@@ -25,6 +25,7 @@
 # - 25/06/2026: Integração real do disparo de e-mail (SMTP) na recuperação de senha.
 # - 25/06/2026: Integração de envio automático de e-mail ao cliente nas rotas de alteração de status da perícia.
 # - 26/06/2026: Integração da consulta de rastreio da Logística Reversa (Correios) na rota detalhes_protocolo.
+# - 27/06/2026: Injeção do historico_rastreio (Correios) na rota de Perícia da Esteira (Cockpit).
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -278,10 +279,17 @@ def periciar_na_esteira(protocolo_id):
                 
     lista_status = admin_engine.buscar_status_ativos()
     
+    # NOVA LÓGICA: Consulta de Rastreio para o painel de perícia (Cockpit)
+    historico_rastreio = []
+    codigo_rastreio = dados_protocolo.get('codigo_rastreio')
+    if codigo_rastreio:
+        historico_rastreio = admin_engine.consultar_historico_rastreio(codigo_rastreio)
+    
     return render_template('pericia_esteira.html', 
                            protocolo=dados_protocolo, 
                            itens=itens_protocolo, 
-                           lista_status=lista_status)
+                           lista_status=lista_status,
+                           historico_rastreio=historico_rastreio)
 
 # --- ROTA: SALVAR DECISÃO DA PERÍCIA (INCLUI DISPARO DE E-MAIL) ---
 @app.route('/esteira/salvar_pericia/<int:protocolo_id>', methods=['POST'])

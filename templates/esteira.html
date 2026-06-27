@@ -11,6 +11,8 @@
                 de status. Filtro dinâmico via JS (Chaves: Protocolo, Cliente, Data).
   - 25/06/2026: Implementação de persistência de filtro via sessionStorage para 
                 evitar reabertura indesejada do Modal no retorno (botão Voltar).
+  - 27/06/2026: Implementação de ordenação dinâmica (Crescente/Decrescente) via JS 
+                para a coluna de "Data Entrada", com feedback visual no cabeçalho.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -146,6 +148,16 @@
     .btn-modal-action {
         background: #333; color: #fff; padding: 12px; border-radius: 6px; text-decoration: none; font-size: 13px; transition: 0.3s; border: none; cursor: pointer; font-weight: bold;
     }
+    
+    /* Hover e efeito visual na coluna de ordenação */
+    #th-data-entrada {
+        cursor: pointer;
+        user-select: none;
+        transition: color 0.2s;
+    }
+    #th-data-entrada:hover {
+        color: var(--cor-destaque);
+    }
 </style>
 
 <!-- MODAL DE BUSCA (Inicia oculto, o JS decide se exibe) -->
@@ -221,7 +233,9 @@
             <tr>
                 <th>Protocolo</th>
                 <th>Cliente</th>
-                <th>Data Entrada</th>
+                <th id="th-data-entrada" title="Clique para ordenar por data">
+                    Data Entrada <i id="icone-sort-data" class="fas fa-sort" style="margin-left: 5px; font-size: 14px; opacity: 0.8;"></i>
+                </th>
                 <th>Valor Ref.</th>
                 <th style="text-align: center;">Ação</th>
             </tr>
@@ -261,14 +275,20 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Elementos do DOM (Filtro e Busca)
         const modal = document.getElementById('modalBusca');
         const btnBuscar = document.getElementById('btnBuscarModal');
         const btnFechar = document.getElementById('btnFecharModal');
         const btnReabrir = document.getElementById('btnReabrirBusca');
         const inputTermo = document.getElementById('termoBusca');
         const selectChave = document.getElementById('chaveBusca');
+        
+        // Elementos do DOM (Tabela e Ordenação)
+        const tabelaBody = document.querySelector('#tabelaEsteira tbody');
         const tabelaLinhas = document.querySelectorAll('.linha-dado');
         const linhaVaziaFiltro = document.getElementById('linhaVaziaFiltro');
+        const thDataEntrada = document.getElementById('th-data-entrada');
+        const iconeSortData = document.getElementById('icone-sort-data');
 
         // Variáveis de Estado
         const hasStatus = {{ 'true' if status_selecionado else 'false' }};
@@ -276,7 +296,49 @@
         const pathAtual = window.location.pathname;
         const urlParams = new URLSearchParams(window.location.search);
         const isNovoFiltro = urlParams.get('filtro') === 'novo';
+        let ordemDataDesc = false; // Controla o estado de ordenação (Crescente/Decrescente)
 
+        // --- LÓGICA DE ORDENAÇÃO DINÂMICA DA TABELA ---
+        if (thDataEntrada && hasProtocolos) {
+            thDataEntrada.addEventListener('click', () => {
+                ordemDataDesc = !ordemDataDesc; // Alterna a ordem
+                
+                // Atualiza o ícone de feedback visual
+                iconeSortData.className = ordemDataDesc ? 'fas fa-sort-down' : 'fas fa-sort-up';
+                iconeSortData.style.color = 'var(--cor-destaque)';
+                iconeSortData.style.opacity = '1';
+
+                // Captura as linhas de dados atuais para o array
+                const linhasTr = Array.from(tabelaLinhas);
+
+                linhasTr.sort((a, b) => {
+                    const textoDataA = a.querySelectorAll('td')[2].textContent.trim();
+                    const textoDataB = b.querySelectorAll('td')[2].textContent.trim();
+                    
+                    // Função interna para transformar DD/MM/YYYY HH:MM em valor comparável (Timestamp)
+                    const converterParaTimestamp = (strData) => {
+                        if (!strData) return 0;
+                        const partes = strData.split(' ');
+                        if (partes.length !== 2) return 0;
+                        const [dia, mes, ano] = partes[0].split('/');
+                        const [hora, min] = partes[1].split(':');
+                        return new Date(ano, mes - 1, dia, hora, min).getTime();
+                    };
+
+                    const valA = converterParaTimestamp(textoDataA);
+                    const valB = converterParaTimestamp(textoDataB);
+
+                    return ordemDataDesc ? (valB - valA) : (valA - valB);
+                });
+
+                // Reanexa as linhas ordenadas na tabela. O insertBefore garante que o modal vazio continue no fim.
+                linhasTr.forEach(linha => {
+                    tabelaBody.insertBefore(linha, linhaVaziaFiltro);
+                });
+            });
+        }
+
+        // --- LÓGICA DE FILTRO DA TABELA ---
         function executarFiltro() {
             const termo = inputTermo.value.trim().toLowerCase();
             const chaveIdx = parseInt(selectChave.value);
@@ -309,7 +371,7 @@
             modal.classList.add('hidden-modal');
         }
 
-        // Lógica Principal de Abertura do Modal e Persistência
+        // --- LÓGICA DE ABERTURA DO MODAL E PERSISTÊNCIA ---
         if (hasStatus && hasProtocolos) {
             if (isNovoFiltro) {
                 // Usuário selecionou ativamente no dropdown: Limpa memória e abre modal
@@ -337,6 +399,7 @@
             }
         }
 
+        // --- LISTENERS DOS BOTÕES DE BUSCA ---
         if (btnBuscar) btnBuscar.addEventListener('click', executarFiltro);
         
         if (btnFechar) btnFechar.addEventListener('click', () => {
