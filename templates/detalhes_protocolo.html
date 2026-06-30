@@ -198,9 +198,9 @@
                 {% for item in itens %}
                 <tr>
                     <td><strong>{{ item.nome_produto }}</strong></td>
-                    <td>{{ item.quantidade }}</td>
+                    <td>{{ item.qtd_declarada }}</td>
                     <td style="color: var(--texto-dim);">R$ {{ "%.2f"|format(item.valor_pix_unitario or 0) }}</td>
-                    <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format((item.valor_pix_unitario or 0) * (item.quantidade or 1)) }}</td>
+                    <td style="color: var(--cor-destaque);">R$ {{ "%.2f"|format((item.valor_pix_unitario or 0) * (item.qtd_declarada or 1)) }}</td>
                     <td>{{ item.comentarios or '--' }}</td>
                 </tr>
                 {% endfor %}

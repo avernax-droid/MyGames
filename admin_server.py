@@ -26,6 +26,8 @@
 # - 25/06/2026: Integração de envio automático de e-mail ao cliente nas rotas de alteração de status da perícia.
 # - 26/06/2026: Integração da consulta de rastreio da Logística Reversa (Correios) na rota detalhes_protocolo.
 # - 27/06/2026: Injeção do historico_rastreio (Correios) na rota de Perícia da Esteira (Cockpit).
+# - 30/06/2026: Atualização da rota salvar_pericia_esteira para processar a Perícia Granular.
+#               Implementação de gatilho inteligente para e-mail de divergência de recebimento.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -291,13 +293,14 @@ def periciar_na_esteira(protocolo_id):
                            lista_status=lista_status,
                            historico_rastreio=historico_rastreio)
 
-# --- ROTA: SALVAR DECISÃO DA PERÍCIA (INCLUI DISPARO DE E-MAIL) ---
+# --- ROTA: SALVAR DECISÃO DA PERÍCIA (INCLUI DISPARO DE E-MAIL E GRANULARIDADE) ---
 @app.route('/esteira/salvar_pericia/<int:protocolo_id>', methods=['POST'])
 @requer_permissao('protocolos', 'update')
 def salvar_pericia_esteira(protocolo_id):
     status_id = request.form.get('status_id')
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
+    payload_itens = request.form.get('payload_itens') # NOVO: Captura os itens do HTML
     
     admin_id = session.get('admin_id')
     is_ajax = request.headers.get('Accept') == 'application/json'
@@ -308,15 +311,48 @@ def salvar_pericia_esteira(protocolo_id):
         flash('Status e Valor Avaliado são obrigatórios.', 'error')
         return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
-    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id)
+    # 1. TIRA UMA "FOTO" DO BANCO ANTES DE ATUALIZAR
+    # Isso serve para saber se o item já era "Não Recebido" antes ou se foi marcado agora
+    itens_antigos = admin_engine.obter_itens_protocolo(protocolo_id)
+
+    # Atualiza o banco de dados
+    sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id, payload_itens)
 
     if sucesso:
-        # Gatilho de notificação para o usuário
         protocolo_atualizado = admin_engine.obter_cabecalho_protocolo(protocolo_id)
         if protocolo_atualizado and protocolo_atualizado.get('cliente_email'):
             slug = protocolo_atualizado.get('slug_tecnico', '').lower() if protocolo_atualizado.get('slug_tecnico') else ''
             
-            # Condição para envio: Aprovado, Parcialmente Aprovado, Negado ou Recusado
+            # REGRA 1: Email de Divergência de Recebimento
+            if payload_itens:
+                try:
+                    itens_json = json.loads(payload_itens)
+                    teve_novo_nao_recebido = False
+                    
+                    for novo_item in itens_json:
+                        # Se o operador marcou na tela como Não Recebido (recebido == false)
+                        if not novo_item.get('recebido'): 
+                            # Verifica se esse item já tinha o status 'Não Recebido' no banco antes do clique de hoje
+                            for antigo in itens_antigos:
+                                if str(antigo['id']) == str(novo_item['id_item']):
+                                    if antigo.get('status_item') != 'Não Recebido':
+                                        teve_novo_nao_recebido = True # É uma marcação inédita!
+                                    break
+                                    
+                    # Dispara o e-mail apenas se for uma divergência nova detectada, independente do status destino
+                    if teve_novo_nao_recebido:
+                        itens_atualizados = admin_engine.obter_itens_protocolo(protocolo_id)
+                        admin_engine.enviar_email_divergencia_recebimento(
+                            destinatario=protocolo_atualizado['cliente_email'],
+                            nome_cliente=protocolo_atualizado['cliente_nome'],
+                            numero_protocolo=protocolo_atualizado['numero_protocolo'],
+                            itens_avaliados=itens_atualizados,
+                            valor_avaliado=protocolo_atualizado['valor_avaliado']
+                        )
+                except Exception as e:
+                    print(f"Erro ao processar gatilho de email de divergencia: {e}")
+            
+            # REGRA 2: Email Final da Perícia Técnica
             if 'aprovado' in slug or 'negado' in slug or 'recusado' in slug or 'parcial' in slug:
                 admin_engine.enviar_email_status_pericia(
                     destinatario=protocolo_atualizado['cliente_email'],

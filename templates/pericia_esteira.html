@@ -5,21 +5,13 @@
   DATA DE CRIAÇÃO: 10/06/2026
   HISTÓRICO DE ALTERAÇÕES:
   - 11/06/2026: Refatoração da UI: Implementação de Acordeão para itens do lote.
-  - 11/06/2026: UX/UI: Implementação de botão toggle para Laudo Técnico e lógica 
-                "Dirty Form" para habilitar/desabilitar o botão Salvar.
-  - 11/06/2026: Ajustes visuais: Alteração da cor de destaque do Laudo para verde, 
-                agrupamento dos botões Salvar/Voltar na mesma linha via Flexbox
-                e padronização da classe .btn-voltar com o tema global.
-  - 11/06/2026: UX Fluxo: O botão 'Voltar' agora usa history.back() para retornar à
-                lista exata anterior. Salvamento migrado para AJAX p/ display discreto.
-  - 12/06/2026: UX Fluxo: Remoção do history.back() e substituição por link direto via 
-                url_for no botão 'Voltar' para evitar cache e forçar atualização da lista.
-  - 12/06/2026: UX UI: Adição da exibição da data_status_atual no cabeçalho do lote do cliente.
-  - 12/06/2026: UX Fluxo: Implementação do parâmetro 'origem' via query string para fixar a 
-                fila correta no botão Voltar pós-recarregamento da página.
-  - 27/06/2026: UX UI: Inclusão do painel de Dados Complementares (Endereço, PIX, 
-                formatação de CEP via Jinja2 e status de Rastreio dos Correios) utilizando 
-                o mesmo padrão visual em Grid da tela de Detalhes.
+  - 12/06/2026: UX Fluxo: Substituição por link direto via url_for no botão 'Voltar'.
+  - 27/06/2026: UX UI: Inclusão do painel de Dados Complementares.
+  - 30/06/2026: UX UI/Lógica: Refatoração profunda para Perícia Granular.
+                - Implementação do fluxo item a item (Recebido / Não Recebido).
+                - Travas de transição de status em JS para evitar deadlocks.
+                - Leitura do campo status_item direto do banco para memória visual.
+                - Retorno dinâmico para a gaveta de origem pós-salvamento.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -49,19 +41,20 @@
     .form-control { width: 100%; padding: 12px; background: #121212; border: 1px solid #444; color: white; border-radius: 6px; font-size: 14px; }
     .form-control:focus { border-color: var(--cor-destaque); outline: none; }
     
-    .btn-salvar { padding: 15px; background: var(--cor-destaque); color: #000; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: 0.3s; text-transform: uppercase; }
-    .btn-salvar:hover:not(:disabled) { filter: brightness(0.9); }
+    .btn-salvar-lote { padding: 15px; background: var(--cor-destaque); color: #000; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: 0.3s; text-transform: uppercase; width: auto; padding-left: 40px; padding-right: 40px; }
+    .btn-salvar-lote:hover:not(:disabled) { filter: brightness(0.9); cursor: pointer; }
+    .btn-salvar-lote:disabled { opacity: 0.5; cursor: not-allowed; }
     
-    /* Botão Voltar padronizado com o visual secundário do painel */
     .btn-voltar { padding: 10px 20px; background: transparent; color: var(--texto-dim); border: 1px solid var(--texto-dim); border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.3s; display: inline-block; cursor: pointer; }
     .btn-voltar:hover { background: var(--texto-dim); color: var(--bg-fundo); }
 
-    .btn-laudo { padding: 8px 15px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 10px; transition: 0.2s; }
-    .btn-laudo:hover { background: #333; }
-
-    /* Estilo ajustado para a caixa de laudo com o tom verde da interface */
-    #caixa-laudo { display: none; background: rgba(0, 230, 118, 0.05); border: 1px solid var(--cor-destaque); padding: 15px; border-radius: 6px; }
-    #caixa-laudo .form-label { color: var(--cor-destaque); }
+    /* Estilos dos Controles Granulares */
+    .bloco-controles { background: #111; border: 1px solid #333; border-radius: 6px; padding: 15px; margin-top: 15px; display: none; }
+    .radio-label { display: inline-flex; align-items: center; margin-right: 20px; color: #ccc; font-size: 13px; cursor: pointer; }
+    .radio-label input { margin-right: 8px; cursor: pointer; }
+    .btn-salvar-item { background: #333; color: #fff; padding: 8px 15px; border-radius: 6px; border: none; font-size: 13px; font-weight: bold; cursor: not-allowed; opacity: 0.5; transition: 0.3s; }
+    .btn-salvar-item.habilitado { background: #0dcaf0; color: #000; cursor: pointer; opacity: 1; }
+    .btn-salvar-item.habilitado:hover { background: #0bacce; }
 </style>
 
 <div class="grid-pericia">
@@ -74,7 +67,7 @@
             </span>
         </h3>
 
-        <!-- INÍCIO: PAINEL DE DADOS COMPLEMENTARES -->
+        <!-- PAINEL DE DADOS COMPLEMENTARES -->
         <div class="dados-complementares" style="background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
             <h4 style="color: var(--texto-dim); font-size: 12px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;">Dados do Cliente e Logística</h4>
             
@@ -97,6 +90,10 @@
                         {% else %}
                             <span style="font-style: italic; color: #ff4444;">Endereço não cadastrado</span>
                         {% endif %}
+                    </p>
+                    <p style="font-size: 13px; color: #ccc; margin-top: 10px;">
+                        <i class="fas fa-phone" style="color: var(--cor-destaque); width: 16px;"></i> Telefone: 
+                        <span style="color: var(--texto-br);">{{ protocolo.cliente_telefone | default('Não informado') }}</span>
                     </p>
                     <p style="font-size: 13px; color: #ccc; margin-top: 10px;">
                         <i class="fab fa-pix" style="color: var(--cor-destaque); width: 16px;"></i> Chave PIX: 
@@ -135,23 +132,38 @@
                 </div>
             </div>
         </div>
-        <!-- FIM: PAINEL DE DADOS COMPLEMENTARES -->
         
         {% set total_pix = namespace(value=0) %}
-        <div class="lista-itens" style="max-height: 550px; overflow-y: auto; padding-right: 10px;">
+        <div class="lista-itens" id="container-itens" style="max-height: 550px; overflow-y: auto; padding-right: 10px;">
             {% for item in itens %}
-                {% set valor_calc = (item.valor_pix_unitario or 0) * (item.quantidade or 1) %}
+                {% set valor_calc = (item.valor_pix_unitario or 0) * (item.qtd_declarada or 1) %}
                 {% set total_pix.value = total_pix.value + valor_calc %}
                 
-                <details class="acordeao-item">
+                <details class="acordeao-item item-lote" 
+                         data-id="{{ item.id }}" 
+                         data-valor-original="{{ valor_calc }}" 
+                         data-valor-atual="{% if item.status_item == 'Não Recebido' %}0.00{% else %}{{ valor_calc }}{% endif %}" 
+                         data-status-recebido="{% if item.status_item == 'Recebido' %}true{% elif item.status_item == 'Não Recebido' %}false{% else %}null{% endif %}"
+                         data-avaliado="{% if item.status_item in ['Recebido', 'Não Recebido'] %}true{% else %}false{% endif %}">
                     <summary class="acordeao-header">
-                        {{ item.quantidade | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
-                        <span style="color: #4CAF50; float: right; margin-right: 15px;">R$ {{ "%.2f"|format(valor_calc) }}</span>
+                        {{ item.qtd_declarada | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
+                        <span class="span-valor-item" style="color: #4CAF50; float: right; margin-right: 15px;">
+                            R$ {% if item.status_item == 'Não Recebido' %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
+                        </span>
+                        
+                        <!-- Lógica Jinja baseada estritamente no status_item textual -->
+                        {% if item.status_item == 'Não Recebido' %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">NÃO RECEBIDO</span>
+                        {% elif item.status_item == 'Recebido' %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #0dcaf0; color: #000; display: inline-block;">RECEBIDO</span>
+                        {% else %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: none;"></span>
+                        {% endif %}
                     </summary>
                     <div class="acordeao-body">
                         <p style="font-size: 13px; color: #aaa; margin-bottom: 5px;">
                             <strong style="color: #ccc;">Observações/Estado:</strong> 
-                            <span style="color: #ffc107;">{{ item.descricao_estado | default('Nenhuma observation informada.', true) }}</span>
+                            <span style="color: #ffc107;">{{ item.descricao_estado | default('Nenhuma observação informada.', true) }}</span>
                         </p>
                         
                         <div class="mt-3">
@@ -166,16 +178,37 @@
                                 {% endif %}
                             </div>
                         </div>
+
+                        <!-- CONTROLES GRANULARES -->
+                        <div class="bloco-controles">
+                            <strong style="font-size: 12px; color: var(--cor-destaque); display: block; margin-bottom: 8px;">CONFIRMAÇÃO DE RECEBIMENTO:</strong>
+                            <label class="radio-label">
+                                <input type="radio" name="recebimento_{{ item.id }}" value="recebido" 
+                                       {% if item.status_item == 'Recebido' %}checked disabled{% endif %}> Recebido
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="recebimento_{{ item.id }}" value="nao_recebido" 
+                                       {% if item.status_item == 'Não Recebido' %}checked disabled{% endif %}> Não Recebido
+                            </label>
+
+                            <!-- Esconde o botão de Salvar Item se ele já foi recebido/negado anteriormente -->
+                            {% if item.status_item not in ['Recebido', 'Não Recebido'] %}
+                            <div style="text-align: right; margin-top: 15px;">
+                                <span class="msg-sucesso-item" style="color: var(--cor-destaque); font-size: 12px; font-weight: bold; margin-right: 15px; display: none;"><i class="fas fa-check"></i> Salvo Temporariamente</span>
+                                <button type="button" class="btn-salvar-item">Salvar Item</button>
+                            </div>
+                            {% else %}
+                            <div style="text-align: right; margin-top: 15px;">
+                                <span style="color: #888; font-size: 12px; font-style: italic;"><i class="fas fa-lock"></i> Etapa Concluída</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
                     </div>
                 </details>
             {% else %}
                 <p style="color: #666; font-size: 14px; font-style: italic;">Nenhum item listado para este protocolo.</p>
             {% endfor %}
-        </div>
-
-        <div style="margin-top: 20px; padding: 15px; background: #151515; border-radius: 6px; border: 1px dashed #444; text-align: right;">
-            <p style="font-size: 13px; color: var(--texto-dim); margin-bottom: 5px;">Total Original Esperado (Referência):</p>
-            <h3 style="color: #666; margin: 0;" id="total_original" data-valor="{{ total_pix.value }}">R$ {{ "%.2f"|format(total_pix.value) }}</h3>
         </div>
     </div>
 
@@ -183,37 +216,32 @@
         <h3 class="titulo-painel"><i class="fas fa-gavel"></i> Decisão Técnica e Financeira</h3>
         
         <form id="form-pericia" action="/esteira/salvar_pericia/{{ protocolo.id }}" method="POST">
-            
-            <div class="form-group" style="background: #1a1a1a; padding: 15px; border-radius: 6px; border: 1px solid #333;">
-                <label class="form-label" style="color: var(--cor-destaque); font-size: 14px;">Valor Final Avaliado do Lote (R$)</label>
-                <input type="number" step="0.01" min="0" name="valor_avaliado" id="valor_avaliado" class="form-control check-dirty" style="font-size: 20px; font-weight: bold; color: #4CAF50;" value="{{ "%.2f"|format(protocolo.valor_avaliado if protocolo.valor_avaliado else total_pix.value) }}" required>
-                <p style="font-size: 11px; color: #888; margin-top: 5px; margin-bottom: 0;">Se rejeitar o lote inteiro, digite 0.00</p>
-            </div>
+            <!-- Campo oculto para enviar o payload dos itens via form -->
+            <input type="hidden" name="payload_itens" id="payload_itens" value="[]">
 
             <div class="form-group">
                 <label class="form-label">Novo Status (Próxima Etapa)</label>
-                <select name="status_id" id="status_id" class="form-control check-dirty" required>
+                <select name="status_id" id="status_id" class="form-control" required>
                     <option value="">-- Selecione uma decisão --</option>
                     {% for s in lista_status %}
-                        <option value="{{ s.id }}" {% if protocolo.status_id == s.id %}selected{% endif %}>
+                        <option value="{{ s.id }}" data-nome="{{ s.nome_exibicao|lower }}" {% if protocolo.status_id == s.id %}selected{% endif %}>
                             {{ s.nome_exibicao }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
 
-            <button type="button" class="btn-laudo" id="btnToggleLaudo">
-                <i class="fas fa-file-alt"></i> Laudo Técnico
-            </button>
-
-            <div id="caixa-laudo" class="form-group">
-                <label class="form-label"><i class="fas fa-exclamation-triangle"></i> Descritivo Técnico</label>
-                <textarea name="laudo_tecnico" id="laudo_tecnico" class="form-control check-dirty" rows="5" placeholder="Digite o laudo técnico ou justificativa...">{{ protocolo.laudo_tecnico if protocolo.laudo_tecnico else '' }}</textarea>
+            <div class="form-group" style="background: #1a1a1a; padding: 15px; border-radius: 6px; border: 1px solid #333; margin-top: 25px;">
+                <label class="form-label" style="color: var(--cor-destaque); font-size: 14px;">Valor Final Avaliado do Lote (R$)</label>
+                <input type="text" id="valor_avaliado_display" class="form-control" style="font-size: 24px; font-weight: bold; color: #4CAF50; border: none; background: transparent; padding: 0;" value="{{ "%.2f"|format(protocolo.valor_avaliado if protocolo.valor_avaliado else total_pix.value) }}" readonly>
+                <input type="hidden" name="valor_avaliado" id="valor_avaliado" value="{{ protocolo.valor_avaliado if protocolo.valor_avaliado else total_pix.value }}">
+                <p style="font-size: 11px; color: #888; margin-top: 5px; margin-bottom: 0;">Valor calculado automaticamente pelas perícias dos itens.</p>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
-                <a href="{{ url_for('esteira_protocolos', status_id=request.args.get('origem', protocolo.status_id)) }}" class="btn-voltar">Voltar</a>
-                <button type="submit" class="btn-salvar" id="btn-salvar" disabled style="width: auto; padding-left: 40px; padding-right: 40px; opacity: 0.5; cursor: not-allowed;">Salvar</button>
+                <!-- Retorno dinâmico para a gaveta exata de onde o protocolo veio -->
+                <a href="/esteira/{{ protocolo.status_id }}" class="btn-voltar">Voltar</a>
+                <button type="submit" class="btn-salvar-lote" id="btn-salvar-lote" disabled>Salvar Lote</button>
             </div>
         </form>
     </div>
@@ -221,93 +249,175 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const formPericia = document.getElementById('form-pericia');
         const selectStatus = document.getElementById('status_id');
-        const inputValor = document.getElementById('valor_avaliado');
-        const campoLaudo = document.getElementById('laudo_tecnico');
-        const caixaLaudo = document.getElementById('caixa-laudo');
-        const btnSalvar = document.getElementById('btn-salvar');
-        const btnToggleLaudo = document.getElementById('btnToggleLaudo');
-        const totalOriginal = parseFloat(document.getElementById('total_original').dataset.valor);
+        const containerItens = document.getElementById('container-itens');
+        const itemsLote = document.querySelectorAll('.item-lote');
+        const displayTotal = document.getElementById('valor_avaliado_display');
+        const inputTotalReal = document.getElementById('valor_avaliado');
+        const btnSalvarLote = document.getElementById('btn-salvar-lote');
+        const formPericia = document.getElementById('form-pericia');
+        const inputPayload = document.getElementById('payload_itens');
+        
+        // MÁQUINA DE ESTADOS: Registra o status com o qual o protocolo foi aberto
+        const statusOriginalDoBanco = "{{ protocolo.status_id }}";
 
-        // Alteração UX: Identifica a gaveta/status original de onde o operador iniciou a perícia
-        const statusOriginal = new URLSearchParams(window.location.search).get('origem') || "{{ protocolo.status_id }}";
-
-        // Captura o estado inicial dos campos para comparar depois
-        const estadoInicial = {
-            status: selectStatus.value,
-            valor: inputValor.value,
-            laudo: campoLaudo.value
-        };
-
-        // Função de controle de abertura/fechamento do laudo
-        btnToggleLaudo.addEventListener('click', function() {
-            if (caixaLaudo.style.display === 'block') {
-                if (!campoLaudo.required) {
-                    caixaLaudo.style.display = 'none';
-                }
-            } else {
-                caixaLaudo.style.display = 'block';
-            }
-        });
-
-        if (estadoInicial.laudo.trim() !== '') {
-            caixaLaudo.style.display = 'block';
+        // Recalcula o valor total com base nos subtotais em tempo real dos itens
+        function recalcularTotalLote() {
+            let novoTotal = 0;
+            itemsLote.forEach(item => {
+                novoTotal += parseFloat(item.dataset.valorAtual) || 0;
+            });
+            const formatado = novoTotal.toFixed(2);
+            displayTotal.value = formatado;
+            inputTotalReal.value = formatado;
+            
+            validarEstadoDoBotaoLote();
         }
 
-        function verificarRegrasEModificacoes() {
-            const textoSelecionado = selectStatus.options[selectStatus.selectedIndex]?.text.toLowerCase() || "";
-            const valorAtual = parseFloat(inputValor.value) || 0;
+        // LÓGICA DE BLINDAGEM DO BOTÃO "SALVAR LOTE" (Evita Deadlocks e Salto de Etapa)
+        function validarEstadoDoBotaoLote() {
+            let todosItensTratados = true;
+            let existeItemEmExibicao = false;
             
-            let exigeLaudo = false;
-            if (textoSelecionado.includes('negado') || textoSelecionado.includes('parcial') || textoSelecionado.includes('recusado') || textoSelecionado.includes('rejeitado')) {
-                exigeLaudo = true;
-            }
-            if (valorAtual < totalOriginal) {
-                exigeLaudo = true;
+            // Verifica se o operador escolheu um NOVO status (Obrigatório)
+            const novoStatusSelecionado = selectStatus.value !== "" && selectStatus.value !== statusOriginalDoBanco;
+
+            // Pega o nome do status que está selecionado agora no dropdown
+            const opcaoSelecionada = selectStatus.options[selectStatus.selectedIndex];
+            const nomeStatusSelecionado = (opcaoSelecionada && opcaoSelecionada.dataset.nome) ? opcaoSelecionada.dataset.nome.toLowerCase() : "";
+
+            itemsLote.forEach(item => {
+                const controles = item.querySelector('.bloco-controles');
+                // Se os controles do item estão visíveis, ele DEVE ser avaliado
+                if (controles.style.display !== 'none') {
+                    existeItemEmExibicao = true;
+                    if (item.dataset.avaliado !== 'true') {
+                        todosItensTratados = false;
+                    }
+                }
+            });
+
+            // REGRA DE OURO: Se o operador fez a triagem, o status não pode mais ser "recebido". Tem que avançar.
+            let statusAvancouCorretamente = novoStatusSelecionado;
+            if (existeItemEmExibicao && todosItensTratados) {
+                if (nomeStatusSelecionado.includes('recebido')) {
+                    statusAvancouCorretamente = false; // Bloqueia o botão até ele mudar para "Aguardando Laudo", etc.
+                }
             }
 
-            if (exigeLaudo) {
-                caixaLaudo.style.display = 'block';
-                campoLaudo.required = true;
+            // Só libera o lote se: Status avançou corretamente E todos os itens visíveis foram tratados
+            if (statusAvancouCorretamente && (!existeItemEmExibicao || todosItensTratados)) {
+                btnSalvarLote.disabled = false;
             } else {
-                campoLaudo.required = false;
+                btnSalvarLote.disabled = true;
             }
+        }
 
-            const formAlterado = (
-                selectStatus.value !== estadoInicial.status ||
-                inputValor.value !== estadoInicial.valor ||
-                campoLaudo.value !== estadoInicial.laudo
-            );
+        // CONTROLADOR DE EXIBIÇÃO POR FASE (Ativa os controles se a fase for de recebimento)
+        selectStatus.addEventListener('change', function() {
+            const opcaoSelecionada = this.options[this.selectedIndex];
+            const nomeStatus = (opcaoSelecionada.dataset.nome || "").toLowerCase();
+            
+            itemsLote.forEach(item => {
+                // PROTEÇÃO UI: Se o item JÁ FOI avaliado nesta sessão, nós NÃO mexemos na tela dele.
+                // Isso permite que o operador troque o status para "Aguardando Laudo" sem que as caixinhas sumam!
+                if (item.dataset.avaliado === 'true') {
+                    return; 
+                }
 
-            // Só altera visualmente se o botão não estiver no estado de "salvando"
-            if (btnSalvar.textContent === "Salvar") {
-                if (formAlterado) {
-                    btnSalvar.disabled = false;
-                    btnSalvar.style.opacity = '1';
-                    btnSalvar.style.cursor = 'pointer';
+                const controles = item.querySelector('.bloco-controles');
+                const btnItem = item.querySelector('.btn-salvar-item');
+                
+                // Limpa o estado local para obrigar nova avaliação
+                item.dataset.avaliado = 'false';
+                btnItem.classList.remove('habilitado');
+                btnItem.disabled = true;
+
+                if (nomeStatus.includes('recebido')) {
+                    controles.style.display = 'block';
+                    item.open = true; // Força a abertura do acordeão
                 } else {
-                    btnSalvar.disabled = true;
-                    btnSalvar.style.opacity = '0.5';
-                    btnSalvar.style.cursor = 'not-allowed';
+                    controles.style.display = 'none';
+                    item.open = false;
                 }
-            }
-        }
+            });
 
-        document.querySelectorAll('.check-dirty').forEach(item => {
-            item.addEventListener('change', verificarRegrasEModificacoes);
-            item.addEventListener('input', verificarRegrasEModificacoes);
+            validarEstadoDoBotaoLote();
         });
 
-        verificarRegrasEModificacoes();
-
-        // Hijack do formulário para envio via AJAX
-        formPericia.addEventListener('submit', function(e) {
-            e.preventDefault(); // Impede o recarregamento da tela
+        // HABILITA O BOTÃO "SALVAR ITEM" APÓS SELEÇÃO DO RADIO
+        containerItens.addEventListener('change', function(e) {
+            const alvo = e.target;
+            const itemLote = alvo.closest('.item-lote');
             
+            if (itemLote && alvo.name.startsWith('recebimento_')) {
+                const btnItem = itemLote.querySelector('.btn-salvar-item');
+                btnItem.classList.add('habilitado');
+                btnItem.disabled = false;
+            }
+        });
+
+        // EXECUÇÃO DO SALVAMENTO INDIVIDUAL (Triagem de Recebimento)
+        containerItens.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-salvar-item')) {
+                const btn = e.target;
+                const itemLote = btn.closest('.item-lote');
+                const badge = itemLote.querySelector('.badge-status-item');
+                const valorOriginal = parseFloat(itemLote.dataset.valorOriginal);
+                
+                const radioSelecionado = itemLote.querySelector('input[name^="recebimento_"]:checked');
+                
+                if (radioSelecionado) {
+                    if (radioSelecionado.value === 'nao_recebido') {
+                        itemLote.dataset.valorAtual = "0.00";
+                        badge.textContent = "NÃO RECEBIDO";
+                        badge.style.background = "#dc3545"; // Vermelho
+                        itemLote.dataset.statusRecebido = "false";
+                    } else {
+                        itemLote.dataset.valorAtual = valorOriginal.toFixed(2);
+                        badge.textContent = "RECEBIDO";
+                        badge.style.background = "#0dcaf0"; // Azul
+                        itemLote.dataset.statusRecebido = "true";
+                    }
+                    
+                    // Aplica UI do item
+                    itemLote.querySelector('.span-valor-item').textContent = `R$ ${itemLote.dataset.valorAtual}`;
+                    badge.style.display = "inline-block";
+                    
+                    // Congela o item como tratado e dá feedback visual
+                    itemLote.dataset.avaliado = "true";
+                    btn.style.display = 'none';
+                    itemLote.querySelector('.msg-sucesso-item').style.display = 'inline-block';
+                    
+                    recalcularTotalLote();
+                    
+                    // Fecha o acordeão
+                    setTimeout(() => itemLote.open = false, 800);
+                }
+            }
+        });
+
+        // ENVIO DO LOTE E PREPARAÇÃO DO PAYLOAD
+        formPericia.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            let payload = [];
+            itemsLote.forEach(item => {
+                if (item.dataset.avaliado === "true") {
+                    payload.push({
+                        id_item: item.dataset.id,
+                        recebido: item.dataset.statusRecebido === "true",
+                        novo_valor: parseFloat(item.dataset.valorAtual)
+                    });
+                }
+            });
+            
+            inputPayload.value = JSON.stringify(payload);
+            
+            btnSalvarLote.textContent = "Salvando Lote...";
+            btnSalvarLote.disabled = true;
+
             const formData = new FormData(this);
-            btnSalvar.textContent = "Salvando...";
-            btnSalvar.disabled = true;
 
             fetch(this.action, {
                 method: 'POST',
@@ -317,31 +427,25 @@
             .then(response => response.json())
             .then(data => {
                 if(data.sucesso) {
-                    // Feedback visual discreto direto no botão
-                    btnSalvar.textContent = "✔ Salvo!";
-                    btnSalvar.style.backgroundColor = "#00e676"; // Cor de sucesso
-                    btnSalvar.style.color = "#000";
-
-                    // Atualiza o estado da memória para bloquear o botão novamente
-                    estadoInicial.status = selectStatus.value;
-                    estadoInicial.valor = inputValor.value;
-                    estadoInicial.laudo = campoLaudo.value;
-
-                    // Alteração UX: Força o redirecionamento injetando o status original como parâmetro fixo
+                    btnSalvarLote.textContent = "✔ Lote Salvo!";
+                    btnSalvarLote.style.backgroundColor = "#00e676";
+                    btnSalvarLote.style.color = "#000";
+                    
+                    // Retorno dinâmico para a gaveta pós-salvamento
                     setTimeout(() => {
-                        window.location.href = window.location.pathname + "?origem=" + statusOriginal;
-                    }, 2500);
+                        window.location.href = "/esteira/{{ protocolo.status_id }}";
+                    }, 2000);
                 } else {
-                    alert("Erro ao salvar: " + (data.mensagem || "Verifique os dados."));
-                    btnSalvar.textContent = "Salvar";
-                    verificarRegrasEModificacoes();
+                    alert("Erro ao salvar: " + (data.mensagem || "Desconhecido."));
+                    btnSalvarLote.textContent = "Salvar Lote";
+                    validarEstadoDoBotaoLote();
                 }
             })
             .catch(error => {
                 console.error("Erro no envio:", error);
                 alert("Erro de comunicação com o servidor.");
-                btnSalvar.textContent = "Salvar";
-                verificarRegrasEModificacoes();
+                btnSalvarLote.textContent = "Salvar Lote";
+                validarEstadoDoBotaoLote();
             });
         });
     });

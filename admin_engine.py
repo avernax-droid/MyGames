@@ -249,6 +249,60 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         print(f"Erro ao enviar e-mail de status da perícia (HTML): {e}")
         return False
 
+def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_protocolo, itens_avaliados, valor_avaliado):
+    """
+    Envia notificação destacando em negrito os itens não recebidos pelo setor de logística.
+    """
+    try:
+        dados_empresa = obter_dados_empresa()
+        nome_empresa = dados_empresa['nome_fantasia'] if dados_empresa and 'nome_fantasia' in dados_empresa else "MyGames"
+
+        sender_email = os.getenv("EMAIL_USER")
+        sender_password = os.getenv("EMAIL_PASS")
+        smtp_server = os.getenv("EMAIL_HOST")
+        smtp_port = int(os.getenv("EMAIL_PORT", 587))
+
+        html_itens = "<strong>CONFERÊNCIA DOS ITENS ENVIADOS NA CAIXA:</strong><br><br>"
+        for item in itens_avaliados:
+            nome_produto = item.get('nome_produto', 'Produto não identificado')
+            status = item.get('status_item', '')
+            
+            if status == 'Não Recebido':
+                html_itens += f"<span style='color: #dc3545;'><strong>Produto: {nome_produto} - ITEM NÃO RECEBIDO NA CAIXA</strong></span><br><br>"
+            else:
+                html_itens += f"Produto: {nome_produto} - Recebido com Sucesso<br><br>"
+
+        corpo_html = f"""
+        <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+            <p>Olá {nome_cliente},</p>
+            <p>Recebemos a sua caixa referente ao protocolo <strong>{numero_protocolo}</strong>!</p>
+            <p>No entanto, durante a nossa triagem inicial, notamos que <strong>alguns itens declarados não estavam presentes na embalagem</strong>.</p>
+            <br>
+            {html_itens}
+            <p>O valor total estimado do seu lote foi recalculado para: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
+            <p>Nossa equipe técnica seguirá com a avaliação dos itens que foram recebidos com sucesso. Se houve algum engano ou se você enviou o item faltante em outra caixa, por favor, responda este e-mail.</p>
+            <br>
+            <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
+        </div>
+        """
+
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr((nome_empresa, sender_email))
+        msg['To'] = destinatario
+        msg['Subject'] = f"{nome_empresa} - Divergência no Recebimento - Protocolo #{numero_protocolo}"
+        
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de divergência: {e}")
+        return False
+
 # [Funções de Protocolo e Esteira de Status]
 def obter_cabecalho_protocolo(protocolo_id):
     db = conectar_bd()
@@ -309,7 +363,9 @@ def obter_itens_protocolo(protocolo_id):
         query = """
             SELECT 
                 i.id, 
-                i.quantidade, 
+                i.qtd_declarada, 
+                i.qtd_recebida,
+                i.status_item, 
                 i.fotos_json, 
                 i.valor_pix_unitario, 
                 i.comentarios AS descricao_estado, 
@@ -350,7 +406,7 @@ def buscar_status_ativos():
             cursor.close()
             db.close()
 
-def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado=None, admin_id=None):
+def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado=None, admin_id=None, payload_itens=None):
     db = conectar_bd()
     if not db: return False
     try:
@@ -372,7 +428,7 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
             """
             cursor.execute(query, (status_id, laudo_tecnico, protocolo_id))
             
-        # 2. Insere na tabela de histórico se houver admin_id e status_id preenchidos
+        # 2. Insere na tabela de histórico
         if admin_id and status_id:
             query_log = """
                 INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id)
@@ -380,6 +436,26 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
             """
             cursor.execute(query_log, (protocolo_id, status_id, admin_id))
             
+        # 3. Processamento Granular (Salva se foi Recebido/Não Recebido)
+        if payload_itens:
+            try:
+                itens = json.loads(payload_itens) if isinstance(payload_itens, str) else payload_itens
+                for item in itens:
+                    id_item = item.get('id_item')
+                    recebido = item.get('recebido')
+                    
+                    status_texto = 'Recebido' if recebido else 'Não Recebido'
+                    qtd_rec = 1 if recebido else 0
+                    
+                    query_item = """
+                        UPDATE itens_periciados 
+                        SET status_item = %s, qtd_recebida = %s 
+                        WHERE id = %s AND protocolo_id = %s
+                    """
+                    cursor.execute(query_item, (status_texto, qtd_rec, id_item, protocolo_id))
+            except Exception as e:
+                print(f"Erro ao processar itens granulares: {e}")
+
         db.commit()
         return True
     except mysql.connector.Error as err:
