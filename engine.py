@@ -34,6 +34,7 @@
 # - 23/06/2026: Implementação da dupla barreira de validação em calcular_cotacao_final (Backend Business Rules).
 # - 23/06/2026: Adição do xml.sax.saxutils (escape) para sanitização rigorosa de caracteres especiais na integração dos Correios.
 # - 26/06/2026: Validação da dinamização do nome fantasia no e-mail (enviar_email_resumo) e remoção de strings "MyGames" hardcoded na integração dos Correios.
+# - 02/07/2026: Correção na função registrar_item_periciado substituindo a coluna inexistente 'quantidade' por 'qtd_declarada' no INSERT do banco de dados.
 # ==============================================================================
 
 import mysql.connector
@@ -863,8 +864,19 @@ def registrar_item_periciado(protocolo_id, item):
     if not db: return False
     try:
         cursor = db.cursor(dictionary=True)
-        sql = "INSERT INTO itens_periciados (protocolo_id, produto_id, quantidade, fotos_json, comentarios, valor_pix_unitario, valor_cred_unitario) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        cursor.execute(sql, (protocolo_id, item['produto_id'], item.get('quantidade', 1), item.get('fotos_json'), item.get('comentarios', ''), item['valor_pix_unitario'], item['valor_cred_unitario']))
+        # CORREÇÃO: O campo no banco de dados se chama 'qtd_declarada', não 'quantidade'.
+        sql = "INSERT INTO itens_periciados (protocolo_id, produto_id, qtd_declarada, fotos_json, comentarios, valor_pix_unitario, valor_cred_unitario) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        
+        # Mantemos o item.get('quantidade', 1) pois é assim que a chave trafega no JSON/Sessão do Front-end
+        cursor.execute(sql, (
+            protocolo_id, 
+            item['produto_id'], 
+            item.get('quantidade', 1), 
+            item.get('fotos_json'), 
+            item.get('comentarios', ''), 
+            item['valor_pix_unitario'], 
+            item['valor_cred_unitario']
+        ))
         db.commit()
         return True
     finally:

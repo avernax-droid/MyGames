@@ -7,7 +7,8 @@ O Problema: Manter a opção "Catálogo" no aplicativo Backoffice/Admin geraria 
 A Solução: Eliminar o CRUD (Create, Read, Update, Delete) de produtos no MyGames. O sistema passará a consultar o catálogo oficial em tempo real na plataforma Supabase da empresa via API.
 
 2. Como a Empresa Concede o Acesso
-A equipe responsável pelo banco centralizado não precisará abrir portas de firewall ou criar conexões diretas complexas com o banco de dados. A liberação ocorre via API REST nativa do Supabase.
+A equipe responsável pelo banco centralizado não precisará abrir portas de firewall ou criar conexões diretas complexas com o banco de dados. 
+A liberação ocorre via API REST nativa do Supabase.
 
 Para que a integração aconteça, a empresa deve fornecer:
 
@@ -16,10 +17,13 @@ URL do Projeto: O endereço web do Supabase deles (ex: https://[ID-DO-PROJETO].s
 Anon Key (Chave Pública): A chave de API padrão gerada pelo Supabase.
 
 Segurança Garantida (RLS):
-A equipe da empresa ativará o Row Level Security (RLS) na tabela de produtos deles. Eles criarão uma regra informando que chaves anônimas (Anon Key) possuem apenas permissão de leitura (SELECT). O banco de dados do Supabase bloqueará automaticamente qualquer tentativa de inserção, edição ou exclusão vinda do nosso aplicativo.
+A equipe da empresa ativará o Row Level Security (RLS) na tabela de produtos deles. Eles criarão uma regra informando que chaves anônimas 
+(Anon Key) possuem apenas permissão de leitura (SELECT). O banco de dados do Supabase bloqueará automaticamente qualquer tentativa de 
+inserção, edição ou exclusão vinda do nosso aplicativo.
 
 3. Implementação Prática no Ambiente MyGames
-A integração mantém a organização atual do código. As configurações sensíveis ficam isoladas e a lógica de comunicação externa fica centralizada no módulo principal de negócios, o engine.py.
+A integração mantém a organização atual do código. As configurações sensíveis ficam isoladas e a lógica de comunicação externa fica 
+centralizada no módulo principal de negócios, o engine.py.
 
 Passo A: Configuração de Variáveis de Ambiente (.env)
 No servidor, adicionamos as credenciais fornecidas pela empresa:

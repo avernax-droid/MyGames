@@ -257,3 +257,484 @@ Senha de App: O campo EMAIL_PASS no .env não deve receber a sua senha pessoal d
 Validação de Ambiente: Caso o e-mail não seja disparado, verifique no terminal se há mensagens de erro da biblioteca smtplib. Se necessário, use print() no início da função de envio para confirmar se as variáveis EMAIL_HOST e EMAIL_USER estão sendo lidas corretamente pelo sistema.
 
 Boas Práticas: Em produção, utilize uma conta de e-mail dedicada ao sistema (ex: suporte@mygames.com) para evitar bloqueios de SPAM e manter a organização das comunicações automáticas.
+
+===========
+26/06
+
+Tarefa: Inclusão de Dados Complementares na Esteira de Gestão
+Módulo Alvo:
+templates/esteira.html
+
+Localização na Interface:
+Página "Esteira de Gestão" > Opção / Modal de "Periciar" > Inserir imediatamente abaixo do quadro "Lote do Cliente: "
+
+Objetivo:
+Replicar as melhorias de UI/UX implementadas no painel de detalhes do protocolo, centralizando as informações financeiras e logísticas do cliente diretamente na tela de perícia para agilizar a validação do operador.
+
+Elementos Visuais a Inserir (Frontend):
+
+Chave PIX: Exibir a chave cadastrada com a cor de destaque do painel. Caso vazia, exibir "Não informada".
+
+Endereço Completo: Exibir logradouro, número, complemento, bairro, cidade e UF.
+
+Formatação de CEP: Aplicar a máscara visual de CEP (hífen) diretamente via motor Jinja2, sem dependência de JavaScript.
+
+Código de Rastreio: Aplicar o design de badge discreta translúcida com tipografia monoespaçada.
+
+Status Correios: Inserir o painel de status logístico com a badge dinâmica (ex: "Objeto postado"), incluindo a data e o local da última atualização.
+
+Requisitos de Integração (Backend - Ponto de Atenção):
+
+Consulta SQL: Verificar se a função no admin_engine.py que alimenta a tela "Periciar" já está trazendo as colunas de endereço (endereco, numero, complemento, bairro, cidade, estado_uf, cep) e chave_pix.
+
+Integração API: Garantir que a rota do Flask correspondente à ação "Periciar" execute a chamada admin_engine.consultar_historico_rastreio(codigo_rastreio) e repasse a variável historico_rastreio para o renderizador do template esteira.html.
+
+=================
+
+27/06
+
+Esta é uma mudança estratégica importante para o MyGames. Passar de um modelo de "perícia de lote" para "perícia de itens" (granular) aumenta a precisão e a profissionalização do atendimento ao cliente.
+
+Abaixo, apresento o plano detalhado de implementação para a sua documentação.
+
+1. Mudanças na Estrutura do Banco de Dados
+Precisamos evoluir a tabela itens_periciados para suportar o estado individual de cada item, permitindo diferenciar o que foi declarado do que foi efetivamente recebido.
+
+A. Comandos SQL Sugeridos
+Execute estes comandos para preparar a tabela de itens:
+-- Adiciona campos para controle granular
+ALTER TABLE itens_periciados 
+ADD COLUMN status_item VARCHAR(20) DEFAULT 'pendente', -- pendente, aprovado, reprovado, ausente
+ADD COLUMN qtd_declarada INT DEFAULT 1,
+ADD COLUMN qtd_recebida INT DEFAULT 0,
+ADD COLUMN motivo_recusa TEXT NULL,
+ADD COLUMN data_pericia TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+2. Módulos e Impactos no Código
+A lógica de processamento deixará de ser um "disparo único" no protocolo e passará a ser uma atualização por linha (item).
+
+A. admin_server.py (Lógica de Backend)
+Nova Rota de Atualização: Criar uma rota (ex: /api/pericia/update-item) que recebe apenas o item_id, status e qtd_recebida.
+
+Cálculo Automático: Após cada atualização de item, o servidor deve verificar o status geral do protocolo:
+
+Se todos os itens estiverem com status final (aprovado/reprovado/ausente) ➔ Alterar status do protocolo para "Periciado".
+
+Trigger de Comunicação: Se um item for marcado como "ausente", a lógica deve sinalizar ao sistema que um e-mail de divergência deve ser 
+preparado ou enviado.
+
+B. templates/pericia_esteira.html (Interface do Operador)
+Transformação em Formulário: Os itens que hoje estão em uma lista (ou acordeão) passarão a ser campos de entrada (<input> para quantidade, 
+<select> para status e <textarea> para motivo).
+
+Feedback Visual: Adicionar cores dinâmicas para cada linha:
+
+Verde (Aprovado), Vermelho (Reprovado), Amarelo (Ausente/Divergente).
+
+Botão de Salvar Individual: Cada linha deve ter um botão "Salvar Item" (via AJAX) para que o operador não precise salvar o lote inteiro de 
+uma vez, evitando perda de dados.
+
+3. Fluxo de Trabalho (Workflow) Proposto
+Para documentar o comportamento do sistema, siga este fluxo:
+
+Entrada: O protocolo chega no sistema. O operador abre a pericia_esteira.html.
+
+Conferência: Para cada item, o operador insere a qtd_recebida.
+
+Caso: Operador insere 0 em um item. Sistema marca automaticamente como Ausente.
+
+Avaliação: Para cada item, o operador seleciona Aprovado ou Reprovado.
+
+Caso: Reprovado ➔ Abrir campo motivo_recusa (obrigatório).
+
+Notificação: Ao finalizar a perícia do último item:
+
+O sistema envia um e-mail ao cliente contendo:
+
+Lista dos itens aprovados e valores.
+
+Lista dos itens reprovados (com motivos).
+
+Lista dos itens ausentes (com solicitação de confirmação).
+
+4. Próximos Passos para Desenvolvimento
+Para não se perder na implementação, recomendo seguir esta ordem:
+
+Migração do Banco: Execute o ALTER TABLE no seu ambiente de desenvolvimento.
+
+Ajuste do Controller: Crie a rota api/pericia/update-item em admin_server.py. Teste via Postman ou Insomnia para garantir que o banco está 
+gravando o status de cada item corretamente.
+
+Refatoração do Front-end: Atualize o templates/pericia_esteira.html para exibir os campos de edição e o botão de salvar.
+
+Implementação do E-mail: Crie a lógica de disparo de e-mail baseada no resultado final do lote após a conferência de todos os itens.
+
+Este plano cobre a necessidade de granularidade e o controle de divergências (itens ausentes). Se precisar que eu escreva o código da nova 
+rota de backend ou o HTML para a nova interface da esteira, é só me pedir!
+
+==================
+
+27/06
+1. MUDANÇAS NA ESTRUTURA DO BANCO DE DADOS (MYSQL)
+- Remoção da coluna 'quantidade' na tabela 'itens_periciados'[cite: 3].
+- Adição de colunas granulares: 'qtd_declarada', 'qtd_recebida', 'status_item' e 'motivo_recusa'[cite: 3].
+
+2. ATUALIZAÇÕES NO ADMIN_ENGINE.PY (CAMADA DE DADOS)
+- Reescrita de 'obter_itens_protocolo' para carregar dados granulares sem a coluna 'quantidade'[cite: 3].
+- Implementação de 'atualizar_status_item' para persistir edições por item[cite: 3].
+- Lógica de automação: fechamento automático do lote ao concluir todos os itens[cite: 3].
+
+3. ATUALIZAÇÕES NO ADMIN_SERVER.PY (CONTROLLER/API)
+- Criação da rota POST '/api/pericia/update-item' para salvamento via AJAX[cite: 2].
+- Proteção por RBAC com '@requer_permissao'[cite: 2].
+- Sanitização de tipos (int/json) para evitar erros de banco[cite: 2].
+
+4. ATUALIZAÇÕES NO PERICIA_ESTEIRA.HTML (INTERFACE)
+- Interface de duas fases (Recebimento vs Perícia) baseada no status[cite: 3].
+- Micro-formulários individuais por item (sem recarregar página)[cite: 3].
+- Calculadora JS em tempo real para o total do lote[cite: 3].
+- Feedback visual com ícones (ticks) e bordas coloridas nos itens[cite: 3].
+
+====================
+28/06
+
+1. Módulo: templates/pericia_esteira.html
+O problema: O uso de <select> para as opções de avaliação não atende à necessidade de uma interface clicável e intuitiva (o sistema de 
+"bolinhas").
+
+O que alterar:
+Substituição de Estrutura: Remover a tag <select class="select-avaliacao"> e substituí-la por uma lista de label contendo input 
+type="radio".
+
+Lógica de Interação: O JavaScript deve ser ajustado para identificar qual input radio foi selecionado, alterar visualmente o ícone 
+(bolinha vazia para check/x/exclamação) e aplicar a regra de negócio (zerar o valor se "Negado", permitir edição se "Parcial").
+
+Obrigatoriedade: Garantir que, ao selecionar "Negado" ou "Parcial", a textarea de justificativa técnica seja exibida e o salvamento seja 
+validado contra o preenchimento desse campo.
+
+2. Módulo: admin_server.py
+O problema: O e-mail não está sendo enviado ao salvar o lote.
+O que alterar:
+O Gatilho (Trigger): A rota salvar_pericia_esteira no seu controlador (admin_server.py) possui uma condição if que verifica o 
+slug_tecnico do status para disparar o e-mail. Se o novo status escolhido no formulário não contiver exatamente os termos que o código 
+espera, o e-mail não é enviado.
+
+Correção: Devemos expandir ou generalizar essa verificação para que qualquer status final (ex: "Validado", "Concluído", "Periciado") 
+dispare a função admin_engine.enviar_email_status_pericia.
+
+3. Módulo: admin_engine.py
+O problema: Dependendo do status final, o e-mail pode não estar carregando corretamente a situação individual de cada item, ou o valor 
+total do lote pode estar vindo zerado se a lógica não estiver capturando a persistência granular corretamente.
+O que alterar:
+
+Sanitização de Valores: Garantir que a função atualizar_status_protocolo esteja recebendo o valor total final calculado pelo front-end 
+após as subtrações dos itens negados.
+
+Validação de Laudo: Como removemos o "Laudo Técnico Global", certificar que a função de envio de e-mail não dependa de um campo nulo de 
+laudo global, passando a utilizar as justificativas individuais salvas em cada item.
+
+Resumo das Ações para Documentação
+Frontend (Interface): Substituir select por input[type="radio"] no pericia_esteira.html e atualizar o EventListener JS para processar 
+os cliques nas bolinhas, atualizando o campo valor_avaliado instantaneamente.
+
+Backend (Controller): Ajustar o filtro de disparo de e-mails em admin_server.py para não depender de palavras-chave restritas, 
+garantindo o disparo para qualquer status de conclusão de pericia.
+
+Persistência (Engine): Verificar se o valor_avaliado (total do lote) passado na função atualizar_status_protocolo no admin_engine.py 
+está recebendo o valor final calculado (após descontos dos itens negados).
+
+===============
+29/06
+
+Prompt de Retomada (Especificação para o próximo ciclo)
+
+A base de dados foi alterada com sucesso para suportar a perícia granular (tabela itens_periciados).
+
+Na tabela: itens_periciados, não existe mais o campo quantidade, agora temos os campos:
+    - qtd_declarada: atualizado pela aplicação site/cliente pelo modulo engine.py (já foi alterado para tratar esse novo campo)
+    - qtd_recebida : atualizado pela aplicação admin/BACKOFFICE pelo operador.
+
+Tarefa: Ajustar o aplicativo admin/BACKOFFICE
+
+Na opção "protocolos/detalhes" - modulo: templates/detalhes_protocolo.html:
+    - inserir no quadro "Dados do Cliente" as seguintes informações:
+        codigo logistica reversa (rastreio) com um destaque discreto.
+        endereço completo
+        CEP
+    - Na pagina "Gestão de Protocolos" alterar o compo "data" para "data entrada"
+    - Permitir ao operador selecionar ordem crescente ou descrescente dos protocolos conforme o campo "data entrada"
+    - Quando o operador seleciona a opção "protocolos" o sistema mostra o popup "Localizar Protocolos", inserir nesse popup o icone "X", 
+      no canto superior direito, caso o operador queira sair dessa condição, clicar nesse icone, para poder escolher outras opções da 
+      aba esquerda da página.
+    - Nesse popup trocar de lugar o botão "Ver Todos" com o botão "Aplicar Filtro", deixar em evidencia o botão "ver todos"
+
+No modulo templates/pericia_esteira.html Inserir no quadro "Lote do Cliente" as informações:
+        endereço completo
+        CEP
+        codigo logistica reversa (rastreio) com um destaque discreto
+        telefone
+            
+    alterar o botão "salvar" do quadro "Decisão Técnica e Financeira" para "salvar lote"
+
+A partir desta versão o sistema passará a tratar os itens do protocolo (lote) individualmente.
+
+Visão geral das alterações:
+
+Após o lote ser postado no correio e recebido pela empresa, o lote é verificado de acordo o informado pelo aplicativo site/cliente.
+Supondo que o lote informado continha tres itens mas a empresa constatou que só foram postados dois itens.
+O operador poderá informar as seguintes informações por item do lote.
+    - recebido
+    - não recebido
+
+O operador poderá avaliar individualmente, de acordo com o laudo tecnico, os itens da seguinte forma:
+    - aprovado
+    - parcialmente aprovado
+    - negado
+
+Fluxo das operações - modulo: templates/pericia_esteira.html
+
+    Na tela "Realizar Perícia - Protocolo" no quadro "Decisão Técnica e Financeira" o botão "salvar lote" deve iniciar desabilitado.
+
+    Primeiro ajuste - Quando o operador selecionar um protocolo com status "aguardando o cliente levar o produto no correio"
+    Quando o produto (lote) é recebido pela empresa, o operador altera o status do protocolo para "produto recebido" e segue com o 
+    seguinte roteiro.
+        - O operador seleciona o item. Lado esquero da pagina - quadro "Lote do Cliente:"
+        - O sistema abre o item e deve mostrar duas opções (radio buttons)
+            recebido
+            não recebido 
+        - O sistema deve mostrar no canto inferior direito o botão "salvar item" desabilitado.
+        - o sistema aguarda o operador selecionar uma das opções e então abilita o botão "salvar item"
+        - O sistema aguarda o operador selecionar o botão "salvar item"
+        - Caso o operador tenha selecionado a opção "não recebido":
+            O valor no item, no quadro do item, deve ser zerado
+            O valor do campo "Valor Final Avaliado do Lote (R$)" no quadro "Decisão Técnica e Financeira" deve ser recalculado e mostrar 
+            o novo valor.
+
+    O operador deve fazer os procedimentos descritos para todos os itens do lote, só então o botão "salvar lote" no quadro " Decisão Técnica e Financeira"
+    deve ser abilitado. O operador pode selecionar um outro status para esse protocolo, em "Novo Status (Próxima Etapa)", como: 
+    "aguardando laudo".
+    Após o operador selecionar o botão "salvar lote" o sistema verifica se algum dos itens do lote foi selecionado como "não recebido", 
+    se sim, o sistema deve envir um e-mail para o usuario descrevendo os itens do lote e destacando (negrito) os itens que não foram recebidos e o novo
+    valor do lote.
+
+    Após o item ser salvo, o sistema sempre deverá mostrar "recebido" ou "não recebido" quando o item for selecionado.
+
+    segundo ajuste - Quando o operador selecionar um protocolo com status "aguardando laudo"
+    procedimentos:
+        O operador deve mudar o status do protocolo, em "Novo Status (Próxima Etapa)", para "validar"
+        O operador seleciona um item do lote (protocolo)
+        O sistema deve verificar se o item foi recebido ou não, caso o item esteja como "não recebido" não executar os passos abaixo.
+        O sistema deve mostrar tres opções (radio buttons)
+            aprovado
+            parcialmente aprovado
+            negado
+        O sistema deve mostrar no canto inferior direito o botão "salvar item" desabilitado.    
+        Se o operador selecionar uma das opções "parcialmente aprovado" ou "negado", o sistema deve obrigar o operador a inserir o 
+        laudo tecnico, o sistema deve abrir uma area para isso.
+        Após o operador selecionar uma das opções o sistema abilita o botão "salvar item"
+        O sistema aguarda o operador selecioanar o botão "salvar item"
+        O sistema verifica se opção for:
+            negado               : o sistema deve zerar o valor do item.
+            parcialmente aprovado: o sistema deve possibilitar o operador alterar o valor do item.
+            Para qualquer um dos dois casos: o sistema deve calcular o novo valor do campo "Valor Final Avaliado do Lote (R$)"
+            calculo do novo valor:
+                Se valor do item = zero, novo valor do lote = valor do lote original - valor do item original
+                Se não, novo valor do lote = valor original do lote - valor original do item + novo valor do item
+
+        Apos o oprador avaliar todos os itens do lote o botão "salvar lote" é abilitado
+        O operador pode selecionar um outro status para esse protocolo, em "Novo Status (Próxima Etapa)", como: "aguardando pagamento"
+        Quando o operador selecionar o botão "salvar lote", do quadro "Decisão Técnica e Financeira", o sistema deve enviar um 
+        e-mail para o usuario descrevendo item a item o resultado da avaliação e o valor avaliado do lote.
+
+        Com a mudança para validar item a item, não faz sentido manter a area " Laudo Técnico" no quadro "Decisão Técnica e Financeira"           
+
+=================
+30/06
+
+RELATÓRIO DE EVOLUÇÃO DO SISTEMA (30/06/2026)
+
+1. REFATORAÇÃO DA PERÍCIA GRANULAR (Módulo: pericia_esteira.html)
+- Implementado controle granular por item: O operador define "Recebido" ou "Não Recebido" individualmente.
+- Adicionadas travas de segurança: O botão "Salvar Lote" permanece indisponível até que todos os itens visíveis sejam avaliados.
+- Integração de memória visual: O status de cada item é lido diretamente do banco de dados, mantendo o estado correto após recarregamentos.
+- Otimização do fluxo: Redirecionamento dinâmico para a gaveta de origem pós-salvamento, limpando a fila automaticamente.
+
+2. ATUALIZAÇÃO DO MOTOR DE REGRAS (admin_engine.py)
+- Query de itens atualizada: A função obter_itens_protocolo agora busca o campo status_item.
+- Persistência granular: A função atualizar_status_protocolo foi adaptada para processar o JSON de itens na tabela itens_periciados.
+- Gatilho de divergência: Criada a função enviar_email_divergencia_recebimento para notificar clientes sobre itens faltantes.
+
+3. ATUALIZAÇÃO DO SERVIDOR FLASK (admin_server.py)
+- Rota de salvamento: Atualizada a /esteira/salvar_pericia/<protocolo_id> para tratar o payload granular.
+- Gatilho inteligente: Implementada verificação para disparar e-mail de divergência apenas se a marcação for inédita.
+
+4. AJUSTES DE UI (Módulo: esteira.html)
+- UX do Modal: Invertida a posição dos botões e aplicado destaque visual (verde luminoso) no "Ver Todos".
+
+5. VERSIONAMENTO
+- Ambiente: Criada a branch em-mutacao e sincronizada no GitHub.
+
+===============
+01/07
+1. Falha na Trava de Segurança do Botão "Salvar Lote" (Front-end)
+O arquivo templates/pericia_esteira.html não está conseguindo bloquear o botão de submissão do formulário de maneira rigorosa, permitindo o avanço da esteira sem as devidas validações.
+
+O botão "Salvar Lote" continua sendo habilitado mesmo quando o operador não altera o status do protocolo no menu suspenso (select).
+
+A função JavaScript responsável pela validação (validarEstadoDoBotaoLote) apresenta falhas ao comparar o status original vindo do banco de dados com o status atual selecionado na interface.
+
+A verificação de obrigatoriedade da avaliação dos itens está acoplada a regras visuais da interface (se a fase é de triagem ou laudo) em vez de validar estritamente as marcações de dados (dataset) de cada item processado.
+
+O comportamento esperado era de bloqueio absoluto do botão caso o novo status seja idêntico ao original ou se houver itens no lote aguardando avaliação obrigatória.
+
+2. Inconsistência de Valores Financeiros no E-mail ao Cliente (Back-end)
+O módulo admin_engine.py está enviando e-mails com os valores desatualizados (originais do catálogo) em vez dos valores efetivamente atribuídos durante a perícia técnica.
+
+Quando um item sofre redução de valor (exemplo: de R$ 2100,00 para R$ 2000,00), o sistema grava ou processa a alteração, mas o e-mail disparado para o cliente exibe o valor original (R$ 2100,00).
+
+Existe uma assincronia ou leitura em cache na função enviar_email_status_pericia: a consulta ao banco de dados que monta o e-mail não consegue enxergar a atualização feita frações de segundo antes.
+
+Há uma suspeita de que a função atualizar_status_protocolo pode não estar aplicando o comando UPDATE na coluna correta que o e-mail posteriormente consulta (valor_pix_unitario vs. colunas de valores atualizados).
+
+O comportamento esperado é que a lista de itens no corpo do e-mail reflita com exatidão matemática o valor recém-digitado e salvo pelo operador no Cockpit de perícia.
+
+3. Mapeamento Incorreto de Status Específicos no E-mail (Banco de Dados / Back-end)
+O e-mail disparado ignora avaliações granulares específicas, substituindo o status técnico real pelo status anterior da triagem.
+
+Itens marcados no front-end como "Parcialmente Aprovado" chegam ao e-mail do cliente classificados incorretamente como "Recebido".
+
+Houve um gargalo de banco de dados anterior (Erro 1406: Data too long for column 'status_item') que impedia a gravação da string "Parcialmente Aprovado", mas mesmo após a expansão do campo para VARCHAR(50), o erro de leitura no e-mail persiste.
+
+O fluxo de montagem do HTML no admin_engine.py falha em reconhecer a string correta no momento da leitura, caindo na condição de fallback que exibe o status de entrada do item.
+
+Existe uma falha na transição do dado: o que sai do payload_itens no navegador, o que é salvo pela query no banco e o que é lido para gerar o HTML do e-mail não estão operando com a mesma string exata.
+
+=====================
+01/07
+
+PROMPT PARA A IA: IMPLEMENTAÇÃO DO FLUXO DE PERÍCIA GRANULAR (MYGAMES V3.0)
+"Atue como um Desenvolvedor Sênior em Python/Flask. O objetivo é refatorar o fluxo de perícia do sistema MyGames para tratar itens de 
+um protocolo (lote) individualmente, com validação granular e blindagem de interface.
+
+1. ESTRUTURA E REGRAS DE OURO:
+
+Regra de Acesso: Utilize estritamente a coluna slug_tecnico do banco de dados para identificar a fase do protocolo (Triagem ou Perícia Técnica). 
+Não dependa de strings visuais como 'Laudo' ou 'Recebido'.
+
+Normalização: Toda validação no front-end deve usar slugStatus.includes('palavra_chave') após normalizarString().
+
+Blindagem de UI: O botão 'Salvar Lote' deve iniciar disabled. Ele só deve habilitar se o status do protocolo foi alterado E todos os 
+itens processáveis (recebidos) tiverem sido salvos individualmente.
+
+Payload: O envio de dados ao servidor deve ser feito via JSON (payload_itens) contendo o status explícito do item, evitando inferências
+pelo back-end.
+
+2. PROCEDIMENTOS POR FASE:
+
+A. Fase de Recebimento (Triagem):
+
+Status gatilho: slug_tecnico contendo 'recebido' ou 'triagem'.
+
+UI por item: Radio buttons [Recebido / Não Recebido].
+
+Ação: Se 'Não Recebido', zerar valor do item e atualizar o "Valor Final Avaliado do Lote" em tempo real.
+
+Gatilho de E-mail: Se houver divergência (item marcado 'Não Recebido'), enviar e-mail de divergência destacando itens faltantes.
+
+B. Fase de Perícia Técnica (Laudo):
+
+Status gatilho: slug_tecnico contendo 'pericia' ou 'laudo'.
+
+UI por item: Radio buttons [Aprovado / Parcialmente Aprovado / Negado].
+
+Obrigatório: Se 'Parcial' ou 'Negado', exigir campo de texto para Laudo Técnico.
+
+Lógica Financeira:
+
+Negado: Valor do item = 0.
+
+Parcial: Permitir edição do valor pelo operador.
+
+Recálculo: Atualizar o "Valor Final Avaliado do Lote" dinamicamente: Valor_Total - Valor_Original_Item + Novo_Valor_Item.
+
+Gatilho de E-mail: Ao salvar o lote, enviar e-mail técnico detalhado item a item.
+
+3. CORREÇÕES DE BACK-END E INTEGRIDADE:
+
+Proteção contra Nulos: No admin_engine.py, ao montar o e-mail, se o nome do produto for None, exibir 'Produto Personalizado 
+(Categoria X)'. Nunca permitir a exibição da string 'None'.
+
+Cálculo de E-mail: Garantir que o e-mail exiba a comparação 'De R$ X por R$ Y' de forma segura, tratando campos nulos como 0.0.
+
+Log de Auditoria: Implementar print(payload_itens) na rota de salvamento para depuração.
+
+UX: Remover o campo de "Laudo Técnico" do quadro "Decisão Técnica e Financeira" (cabeçalho), pois a avaliação agora é granular por item.
+
+Implemente os ajustes nos módulos templates/pericia_esteira.html, admin_engine.py e admin_server.py. Mantenha o código documentado 
+conforme o cabeçalho oficial do projeto."
+
+====================
+
+PROMPT DE REINÍCIO: Fluxo de Perícia Granular (MyGames V3.0)
+"Estamos reiniciando a implementação da perícia granular no admin/backoffice. O objetivo é substituir a lógica baseada em strings 
+visuais por uma lógica baseada estritamente no slug_tecnico do banco de dados e garantir a integridade dos dados item a item. Siga 
+estas diretrizes obrigatórias:
+
+1. Estratégia de Identificação (O 'Contrato'):
+
+Em templates/pericia_esteira.html, no <select> de status, utilize o atributo data-slug="{{ s.slug_tecnico }}" para identificar a fase 
+do protocolo.
+
+O JavaScript deve normalizar strings (remover acentos/maiusculas) e utilizar .includes('pericia') ou .includes('laudo') para ativar a 
+interface granular. Nenhuma lógica deve depender do texto visual exibido no combobox.
+
+2. Blindagem Total da Interface (Manual de Engenharia)
+Regra de Ouro da Trava: O botão "Salvar Lote" deve permanecer rigorosamente disabled (cinza) em qualquer fase (seja na Triagem de 
+recebimento ou na Perícia de laudo) até que o operador tenha interagido com todos os itens do lote.
+
+Blindagem na Triagem: Se o status do protocolo estiver na fase de recebimento, o operador deve ser obrigado a marcar cada item como 
+"Recebido" ou "Não Recebido" e clicar em "Salvar Item" individualmente. A trava só libera o "Salvar Lote" se o contador de itens 
+processados for igual ao total de itens do protocolo.
+
+Blindagem na Perícia: Se o status estiver na fase de perícia/laudo, a trava se mantém: o botão de submissão do formulário principal só 
+libera após cada item recebido ter sido avaliado (Aprovado/Parcial/Negado), com laudo preenchido quando necessário e salvo 
+individualmente.
+
+Estado na Memória: O front-end nunca deve confiar no que está sendo exibido na tela (o display: block/none das divs). Ele deve validar 
+exclusivamente o dataset (ex: data-avaliado-triagem='true' ou data-avaliado-laudo='true') que cada item recebe após o salvamento 
+individual.
+
+Este nível de rigor garante que, quando você clicar em "Salvar Lote", o sistema não esteja apenas enviando um "OK", mas sim um snapshot 
+validado de todo o conteúdo do lote.
+
+3. Tratamento de Dados e E-mail (admin_engine.py):
+
+Regra do Nome do Produto: Ao montar o e-mail, se nome_produto for None, o sistema deve realizar um fallback imediato para a categoria 
+do item (ex: "Consoles (Item Personalizado)"). Nunca deve aparecer a string 'None'.
+
+Regra de Valores: A função de e-mail deve comparar valor_pix_base (original) com valor_pix_unitario (avaliado) de forma segura, 
+garantindo tratamento contra None ou float nulos.
+
+Regra de Status: O status macro do e-mail (Aprovado, Parcial, Negado) deve ser decidido com base no status real dos itens contidos no 
+payload_itens processado, e não apenas no status global do protocolo.
+
+4. Orquestração (admin_server.py):
+
+O servidor deve registrar logs de auditoria (print) de cada payload_itens recebido, para que possamos validar matematicamente se o que 
+foi salvo na tela é o que chegou no Python.
+
+As chamadas de e-mail devem ocorrer apenas após a confirmação da transação (COMMIT) da atualização dos itens."
+
+Por que esse caminho funcionará melhor?
+Desacoplamento: O nome "Perícia Técnica" pode mudar para "Inspeção" no banco de dados e o seu código não quebrará, pois o slug_tecnico 
+(ex: laudo_tecnico) permanecerá o mesmo.
+
+Previsibilidade: Ao forçar o uso do dataset no JS e da comparação de slug no Python, eliminamos a ambiguidade.
+
+Auditoria: Com os prints no servidor, não precisaremos de adivinhação. Se o e-mail sair errado, você olha o terminal e vê: "O payload 
+chegou como 'Parcialmente Aprovado'". Se o payload está certo e o e-mail está errado, o erro só pode estar na função de e-mail
+Dividimos o problema ao meio.
+
+Dica de ouro para amanhã:
+Assim que começarmos o novo chat, anexe o IA_memoria.txt primeiro, e depois estes três módulos. Assim, eu já entro "setado" com o 
+contexto total do projeto antes de aplicarmos essas correções.

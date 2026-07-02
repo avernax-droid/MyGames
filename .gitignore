@@ -5,20 +5,20 @@ venv/
 .env.*
 *.pyc
 .vscode/
+.idea/ # <- se um dia usar PyCharm
 
 # Pasta de utilitários e scripts (Não enviar para o GitHub)
-#utils/
+scripts/
+DOCS/
 
 # Arquivos de dados e scripts de carga
 *.xlsx
 *.csv
-base
-popula_catalogo.py
-
-# Documentação de estrutura
-estrutura.txt
+*.txt
+*.sql
 
 # Arquivos temporários e uploads locais
 *:Zone.Identifier
 static/uploads/
 flask_session/
+instance/ # <- Flask cria essa pasta se usar sqlite em app.instance_path
