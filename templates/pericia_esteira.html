@@ -11,6 +11,8 @@
   - 02/07/2026: Refatoração Backend-Driven: Substituição do campo textual 
                 status_item pela flag booleana recebido_fisicamente para 
                 maior segurança e blindagem da máquina de estados.
+  - 03/07/2026: Implementação da Fase de Laudo Técnico: Inclusão de decisão 
+                granulada (Aprovado/Parcial/Negado) e campos de valor final.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -54,6 +56,13 @@
     .btn-salvar-item { background: #333; color: #fff; padding: 8px 15px; border-radius: 6px; border: none; font-size: 13px; font-weight: bold; cursor: not-allowed; opacity: 0.5; transition: 0.3s; }
     .btn-salvar-item.habilitado { background: #0dcaf0; color: #000; cursor: pointer; opacity: 1; }
     .btn-salvar-item.habilitado:hover { background: #0bacce; }
+
+    /* Estilos do Laudo Técnico */
+    .bloco-laudo { background: #111; border: 1px solid #333; border-radius: 6px; padding: 15px; margin-top: 15px; display: none; }
+    .textarea-laudo { width: 100%; height: 80px; background: #121212; border: 1px solid #444; color: white; border-radius: 6px; padding: 10px; margin-top: 15px; font-size: 13px; resize: vertical; display: none; }
+    .textarea-laudo:focus { border-color: var(--cor-destaque); outline: none; }
+    .input-valor-parcial { background: #121212; border: 1px solid #444; color: #4CAF50; border-radius: 6px; padding: 8px; font-size: 14px; width: 150px; margin-top: 15px; display: none; font-weight: bold; }
+    .input-valor-parcial:focus { border-color: var(--cor-destaque); outline: none; }
 </style>
 
 <div class="grid-pericia">
@@ -140,8 +149,9 @@
                          data-valor-original="{{ valor_calc }}" 
                          data-valor-atual="{% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ valor_calc }}{% endif %}" 
                          data-status-recebido="{% if item.recebido_fisicamente == 1 %}true{% elif item.recebido_fisicamente == 0 %}false{% else %}null{% endif %}"
-                         data-avaliado="{% if item.recebido_fisicamente in [0, 1, true, false] %}true{% else %}false{% endif %}">
-                    <summary class="acordeao-header">
+                         data-avaliado="false">
+                    
+                         <summary class="acordeao-header">
                         {{ item.qtd_declarada | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
                         <span class="span-valor-item" style="color: #4CAF50; float: right; margin-right: 15px;">
                             R$ {% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
@@ -195,6 +205,29 @@
                                 <span style="color: #888; font-size: 12px; font-style: italic;"><i class="fas fa-lock"></i> Etapa Concluída</span>
                             </div>
                             {% endif %}
+                        </div>
+
+                        <div class="bloco-laudo">
+                            <strong style="font-size: 12px; color: #ffc107; display: block; margin-bottom: 8px;"><i class="fas fa-microscope"></i> AVALIAÇÃO TÉCNICA (LAUDO):</strong>
+                            <label class="radio-label">
+                                <input type="radio" name="laudo_{{ item.id }}" value="aprovado"> Aprovado
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="laudo_{{ item.id }}" value="parcial"> Parcial
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="laudo_{{ item.id }}" value="negado"> Negado
+                            </label>
+
+                            <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                <input type="number" class="input-valor-parcial" id="valor_parcial_{{ item.id }}" placeholder="Novo Valor R$" step="0.01" min="0">
+                                <textarea class="textarea-laudo" id="texto_laudo_{{ item.id }}" placeholder="Descreva o parecer técnico obrigatório..."></textarea>
+                            </div>
+
+                            <div style="text-align: right; margin-top: 15px;">
+                                <span class="msg-sucesso-laudo" style="color: #ffc107; font-size: 12px; font-weight: bold; margin-right: 15px; display: none;"><i class="fas fa-check"></i> Laudo Salvo Temporariamente</span>
+                                <button type="button" class="btn-salvar-item-laudo btn-salvar-item">Registrar Laudo</button>
+                            </div>
                         </div>
 
                     </div>
@@ -265,22 +298,21 @@
             validarEstadoDoBotaoLote();
         }
 
-        // LÓGICA DE BLINDAGEM DO BOTÃO "SALVAR LOTE" (Evita Deadlocks e Salto de Etapa)
+// LÓGICA DE BLINDAGEM DO BOTÃO "SALVAR LOTE" (Evita Deadlocks e Salto de Etapa)
         function validarEstadoDoBotaoLote() {
             let todosItensTratados = true;
             let existeItemEmExibicao = false;
             
-            // Verifica se o operador escolheu um NOVO status (Obrigatório)
             const novoStatusSelecionado = selectStatus.value !== "" && selectStatus.value !== statusOriginalDoBanco;
-
-            // Pega o nome do status que está selecionado agora no dropdown
             const opcaoSelecionada = selectStatus.options[selectStatus.selectedIndex];
             const nomeStatusSelecionado = (opcaoSelecionada && opcaoSelecionada.dataset.nome) ? opcaoSelecionada.dataset.nome.toLowerCase() : "";
 
             itemsLote.forEach(item => {
-                const controles = item.querySelector('.bloco-controles');
-                // Se os controles do item estão visíveis, ele DEVE ser avaliado
-                if (controles.style.display !== 'none') {
+                const controlesRecebimento = item.querySelector('.bloco-controles');
+                const controlesLaudo = item.querySelector('.bloco-laudo');
+                
+                // Se o bloco de recebimento ou o bloco de laudo está visível, o item precisa ser avaliado
+                if (controlesRecebimento.style.display !== 'none' || controlesLaudo.style.display !== 'none') {
                     existeItemEmExibicao = true;
                     if (item.dataset.avaliado !== 'true') {
                         todosItensTratados = false;
@@ -288,15 +320,16 @@
                 }
             });
 
-            // REGRA DE OURO: Se o operador fez a triagem, o status não pode mais ser "recebido". Tem que avançar.
             let statusAvancouCorretamente = novoStatusSelecionado;
             if (existeItemEmExibicao && todosItensTratados) {
-                if (nomeStatusSelecionado.includes('recebido')) {
-                    statusAvancouCorretamente = false; // Bloqueia o botão até ele mudar para "Aguardando Laudo", etc.
+                // NOVA TRAVA: Bloqueia se o operador mantiver o status de triagem OU de perícia.
+                if (nomeStatusSelecionado.includes('recebido') || 
+                    nomeStatusSelecionado.includes('perícia') || 
+                    nomeStatusSelecionado.includes('pericia')) {
+                    statusAvancouCorretamente = false; 
                 }
             }
 
-            // Só libera o lote se: Status avançou corretamente E todos os itens visíveis foram tratados
             if (statusAvancouCorretamente && (!existeItemEmExibicao || todosItensTratados)) {
                 btnSalvarLote.disabled = false;
             } else {
@@ -304,31 +337,40 @@
             }
         }
 
-        // CONTROLADOR DE EXIBIÇÃO POR FASE (Ativa os controles se a fase for de recebimento)
+        // CONTROLADOR DE EXIBIÇÃO POR FASE
         selectStatus.addEventListener('change', function() {
             const opcaoSelecionada = this.options[this.selectedIndex];
             const nomeStatus = (opcaoSelecionada.dataset.nome || "").toLowerCase();
             
             itemsLote.forEach(item => {
-                // PROTEÇÃO UI: Se o item JÁ FOI avaliado nesta sessão, nós NÃO mexemos na tela dele.
-                // Isso permite que o operador troque o status para "Aguardando Laudo" sem que as caixinhas sumam!
                 if (item.dataset.avaliado === 'true') {
                     return; 
                 }
 
-                const controles = item.querySelector('.bloco-controles');
+                const controlesRecebimento = item.querySelector('.bloco-controles');
+                const controlesLaudo = item.querySelector('.bloco-laudo');
                 const btnItem = item.querySelector('.btn-salvar-item');
                 
-                // Limpa o estado local para obrigar nova avaliação
                 item.dataset.avaliado = 'false';
                 btnItem.classList.remove('habilitado');
                 btnItem.disabled = true;
 
                 if (nomeStatus.includes('recebido')) {
-                    controles.style.display = 'block';
-                    item.open = true; // Força a abertura do acordeão
+                    controlesRecebimento.style.display = 'block';
+                    controlesLaudo.style.display = 'none';
+                    item.open = true;
+                } else if (nomeStatus.includes('perícia') || nomeStatus.includes('pericia')) {
+                    controlesRecebimento.style.display = 'none';
+                    // Só libera laudo se o item foi marcado fisicamente como recebido (true) no BD
+                    if (item.dataset.statusRecebido === "true") {
+                        controlesLaudo.style.display = 'block';
+                        item.open = true;
+                    } else {
+                        controlesLaudo.style.display = 'none';
+                    }
                 } else {
-                    controles.style.display = 'none';
+                    controlesRecebimento.style.display = 'none';
+                    controlesLaudo.style.display = 'none';
                     item.open = false;
                 }
             });
@@ -336,21 +378,46 @@
             validarEstadoDoBotaoLote();
         });
 
-        // HABILITA O BOTÃO "SALVAR ITEM" APÓS SELEÇÃO DO RADIO
+        // HABILITA O BOTÃO E CONTROLA OS CAMPOS APÓS SELEÇÃO DO RADIO
         containerItens.addEventListener('change', function(e) {
             const alvo = e.target;
             const itemLote = alvo.closest('.item-lote');
             
+            // Lógica do Recebimento Físico
             if (itemLote && alvo.name.startsWith('recebimento_')) {
                 const btnItem = itemLote.querySelector('.btn-salvar-item');
                 btnItem.classList.add('habilitado');
                 btnItem.disabled = false;
             }
+
+            // Lógica do Laudo Técnico
+            if (itemLote && alvo.name.startsWith('laudo_')) {
+                const btnItemLaudo = itemLote.querySelector('.btn-salvar-item-laudo');
+                const textarea = itemLote.querySelector('.textarea-laudo');
+                const inputValor = itemLote.querySelector('.input-valor-parcial');
+                
+                btnItemLaudo.classList.add('habilitado');
+                btnItemLaudo.disabled = false;
+
+                if (alvo.value === 'aprovado') {
+                    textarea.style.display = 'none';
+                    inputValor.style.display = 'none';
+                } else if (alvo.value === 'negado') {
+                    textarea.style.display = 'block';
+                    inputValor.style.display = 'none';
+                } else if (alvo.value === 'parcial') {
+                    textarea.style.display = 'block';
+                    inputValor.style.display = 'block';
+                    if (!inputValor.value) inputValor.value = itemLote.dataset.valorOriginal; // Sugere o valor base
+                }
+            }
         });
 
-        // EXECUÇÃO DO SALVAMENTO INDIVIDUAL (Triagem de Recebimento)
+        // EXECUÇÃO DO SALVAMENTO INDIVIDUAL
         containerItens.addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-salvar-item')) {
+            
+            // Salvamento do Recebimento Físico
+            if (e.target.classList.contains('btn-salvar-item') && !e.target.classList.contains('btn-salvar-item-laudo')) {
                 const btn = e.target;
                 const itemLote = btn.closest('.item-lote');
                 const badge = itemLote.querySelector('.badge-status-item');
@@ -362,27 +429,80 @@
                     if (radioSelecionado.value === 'nao_recebido') {
                         itemLote.dataset.valorAtual = "0.00";
                         badge.textContent = "NÃO RECEBIDO";
-                        badge.style.background = "#dc3545"; // Vermelho
+                        badge.style.background = "#dc3545";
                         itemLote.dataset.statusRecebido = "false";
                     } else {
                         itemLote.dataset.valorAtual = valorOriginal.toFixed(2);
                         badge.textContent = "RECEBIDO";
-                        badge.style.background = "#0dcaf0"; // Azul
+                        badge.style.background = "#0dcaf0";
                         itemLote.dataset.statusRecebido = "true";
                     }
                     
-                    // Aplica UI do item
                     itemLote.querySelector('.span-valor-item').textContent = `R$ ${itemLote.dataset.valorAtual}`;
                     badge.style.display = "inline-block";
                     
-                    // Congela o item como tratado e dá feedback visual
                     itemLote.dataset.avaliado = "true";
                     btn.style.display = 'none';
                     itemLote.querySelector('.msg-sucesso-item').style.display = 'inline-block';
                     
                     recalcularTotalLote();
+                    setTimeout(() => itemLote.open = false, 800);
+                }
+            }
+
+            // Salvamento do Laudo Técnico
+            if (e.target.classList.contains('btn-salvar-item-laudo')) {
+                const btn = e.target;
+                const itemLote = btn.closest('.item-lote');
+                const badge = itemLote.querySelector('.badge-status-item');
+                const radioSelecionado = itemLote.querySelector('input[name^="laudo_"]:checked');
+                const textarea = itemLote.querySelector('.textarea-laudo');
+                const inputValor = itemLote.querySelector('.input-valor-parcial');
+                
+                if (radioSelecionado) {
+                    const decisao = radioSelecionado.value;
+
+                    // Validações de segurança
+                    if ((decisao === 'negado' || decisao === 'parcial') && textarea.value.trim() === '') {
+                        alert("O preenchimento do Laudo Técnico é obrigatório para itens Negados ou Parciais.");
+                        textarea.focus();
+                        return;
+                    }
+                    if (decisao === 'parcial' && (inputValor.value === '' || parseFloat(inputValor.value) < 0)) {
+                        alert("Informe o novo valor validado para o item.");
+                        inputValor.focus();
+                        return;
+                    }
+
+                    // Aplica as regras financeiras
+                    let novoValor = parseFloat(itemLote.dataset.valorOriginal);
+                    if (decisao === 'negado') {
+                        novoValor = 0.00;
+                        badge.textContent = "LAUDO: NEGADO";
+                        badge.style.background = "#dc3545";
+                    } else if (decisao === 'parcial') {
+                        novoValor = parseFloat(inputValor.value);
+                        badge.textContent = "LAUDO: PARCIAL";
+                        badge.style.background = "#fd7e14";
+                    } else {
+                        badge.textContent = "LAUDO: APROVADO";
+                        badge.style.background = "#198754";
+                    }
+
+                    // Grava os dados na memória do elemento HTML
+                    itemLote.dataset.valorAtual = novoValor.toFixed(2);
+                    itemLote.dataset.statusLaudo = decisao;
+                    itemLote.dataset.textoLaudo = textarea.value.trim();
                     
-                    // Fecha o acordeão
+                    // Aplica UI
+                    itemLote.querySelector('.span-valor-item').textContent = `R$ ${itemLote.dataset.valorAtual}`;
+                    badge.style.display = "inline-block";
+                    
+                    itemLote.dataset.avaliado = "true";
+                    btn.style.display = 'none';
+                    itemLote.querySelector('.msg-sucesso-laudo').style.display = 'inline-block';
+                    
+                    recalcularTotalLote();
                     setTimeout(() => itemLote.open = false, 800);
                 }
             }
@@ -398,7 +518,9 @@
                     payload.push({
                         id_item: item.dataset.id,
                         recebido: item.dataset.statusRecebido === "true",
-                        novo_valor: parseFloat(item.dataset.valorAtual)
+                        novo_valor: parseFloat(item.dataset.valorAtual),
+                        status_laudo: item.dataset.statusLaudo || null,
+                        texto_laudo: item.dataset.textoLaudo || ""
                     });
                 }
             });
@@ -422,7 +544,6 @@
                     btnSalvarLote.style.backgroundColor = "#00e676";
                     btnSalvarLote.style.color = "#000";
                     
-                    // Retorno dinâmico para a gaveta pós-salvamento
                     setTimeout(() => {
                         window.location.href = "/esteira/{{ protocolo.status_id }}";
                     }, 2000);
