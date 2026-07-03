@@ -331,12 +331,11 @@ def salvar_pericia_esteira(protocolo_id):
                     teve_novo_nao_recebido = False
                     
                     for novo_item in itens_json:
-                        # Se o operador marcou na tela como Não Recebido (agora o JSON envia false explícito)
+                        # Se o operador marcou na tela como Não Recebido
                         if novo_item.get('recebido') is False: 
                             # Verifica se esse item já tinha o status_item 'Não Recebido' OU recebido_fisicamente = 0 no banco antes do clique de hoje
                             for antigo in itens_antigos:
                                 if str(antigo['id']) == str(novo_item['id_item']):
-                                    # Dupla validação (antiga em string e nova em booleano) para suportar a transição
                                     if antigo.get('status_item') != 'Não Recebido' and antigo.get('recebido_fisicamente') != 0:
                                         teve_novo_nao_recebido = True # É uma marcação inédita!
                                     break
@@ -349,20 +348,36 @@ def salvar_pericia_esteira(protocolo_id):
                             nome_cliente=protocolo_atualizado['cliente_nome'],
                             numero_protocolo=protocolo_atualizado['numero_protocolo'],
                             itens_avaliados=itens_atualizados,
-                            valor_avaliado=protocolo_atualizado['valor_avaliado']
+                            valor_avaliado=protocolo_atualizado['valor_avaliado'],
+                            codigo_rastreio=codigo_rastreio,           # <-- INJEÇÃO DO RASTREIO CORRIGIDA
+                            status_rastreio=status_rastreio_reversa    # <-- INJEÇÃO DO STATUS CORRIGIDA
                         )
                 except Exception as e:
                     print(f"Erro ao processar gatilho de email de divergencia: {e}")
             
             # REGRA 2: Email Final da Perícia Técnica
             if 'aprovado' in slug or 'negado' in slug or 'recusado' in slug or 'parcial' in slug:
+                # Obtém os itens atualizados no banco após o salvamento
+                itens_atualizados_banco = admin_engine.obter_itens_protocolo(protocolo_id)
+                
+                # Obtém o status do rastreio
+                codigo_rastreio = protocolo_atualizado.get('codigo_rastreio')
+                status_rastreio_reversa = ""
+                if codigo_rastreio:
+                    historico = admin_engine.consultar_historico_rastreio(codigo_rastreio)
+                    if historico:
+                         status_rastreio_reversa = historico[0].get('status', '')
+
                 admin_engine.enviar_email_status_pericia(
                     destinatario=protocolo_atualizado['cliente_email'],
                     nome_cliente=protocolo_atualizado['cliente_nome'],
                     numero_protocolo=protocolo_atualizado['numero_protocolo'],
                     status_nome=protocolo_atualizado['status_nome'],
                     laudo_tecnico=protocolo_atualizado['laudo_tecnico'],
-                    valor_avaliado=protocolo_atualizado['valor_avaliado']
+                    valor_avaliado=protocolo_atualizado['valor_avaliado'],
+                    itens_avaliados=itens_atualizados_banco, # Novo parâmetro
+                    codigo_rastreio=codigo_rastreio,         # Novo parâmetro
+                    status_rastreio=status_rastreio_reversa  # Novo parâmetro
                 )
 
     if is_ajax:

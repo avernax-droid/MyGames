@@ -121,10 +121,10 @@ def enviar_email_recuperacao(destinatario, nova_senha):
         print(f"Erro ao enviar e-mail de recuperação: {e}")
         return False
 
-def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, status_nome, laudo_tecnico, valor_avaliado):
+def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, status_nome, laudo_tecnico, valor_avaliado, itens_avaliados=None, codigo_rastreio=None, status_rastreio=None):
     """
     Envia notificação em HTML ao usuário sobre a decisão da perícia técnica.
-    Formata o e-mail dinamicamente para Aprovado, Reprovado ou Parcialmente Aprovado.
+    Formata o e-mail dinamicamente separando status de 'Não Recebido' de 'Reprovado' e injeta totalizador.
     """
     try:
         dados_empresa = obter_dados_empresa()
@@ -135,49 +135,64 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         smtp_server = os.getenv("EMAIL_HOST")
         smtp_port = int(os.getenv("EMAIL_PORT", 587))
 
-        # Normaliza o status para realizar a regra de negócio com segurança
         slug_status = unicodedata.normalize('NFKD', status_nome).encode('ASCII', 'ignore').decode('utf-8').lower()
-
-        # Tratamento seguro para quebra de linhas do HTML
         laudo_formatado = laudo_tecnico.replace('\n', '<br>') if laudo_tecnico else 'Não informado.'
 
-        # REGRA DE NEGÓCIO: Se for negado/recusado, zera o valor exibido no e-mail
         if 'negado' in slug_status or 'recusado' in slug_status or 'reprovado' in slug_status:
             valor_avaliado = 0.0
 
-        # BUSCA DOS ITENS DO PROTOCOLO PARA LISTAGEM NO E-MAIL
-        itens_avaliados = []
-        db = conectar_bd()
-        if db:
-            try:
-                cursor = db.cursor(dictionary=True)
-                cursor.execute("SELECT id FROM protocolos_recompra WHERE numero_protocolo = %s", (numero_protocolo,))
-                prot = cursor.fetchone()
-                if prot:
-                    itens_avaliados = obter_itens_protocolo(prot['id'])
-            finally:
-                db.close()
+        html_itens = "<strong>AVALIAÇÃO DOS ÍTENS DA VENDA:</strong><br><br>"
+        
+        if itens_avaliados:
+            for item in itens_avaliados:
+                nome_produto = item.get('nome_produto', 'Produto não identificado')
+                valor_original = float(item.get('valor_pix_unitario', 0.0))
+                
+                valor_final_bd = item.get('valor_final_pix')
+                valor_final = float(valor_final_bd) if valor_final_bd is not None else valor_original
+                
+                motivo_recusa = item.get('motivo_recusa', '')
+                status_item_atual = item.get('status_item', '')
+                status_exibicao = ""
+                laudo_exibicao = ""
 
-        # MONTANDO A LISTA HTML DOS PRODUTOS
-        html_itens = "<strong>ÍTENS INCLUÍDOS NA VENDA:</strong><br><br>"
-        for item in itens_avaliados:
-            nome_produto = item.get('nome_produto', 'Produto não identificado')
-            valor_item = float(item.get('valor_pix_unitario', 0.0))
+                # SEPARAÇÃO DE REGRAS: Não Recebido X Reprovado
+                if 'não recebido' in status_item_atual.lower():
+                    status_exibicao = " - <span style='color: #dc3545;'>NÃO RECEBIDO</span>"
+                    valor_final = 0.0
+                elif 'reprovado' in status_item_atual.lower() or 'negado' in status_item_atual.lower():
+                    status_exibicao = " - <span style='color: #dc3545;'>REPROVADO</span>"
+                    valor_final = 0.0
+                    if motivo_recusa:
+                        laudo_exibicao = f"<strong>Laudo Técnico:</strong> <span style='color: #888;'>{motivo_recusa}</span><br>"
+                elif 'parcial' in status_item_atual.lower():
+                     status_exibicao = " - <span style='color: #fd7e14;'>APROVAÇÃO PARCIAL</span>"
+                     if motivo_recusa:
+                        laudo_exibicao = f"<strong>Laudo Técnico:</strong> <span style='color: #888;'>{motivo_recusa}</span><br>"
+                else:
+                    status_exibicao = " - <span style='color: #198754;'>APROVADO</span>"
+
+                html_itens += f"<div style='border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;'>"
+                html_itens += f"<strong>Produto:</strong> {nome_produto}{status_exibicao}<br>"
+                html_itens += f"<strong>Valor Original Sugerido:</strong> R$ {valor_original:.2f}<br>"
+                html_itens += f"<strong>Valor Final Avaliado:</strong> <strong>R$ {valor_final:.2f}</strong><br>"
+                html_itens += laudo_exibicao
+                html_itens += f"</div>"
             
-            status_item = ""
-            if 'parcial' in slug_status:
-                # Regra Futura: não define o status por linha no modelo parcial ainda
-                status_item = ""
-            elif 'negado' in slug_status or 'recusado' in slug_status or 'reprovado' in slug_status:
-                status_item = " - REPROVADO"
-            else:
-                status_item = " - APROVADO"
+            # TOTALIZADOR DA AVALIAÇÃO
+            html_itens += f"<div style='margin-top: 15px; padding-top: 10px; border-top: 2px solid #ccc;'>"
+            html_itens += f"<strong style='font-size: 16px; color: #000;'>VALOR TOTAL DA AVALIAÇÃO: R$ {float(valor_avaliado):.2f}</strong>"
+            html_itens += f"</div>"
+        else:
+            html_itens += "Nenhum detalhe de item disponível."
+            
+        bloco_rastreio = ""
+        if codigo_rastreio:
+            bloco_rastreio = f"""
+            <p style="margin-top: 0;"><strong>Código de Rastreio:</strong> {codigo_rastreio}<br>
+            <strong>Status do Transporte:</strong> {status_rastreio if status_rastreio else 'Sem atualizações'}</p>
+            """
 
-            html_itens += f"<strong>Produto:</strong> {nome_produto}{status_item}<br>"
-            html_itens += f"<strong>Valor:</strong> R$ {valor_item:.2f}<br><br>"
-
-
-        # MONTANDO O CORPO DO E-MAIL BASEADO NO STATUS
         corpo_html = ""
 
         if 'parcial' in slug_status:
@@ -185,12 +200,12 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
             <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
                 <p>Olá {nome_cliente},</p>
                 <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
-                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
-                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
-                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <p>O seu processo de venda foi analisado e o Laudo Técnico de cada item está concluído.</p>
+                <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> {numero_protocolo}</p>
+                {bloco_rastreio}
                 <br>
                 {html_itens}
-                <p>Como pode notar no laudo, alguns de seus itens foram aprovados na perícia técnica e estão marcados como <strong>APROVADOS</strong> enquanto outros foram <strong>REPROVADOS</strong>.</p>
+                <p style="margin-top: 20px;">Como pode notar no laudo acima, alguns de seus itens foram <strong>APROVADOS</strong> na perícia técnica enquanto outros sofreram depreciação parcial ou foram <strong>REPROVADOS</strong>.</p>
                 <p>Nossa equipe entrará em contato com você para definirmos o que fazer com os ítens reprovados para que possamos seguir com o PAGAMENTO!</p>
                 <p>Está sendo um grande prazer fazer negócio com você e tê-lo como nosso cliente.</p>
                 <br>
@@ -203,12 +218,12 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
             <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
                 <p>Olá {nome_cliente},</p>
                 <p>Muito obrigado por realizar a sua cotação de venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
-                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
-                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
-                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <p>O seu processo de venda foi analisado e o Laudo Técnico de cada item está concluído.</p>
+                <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> {numero_protocolo}</p>
+                {bloco_rastreio}
                 <br>
                 {html_itens}
-                <p>Infelizmente, <strong>TODOS</strong> os seus itens foram <strong>REPROVADOS</strong> na perícia técnica. O Laudo explica o que aconteceu.</p>
+                <p style="margin-top: 20px;">Infelizmente, <strong>TODOS</strong> os seus itens foram <strong>REPROVADOS</strong> na perícia técnica. O Laudo individual acima explica o que aconteceu.</p>
                 <p>Nossa equipe entrará em contato com você para definirmos como podemos avançar com a nossa negociação ou para acertar detalhes da devolução dos produtos para você!</p>
                 <br>
                 <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
@@ -220,12 +235,12 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
             <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
                 <p>Olá {nome_cliente},</p>
                 <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_empresa}</strong>!</p>
-                <p>Segue seu LAUDO abaixo para finalização do seu processo de venda:</p>
-                <p><strong>Protocolo:</strong> {numero_protocolo}</p>
-                <p><strong>LAUDO DA PERÍCIA TÉCNICA</strong><br>{laudo_formatado}</p>
+                <p>O seu processo de venda foi analisado e o Laudo Técnico de cada item está concluído.</p>
+                <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> {numero_protocolo}</p>
+                {bloco_rastreio}
                 <br>
                 {html_itens}
-                <p>Todos os seus itens aprovados na perícia técnica estão marcados como <strong>APROVADOS</strong> e vamos realizar o PAGAMENTO destes itens em até 48 horas úteis.</p>
+                <p style="margin-top: 20px;">Todos os seus itens aprovados na perícia técnica estão marcados como <strong>APROVADOS</strong> e vamos realizar o PAGAMENTO destes itens em até 48 horas úteis.</p>
                 <p>Foi um grande prazer fazer negócio com você e tê-lo como nosso cliente.</p>
                 <br>
                 <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
@@ -237,7 +252,6 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         msg['To'] = destinatario
         msg['Subject'] = f"{nome_empresa} - Atualização do Protocolo #{numero_protocolo}"
         
-        # Anexa o HTML na mensagem
         msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
 
         server = smtplib.SMTP(smtp_server, smtp_port)
@@ -250,9 +264,11 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         print(f"Erro ao enviar e-mail de status da perícia (HTML): {e}")
         return False
 
-def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_protocolo, itens_avaliados, valor_avaliado):
+
+def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_protocolo, itens_avaliados, valor_avaliado, codigo_rastreio=None, status_rastreio=None):
     """
     Envia notificação destacando em negrito os itens não recebidos pelo setor de logística.
+    Inclui status de rastreio formatado.
     """
     try:
         dados_empresa = obter_dados_empresa()
@@ -268,19 +284,29 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
             nome_produto = item.get('nome_produto', 'Produto não identificado')
             status = item.get('status_item', '')
             
-            if status == 'Não Recebido':
+            if status == 'Não Recebido' or status == 'Laudo: Negado':
                 html_itens += f"<span style='color: #dc3545;'><strong>Produto: {nome_produto} - ITEM NÃO RECEBIDO NA CAIXA</strong></span><br><br>"
             else:
                 html_itens += f"Produto: {nome_produto} - Recebido com Sucesso<br><br>"
 
+        # BLOCO DE RASTREIO LOGÍSTICO
+        bloco_rastreio = ""
+        if codigo_rastreio:
+            bloco_rastreio = f"""
+            <p style="margin-top: 0;"><strong>Código de Rastreio dos Correios:</strong> {codigo_rastreio}<br>
+            <strong>Status do Transporte:</strong> {status_rastreio if status_rastreio else 'Sem atualizações'}</p>
+            """
+
         corpo_html = f"""
         <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
             <p>Olá {nome_cliente},</p>
-            <p>Recebemos a sua caixa referente ao protocolo <strong>{numero_protocolo}</strong>!</p>
+            <p>Recebemos a sua caixa referente ao processo de venda!</p>
+            <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> {numero_protocolo}</p>
+            {bloco_rastreio}
             <p>No entanto, durante a nossa triagem inicial, notamos que <strong>alguns itens declarados não estavam presentes na embalagem</strong>.</p>
             <br>
             {html_itens}
-            <p>O valor total estimado do seu lote foi recalculado para: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
+            <p>O Valor Total do Lote foi recalculado para: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
             <p>Nossa equipe técnica seguirá com a avaliação dos itens que foram recebidos com sucesso. Se houve algum engano ou se você enviou o item faltante em outra caixa, por favor, responda este e-mail.</p>
             <br>
             <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
@@ -303,6 +329,7 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
     except Exception as e:
         print(f"Erro ao enviar e-mail de divergência: {e}")
         return False
+
 
 # [Funções de Protocolo e Esteira de Status]
 def obter_cabecalho_protocolo(protocolo_id):
@@ -369,8 +396,10 @@ def obter_itens_protocolo(protocolo_id):
                 i.status_item, 
                 i.recebido_fisicamente,
                 i.fotos_json, 
-                i.valor_pix_unitario, 
-                i.comentarios AS descricao_estado, 
+                i.valor_pix_unitario,
+                i.valor_final_pix, 
+                i.comentarios AS descricao_estado,
+                i.motivo_recusa,
                 cm.nome_produto,
                 CASE cm.categoria_id
                     WHEN 1 THEN 'Consoles'
@@ -438,7 +467,7 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
             """
             cursor.execute(query_log, (protocolo_id, status_id, admin_id))
             
-        # 3. Processamento Granular (Salva se foi Recebido/Não Recebido)
+        # 3. Processamento Granular (Salva Recebimento Física, Valores e Laudos)
         if payload_itens:
             try:
                 itens = json.loads(payload_itens) if isinstance(payload_itens, str) else payload_itens
@@ -446,19 +475,41 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
                     id_item = item.get('id_item')
                     recebido = item.get('recebido')
                     
-                    status_texto = 'Recebido' if recebido else 'Não Recebido'
-                    qtd_rec = 1 if recebido else 0
+                    # NOVOS CAMPOS CAPTURADOS DO PAYLOAD
+                    novo_valor = item.get('novo_valor')
+                    status_laudo = item.get('status_laudo')
+                    texto_laudo = item.get('texto_laudo')
                     
                     # Converte o booleano do JSON (True/False) para o formato do banco (1/0)
                     flag_fisica = 1 if recebido else 0
+                    qtd_rec = 1 if recebido else 0
                     
-                    # UPDATE atualizado para persistir na nova coluna recebido_fisicamente
+                    # Hierarquia de Status Textual: Se já tem laudo, o status reflete o laudo.
+                    if status_laudo:
+                        if status_laudo == 'negado':
+                            status_texto = 'Laudo: Negado'
+                        elif status_laudo == 'parcial':
+                            status_texto = 'Laudo: Parcial'
+                        else:
+                            status_texto = 'Laudo: Aprovado'
+                    else:
+                        status_texto = 'Recebido' if recebido else 'Não Recebido'
+                    
+                    # UPDATE ATUALIZADO: Agora persiste valor_final_pix e motivo_recusa (texto do laudo)
                     query_item = """
                         UPDATE itens_periciados 
-                        SET status_item = %s, qtd_recebida = %s, recebido_fisicamente = %s 
+                        SET status_item = %s, 
+                            qtd_recebida = %s, 
+                            recebido_fisicamente = %s,
+                            valor_final_pix = %s,
+                            motivo_recusa = %s
                         WHERE id = %s AND protocolo_id = %s
                     """
-                    cursor.execute(query_item, (status_texto, qtd_rec, flag_fisica, id_item, protocolo_id))
+                    
+                    # Tratamento numérico seguro
+                    v_final = float(novo_valor) if novo_valor is not None else None
+                    
+                    cursor.execute(query_item, (status_texto, qtd_rec, flag_fisica, v_final, texto_laudo, id_item, protocolo_id))
             except Exception as e:
                 print(f"Erro ao processar itens granulares: {e}")
 
