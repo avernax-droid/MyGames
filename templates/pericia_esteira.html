@@ -8,10 +8,9 @@
   - 12/06/2026: UX Fluxo: Substituição por link direto via url_for no botão 'Voltar'.
   - 27/06/2026: UX UI: Inclusão do painel de Dados Complementares.
   - 30/06/2026: UX UI/Lógica: Refatoração profunda para Perícia Granular.
-                - Implementação do fluxo item a item (Recebido / Não Recebido).
-                - Travas de transição de status em JS para evitar deadlocks.
-                - Leitura do campo status_item direto do banco para memória visual.
-                - Retorno dinâmico para a gaveta de origem pós-salvamento.
+  - 02/07/2026: Refatoração Backend-Driven: Substituição do campo textual 
+                status_item pela flag booleana recebido_fisicamente para 
+                maior segurança e blindagem da máquina de estados.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -67,12 +66,10 @@
             </span>
         </h3>
 
-        <!-- PAINEL DE DADOS COMPLEMENTARES -->
         <div class="dados-complementares" style="background: #1a1a1a; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
             <h4 style="color: var(--texto-dim); font-size: 12px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;">Dados do Cliente e Logística</h4>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <!-- Bloco Cliente/Financeiro -->
                 <div>
                     <p style="font-size: 13px; color: #ccc; margin-bottom: 5px; line-height: 1.4;">
                         <i class="fas fa-map-marker-alt" style="color: #888; width: 16px;"></i> 
@@ -105,7 +102,6 @@
                     </p>
                 </div>
 
-                <!-- Bloco Logística Reversa -->
                 <div style="border-left: 1px solid #333; padding-left: 15px;">
                     <p style="font-size: 13px; color: #ccc; margin-bottom: 10px;">
                         <i class="fas fa-box" style="color: #888; width: 16px;"></i> Rastreio: 
@@ -142,19 +138,18 @@
                 <details class="acordeao-item item-lote" 
                          data-id="{{ item.id }}" 
                          data-valor-original="{{ valor_calc }}" 
-                         data-valor-atual="{% if item.status_item == 'Não Recebido' %}0.00{% else %}{{ valor_calc }}{% endif %}" 
-                         data-status-recebido="{% if item.status_item == 'Recebido' %}true{% elif item.status_item == 'Não Recebido' %}false{% else %}null{% endif %}"
-                         data-avaliado="{% if item.status_item in ['Recebido', 'Não Recebido'] %}true{% else %}false{% endif %}">
+                         data-valor-atual="{% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ valor_calc }}{% endif %}" 
+                         data-status-recebido="{% if item.recebido_fisicamente == 1 %}true{% elif item.recebido_fisicamente == 0 %}false{% else %}null{% endif %}"
+                         data-avaliado="{% if item.recebido_fisicamente in [0, 1, true, false] %}true{% else %}false{% endif %}">
                     <summary class="acordeao-header">
                         {{ item.qtd_declarada | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
                         <span class="span-valor-item" style="color: #4CAF50; float: right; margin-right: 15px;">
-                            R$ {% if item.status_item == 'Não Recebido' %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
+                            R$ {% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
                         </span>
                         
-                        <!-- Lógica Jinja baseada estritamente no status_item textual -->
-                        {% if item.status_item == 'Não Recebido' %}
+                        {% if item.recebido_fisicamente == 0 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">NÃO RECEBIDO</span>
-                        {% elif item.status_item == 'Recebido' %}
+                        {% elif item.recebido_fisicamente == 1 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #0dcaf0; color: #000; display: inline-block;">RECEBIDO</span>
                         {% else %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: none;"></span>
@@ -179,20 +174,18 @@
                             </div>
                         </div>
 
-                        <!-- CONTROLES GRANULARES -->
                         <div class="bloco-controles">
                             <strong style="font-size: 12px; color: var(--cor-destaque); display: block; margin-bottom: 8px;">CONFIRMAÇÃO DE RECEBIMENTO:</strong>
                             <label class="radio-label">
                                 <input type="radio" name="recebimento_{{ item.id }}" value="recebido" 
-                                       {% if item.status_item == 'Recebido' %}checked disabled{% endif %}> Recebido
+                                       {% if item.recebido_fisicamente == 1 %}checked disabled{% endif %}> Recebido
                             </label>
                             <label class="radio-label">
                                 <input type="radio" name="recebimento_{{ item.id }}" value="nao_recebido" 
-                                       {% if item.status_item == 'Não Recebido' %}checked disabled{% endif %}> Não Recebido
+                                       {% if item.recebido_fisicamente == 0 %}checked disabled{% endif %}> Não Recebido
                             </label>
 
-                            <!-- Esconde o botão de Salvar Item se ele já foi recebido/negado anteriormente -->
-                            {% if item.status_item not in ['Recebido', 'Não Recebido'] %}
+                            {% if item.recebido_fisicamente is none %}
                             <div style="text-align: right; margin-top: 15px;">
                                 <span class="msg-sucesso-item" style="color: var(--cor-destaque); font-size: 12px; font-weight: bold; margin-right: 15px; display: none;"><i class="fas fa-check"></i> Salvo Temporariamente</span>
                                 <button type="button" class="btn-salvar-item">Salvar Item</button>
@@ -216,7 +209,6 @@
         <h3 class="titulo-painel"><i class="fas fa-gavel"></i> Decisão Técnica e Financeira</h3>
         
         <form id="form-pericia" action="/esteira/salvar_pericia/{{ protocolo.id }}" method="POST">
-            <!-- Campo oculto para enviar o payload dos itens via form -->
             <input type="hidden" name="payload_itens" id="payload_itens" value="[]">
 
             <div class="form-group">
@@ -239,7 +231,6 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
-                <!-- Retorno dinâmico para a gaveta exata de onde o protocolo veio -->
                 <a href="/esteira/{{ protocolo.status_id }}" class="btn-voltar">Voltar</a>
                 <button type="submit" class="btn-salvar-lote" id="btn-salvar-lote" disabled>Salvar Lote</button>
             </div>

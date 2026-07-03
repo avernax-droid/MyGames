@@ -28,6 +28,7 @@
 # - 27/06/2026: Injeção do historico_rastreio (Correios) na rota de Perícia da Esteira (Cockpit).
 # - 30/06/2026: Atualização da rota salvar_pericia_esteira para processar a Perícia Granular.
 #               Implementação de gatilho inteligente para e-mail de divergência de recebimento.
+# - 02/07/2026: Correção do gatilho de e-mail na salvar_pericia_esteira para usar o novo padrão booleano (recebido_fisicamente).
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -315,7 +316,7 @@ def salvar_pericia_esteira(protocolo_id):
     # Isso serve para saber se o item já era "Não Recebido" antes ou se foi marcado agora
     itens_antigos = admin_engine.obter_itens_protocolo(protocolo_id)
 
-    # Atualiza o banco de dados
+    # Atualiza o banco de dados (agora salva o booleano recebido_fisicamente também)
     sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id, payload_itens)
 
     if sucesso:
@@ -330,16 +331,17 @@ def salvar_pericia_esteira(protocolo_id):
                     teve_novo_nao_recebido = False
                     
                     for novo_item in itens_json:
-                        # Se o operador marcou na tela como Não Recebido (recebido == false)
-                        if not novo_item.get('recebido'): 
-                            # Verifica se esse item já tinha o status 'Não Recebido' no banco antes do clique de hoje
+                        # Se o operador marcou na tela como Não Recebido (agora o JSON envia false explícito)
+                        if novo_item.get('recebido') is False: 
+                            # Verifica se esse item já tinha o status_item 'Não Recebido' OU recebido_fisicamente = 0 no banco antes do clique de hoje
                             for antigo in itens_antigos:
                                 if str(antigo['id']) == str(novo_item['id_item']):
-                                    if antigo.get('status_item') != 'Não Recebido':
+                                    # Dupla validação (antiga em string e nova em booleano) para suportar a transição
+                                    if antigo.get('status_item') != 'Não Recebido' and antigo.get('recebido_fisicamente') != 0:
                                         teve_novo_nao_recebido = True # É uma marcação inédita!
                                     break
                                     
-                    # Dispara o e-mail apenas se for uma divergência nova detectada, independente do status destino
+                    # Dispara o e-mail apenas se for uma divergência nova detectada
                     if teve_novo_nao_recebido:
                         itens_atualizados = admin_engine.obter_itens_protocolo(protocolo_id)
                         admin_engine.enviar_email_divergencia_recebimento(

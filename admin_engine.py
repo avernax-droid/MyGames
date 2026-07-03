@@ -44,6 +44,7 @@
 # - 26/06/2026: Conversão dos templates de e-mail de status (Aprovado, Parcial e Negado) para HTML rico com busca de itens do protocolo.
 # - 26/06/2026: Inclusão das bibliotecas base64, requests e logging, e criação da função consultar_historico_rastreio para a API REST dos Correios.
 # - 26/06/2026: Inclusão dos campos de endereço completo, CEP e bairro na query da função obter_cabecalho_protocolo.
+# - 02/07/2026: Atualização da engine para ler e persistir o novo campo recebido_fisicamente nas operações da esteira.
 # ==============================================================================
 
 import mysql.connector
@@ -366,6 +367,7 @@ def obter_itens_protocolo(protocolo_id):
                 i.qtd_declarada, 
                 i.qtd_recebida,
                 i.status_item, 
+                i.recebido_fisicamente,
                 i.fotos_json, 
                 i.valor_pix_unitario, 
                 i.comentarios AS descricao_estado, 
@@ -447,12 +449,16 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
                     status_texto = 'Recebido' if recebido else 'Não Recebido'
                     qtd_rec = 1 if recebido else 0
                     
+                    # Converte o booleano do JSON (True/False) para o formato do banco (1/0)
+                    flag_fisica = 1 if recebido else 0
+                    
+                    # UPDATE atualizado para persistir na nova coluna recebido_fisicamente
                     query_item = """
                         UPDATE itens_periciados 
-                        SET status_item = %s, qtd_recebida = %s 
+                        SET status_item = %s, qtd_recebida = %s, recebido_fisicamente = %s 
                         WHERE id = %s AND protocolo_id = %s
                     """
-                    cursor.execute(query_item, (status_texto, qtd_rec, id_item, protocolo_id))
+                    cursor.execute(query_item, (status_texto, qtd_rec, flag_fisica, id_item, protocolo_id))
             except Exception as e:
                 print(f"Erro ao processar itens granulares: {e}")
 
