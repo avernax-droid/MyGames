@@ -250,7 +250,6 @@ templates/configuracoes/opcoes_estado.html | Gestão de Opções de Estado de Co
 4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
 
 TABELA                    COLUNA                    TIPO                                                         CHAVE      ORD_TABELA           ORD_COLUNA   ORDEM_TIPO
-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 avaliacoes_manuais        id                        int                                                          PK,AI      avaliacoes_manuais   1            0
                           nome_produto_informado    varchar(255)                                                 -          avaliacoes_manuais   2            0
                           descricao_estado          text                                                         -          avaliacoes_manuais   3            0
@@ -336,15 +335,18 @@ historico_status_protocolo id                        int                        
 itens_periciados          id                        int                                                          PK,AI      itens_periciados     1            0
                           protocolo_id              int                                                          FK         itens_periciados     2            0
                           produto_id                int                                                          FK         itens_periciados     3            0
-                          status_item               varchar(20)                                                  -          itens_periciados     4            0
-                          qtd_declarada             int                                                          -          itens_periciados     5            0
-                          qtd_recebida              int                                                          -          itens_periciados     6            0
-                          fotos_json                json                                                         -          itens_periciados     7            0
-                          comentarios               text                                                         -          itens_periciados     8            0
-                          motivo_recusa             text                                                         -          itens_periciados     9            0
-                          data_pericia              timestamp                                                    -          itens_periciados     10           0
-                          valor_pix_unitario        decimal(10,2)                                                -          itens_periciados     11           0
-                          valor_cred_unitario       decimal(10,2)                                                -          itens_periciados     12           0
+                          status_item               varchar(50)                                                  -          itens_periciados     4            0
+                          recebido_fisicamente      tinyint(1)                                                   -          itens_periciados     5            0
+                          qtd_declarada             int                                                          -          itens_periciados     6            0
+                          qtd_recebida              int                                                          -          itens_periciados     7            0
+                          fotos_json                json                                                         -          itens_periciados     8            0
+                          comentarios               text                                                         -          itens_periciados     9            0
+                          motivo_recusa             text                                                         -          itens_periciados     10           0
+                          data_pericia              timestamp                                                    -          itens_periciados     11           0
+                          valor_pix_unitario        decimal(10,2)                                                -          itens_periciados     12           0
+                          valor_cred_unitario       decimal(10,2)                                                -          itens_periciados     13           0
+                          valor_final_pix           decimal(10,2)                                                -          itens_periciados     14           0
+                          valor_final_credito       decimal(10,2)                                                -          itens_periciados     15           0
 ----------                ----------                ----------                                                   ---------- itens_periciados     999          1
 opcoes_estado             id                        int                                                          PK,AI      opcoes_estado        1            0
                           categoria_id              int                                                          FK         opcoes_estado        2            0

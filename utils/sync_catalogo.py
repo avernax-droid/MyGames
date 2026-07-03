@@ -4,6 +4,11 @@
 # DATA DE CRIAÇÃO: 27/06/2026
 # TÍTULO: ETL de Sincronização de Catálogo (Supabase -> MySQL) - OTIMIZADO
 # FUNÇÃO: Processo batch (lote) autônomo para sincronização de catálogo.
+#
+# HISTÓRICO DE ALTERAÇÕES:
+# - 27/06/2026: Criação do script de sincronização ETL.
+# - 03/07/2026: Correção na função classificar_categoria invertendo os IDs 
+#               de Jogos (para 4) e Acessórios (para 3) para alinhar com o banco local.
 # ==============================================================================
 
 import os
@@ -33,11 +38,11 @@ def conectar_bd():
 def classificar_categoria(nome_produto):
     nome_lower = nome_produto.lower()
     if 'jogo' in nome_lower or 'jogos' in nome_lower:
-        return 3
+        return 4  # CORRIGIDO: Agora retorna 4 para Jogos
     elif 'controle' in nome_lower or 'navigator' in nome_lower or 'move' in nome_lower:
         return 2
     elif any(acessorio in nome_lower for acessorio in ['camera', 'kinect', 'volante', 'vr', 'câmbio', 'óculos', 'portal']):
-        return 4
+        return 3  # CORRIGIDO: Agora retorna 3 para Acessórios
     else:
         return 1
 

@@ -738,3 +738,124 @@ Dividimos o problema ao meio.
 Dica de ouro para amanhã:
 Assim que começarmos o novo chat, anexe o IA_memoria.txt primeiro, e depois estes três módulos. Assim, eu já entro "setado" com o 
 contexto total do projeto antes de aplicarmos essas correções.
+
+=====================
+02/07
+
+📋 RESUMO DE CONTEXTO E CORREÇÕES (PARA O PRÓXIMO CHAT)
+1. O QUE FOI FEITO ATÉ AGORA:
+
+Refatoração do Front-end (pericia_esteira.html): Evoluímos a interface para suportar a Fase de Laudo Técnico (Perícia).
+
+Nova Interface de Avaliação: Criamos o bloco .bloco-controles-pericia oculto dentro do acordeão de cada item. Ele exibe opções de "Aprovado", "Parcialmente Aprovado" (exigindo laudo e novo valor) e "Negado" (exigindo laudo e zerando o valor).
+
+Payload JSON Blindado: Estruturamos a saída do formulário para enviar dados limpos ao backend (id_item, recebido, status_tecnico, 
+valor_original, novo_valor e laudo). Isso resolve o problema antigo de misturar status logístico com técnico na hora de gerar o e-mail do cliente.
+
+2. O QUE DEU ERRADO (O SINTOMA):
+Ao selecionar o status "Perícia" no dropdown Novo Status (Próxima Etapa), a tela permaneceu estática. O acordeão dos itens que haviam 
+sido recebidos não abriu e os controles de laudo técnico não apareceram.
+
+3. A CAUSA DO ERRO:
+Divergência Crítica de Strings: O código estava usando comparações estritas (Ex: item.status_item == 'Recebido' no Jinja e 
+nomeStatus === 'pericia' no JavaScript). Qualquer pequena variação no banco de dados (como estar salvo em minúsculo "recebido"), 
+ou atributos invisíveis no HTML (espaços em branco ou acentos como "perícia"), faziam a validação falhar silenciosamente. O JavaScript 
+entendia que as condições não foram atendidas e abortava a exibição dos blocos.
+
+4. COMO ACERTAR (A SOLUÇÃO A SER APLICADA):
+Para corrigir, precisamos aplicar filtros de higienização de texto (Normalização) em duas frentes no arquivo pericia_esteira.html:
+
+A. No Jinja (HTML):
+Devemos forçar o valor vindo do banco a ficar em minúsculo usando |string|lower antes de comparar. A tag <details> e o <summary> do 
+loop de itens devem ser atualizados para:
+
+<details class="acordeao-item item-lote" 
+         data-id="{{ item.id }}" 
+         data-valor-original="{{ valor_calc }}" 
+         data-valor-atual="{% if (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}0.00{% else %}{{ valor_calc }}{% endif %}" 
+         data-status-recebido="{% if (item.status_item|string|lower) == 'recebido' %}true{% elif (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}false{% else %}null{% endif %}"
+         data-avaliado="{% if (item.status_item|string|lower) in ['recebido', 'não recebido', 'nao recebido'] %}true{% else %}false{% endif %}"
+         data-status-tecnico=""
+         data-laudo="">
+    
+    <summary class="acordeao-header">
+        {{ item.qtd_declarada | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
+        <span class="span-valor-item" style="color: #4CAF50; float: right; margin-right: 15px;">
+            R$ {% if (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
+        </span>
+        
+        <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: {% if (item.status_item|string|lower) in ['recebido', 'não recebido', 'nao recebido'] %}inline-block{% else %}none{% endif %}; background: {% if (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}#dc3545{% else %}#0dcaf0{% endif %}; color: {% if (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}#fff{% else %}#000{% endif %};">
+            {% if (item.status_item|string|lower) in ['não recebido', 'nao recebido'] %}NÃO RECEBIDO{% elif (item.status_item|string|lower) == 'recebido' %}RECEBIDO{% endif %}
+        </span>
+    </summary>
+
+    B. No JavaScript:
+Na função selectStatus.addEventListener('change', ...), devemos limpar acentos e espaços da opção selecionada antes de fazer os IFs, 
+utilizando a string higienizada com o método .includes():
+
+const nomeStatus = (opcaoSelecionada.dataset.nome || "")
+                    .toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+                    .trim();
+
+// Mais abaixo, os gatilhos passam a ser:
+if (nomeStatus.includes('recebido')) { ... }
+else if (nomeStatus.includes('pericia')) { ... }
+
+5. PRÓXIMOS PASSOS (NO NOVO CHAT):
+Inserir essas duas correções no pericia_esteira.html para destravar a interface.
+
+Criar a lógica no backend (admin_server.py e admin_engine.py) para receber esse novo payload JSON.
+
+Desenvolver a função de disparo do E-mail detalhado para o cliente informando o laudo e os novos valores.
+
+====================
+02/07
+
+RELATÓRIO DE ESTADO DO PROJETO MYGAMES (BACKOFFICE)
+1. RESUMO DA ESTRUTURA ATUAL (ESTADO DA ARTE)
+Nós transformamos o sistema de uma arquitetura baseada em inferências frágeis (leitura de textos na tela) para uma Máquina de Estados blindada e orientada a dados.
+
+Banco de Dados (MySQL): Implementamos a coluna recebido_fisicamente (TINYINT(1)) na tabela itens_periciados.
+
+Interface (pericia_esteira.html): Refatoramos o front-end para operar com validações binárias (True/False/None) baseadas neste novo campo, garantindo que o JavaScript apenas reaja aos dados reais e não a adivinhações.
+
+Motor de Persistência (admin_engine.py): Atualizamos as funções de SELECT e UPDATE para ler e gravar a flag física, eliminando a dependência de strings como "Recebido"/"Não Recebido" no back-end.
+
+Comunicação (admin_server.py): Centralizamos a lógica de notificação, garantindo que qualquer alteração de status dispare e-mails técnicos precisos, agora incluindo obrigatoriamente o código de rastreio da logística reversa.
+
+2. FUNCIONALIDADES IMPLEMENTADAS (TESTADAS E VALIDADAS)
+Triagem Granular: O operador consegue realizar a conferência física item a item com feedback visual imediato.
+
+Trava de Segurança: O botão "Salvar Lote" permanece desabilitado até que a triagem de todos os itens seja concluída e um novo status seja selecionado no sistema.
+
+Notificações Inteligentes:
+
+E-mail de Divergência: Disparado automaticamente se o operador marcar um item como "Não Recebido" pela primeira vez.
+
+E-mail de Laudo: Disparado no avanço do status (Aprovado/Negado/Parcial).
+
+Rastreio: Todos os e-mails agora consolidam o código da logística reversa para transparência total ao cliente.
+
+3. PRÓXIMA ETAPA DOCUMENTADA: FASE DE PERÍCIA TÉCNICA (LAUDO)
+Esta é a tarefa pendente para a próxima sessão de codificação:
+
+Objetivo: Implementar avaliação técnica detalhada por item.
+
+Gatilho: Quando o status do protocolo for alterado para 'perícia' no menu suspenso.
+
+Interface por Item:
+
+Incluir botões de rádio: [Aprovado], [Parcialmente Aprovado], [Negado].
+
+Exigir campo textarea (Laudo Técnico) quando o item for Negado ou Parcial.
+
+Regras Financeiras:
+
+Negado: Valor do item = 0.
+
+Parcial: Habilitar edição manual do valor pelo operador.
+
+Recálculo Financeiro: Atualizar o total do lote na tela via JavaScript: Valor_Total - Valor_Original_Item + Novo_Valor_Item.
+
+E-mail Técnico: Envio consolidado pós-salvamento, detalhando o parecer técnico e o laudo de cada item (nos casos Parcial/Negado).
