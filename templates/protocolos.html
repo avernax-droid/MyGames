@@ -20,6 +20,8 @@
                 para melhorar a navegação do usuário.
   - 27/06/2026: Implementação de ordenação dinâmica (Crescente/Decrescente) via JS 
                 para a coluna de "Data Entrada", com feedback visual no cabeçalho.
+  - 04/07/2026: Implementação de validação de UX no modal de busca: bloqueio condicional
+                dos botões 'Ver Todos' e 'Aplicar Filtro' com base no preenchimento do input.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -171,7 +173,6 @@
 
 <div id="modalBusca" class="modal-overlay">
     <div class="modal-content">
-        <!-- Botão X no topo direito -->
         <i class="fas fa-times btn-fechar-x" id="btnFecharX" title="Fechar aba de busca"></i>
 
         <h3 style="color: var(--cor-destaque); margin-bottom: 10px; font-size: 22px;">
@@ -196,7 +197,6 @@
         </div>
         
         <div style="display: flex; gap: 10px; margin-top: 25px;">
-            <!-- Botões Invertidos: Aplicar Filtro como secundário e Ver Todos em evidência -->
             <button id="btnBuscarModal" class="btn-action" style="flex: 1; background: #444; color: #fff; padding: 12px; font-weight: bold;">
                 Aplicar Filtro <i class="fas fa-check"></i>
             </button>
@@ -375,6 +375,34 @@
             modal.classList.add('hidden-modal');
         }
 
+        // ---------------------------------------------------------------------
+        // 1. NOVO CÓDIGO: Monitoriza a digitação para travar/destravar os botões
+        // ---------------------------------------------------------------------
+        if (inputTermo) {
+            inputTermo.addEventListener('input', function() {
+                const temTexto = this.value.trim().length > 0;
+                
+                // Botão "Ver Todos" - Desabilita se tiver texto
+                if(btnFechar) {
+                    btnFechar.disabled = temTexto;
+                    btnFechar.style.opacity = temTexto ? '0.5' : '1';
+                    btnFechar.style.cursor = temTexto ? 'not-allowed' : 'pointer';
+                }
+                
+                // Botão "Aplicar Filtro" - Habilita se tiver texto
+                if(btnBuscar) {
+                    btnBuscar.disabled = !temTexto;
+                    btnBuscar.style.opacity = !temTexto ? '0.5' : '1';
+                    btnBuscar.style.cursor = !temTexto ? 'not-allowed' : 'pointer';
+                }
+            });
+            // Dispara o evento logo ao carregar para garantir o estado inicial correto
+            inputTermo.dispatchEvent(new Event('input'));
+        }
+
+        // ---------------------------------------------------------------------
+        // 2. CÓDIGO ANTIGO (MANTIDO): Executa as ações reais ao clicar
+        // ---------------------------------------------------------------------
         // Gatilhos de Ação
         btnBuscar.addEventListener('click', executarFiltro);
         

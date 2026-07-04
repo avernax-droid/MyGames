@@ -45,8 +45,9 @@
 # - 26/06/2026: Inclusão das bibliotecas base64, requests e logging, e criação da função consultar_historico_rastreio para a API REST dos Correios.
 # - 26/06/2026: Inclusão dos campos de endereço completo, CEP e bairro na query da função obter_cabecalho_protocolo.
 # - 02/07/2026: Atualização da engine para ler e persistir o novo campo recebido_fisicamente nas operações da esteira.
+# - 04/07/2026: Refatoração inteligente do e-mail de triagem: Substituição da função enviar_email_divergencia_recebimento 
+#               por enviar_email_triagem_recebimento para disparar notificação com texto adaptável (100% sucesso ou faltantes).
 # ==============================================================================
-
 import mysql.connector
 import os
 import json
@@ -265,10 +266,11 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         return False
 
 
-def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_protocolo, itens_avaliados, valor_avaliado, codigo_rastreio=None, status_rastreio=None):
+def enviar_email_triagem_recebimento(destinatario, nome_cliente, numero_protocolo, itens_avaliados, valor_avaliado, codigo_rastreio=None, status_rastreio=None):
     """
-    Envia notificação destacando em negrito os itens não recebidos pelo setor de logística.
-    Inclui status de rastreio formatado.
+    Envia notificação do resultado da triagem física.
+    Adapta o texto dinamicamente para celebrar 100% de recebimento ou alertar sobre divergências.
+    Posiciona o código de rastreio imediatamente abaixo do número do protocolo.
     """
     try:
         dados_empresa = obter_dados_empresa()
@@ -279,23 +281,46 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
         smtp_server = os.getenv("EMAIL_HOST")
         smtp_port = int(os.getenv("EMAIL_PORT", 587))
 
+        itens_faltantes = 0
         html_itens = "<strong>CONFERÊNCIA DOS ITENS ENVIADOS NA CAIXA:</strong><br><br>"
+        
         for item in itens_avaliados:
             nome_produto = item.get('nome_produto', 'Produto não identificado')
             status = item.get('status_item', '')
             
             if status == 'Não Recebido' or status == 'Laudo: Negado':
+                itens_faltantes += 1
                 html_itens += f"<span style='color: #dc3545;'><strong>Produto: {nome_produto} - ITEM NÃO RECEBIDO NA CAIXA</strong></span><br><br>"
             else:
                 html_itens += f"Produto: {nome_produto} - Recebido com Sucesso<br><br>"
 
-        # BLOCO DE RASTREIO LOGÍSTICO
+        # BLOCO DE RASTREIO LOGÍSTICO (Limpo e formatado para colar no Protocolo)
         bloco_rastreio = ""
         if codigo_rastreio:
             bloco_rastreio = f"""
-            <p style="margin-top: 0;"><strong>Código de Rastreio dos Correios:</strong> {codigo_rastreio}<br>
+            <p style="margin-top: 0; margin-bottom: 15px;"><strong>Código de Rastreio dos Correios:</strong> {codigo_rastreio}<br>
             <strong>Status do Transporte:</strong> {status_rastreio if status_rastreio else 'Sem atualizações'}</p>
             """
+
+        # Roteamento Dinâmico de Texto (Sucesso vs. Divergência)
+        if itens_faltantes > 0:
+            texto_resultado = f"""
+            <p>No entanto, durante a nossa triagem inicial, notamos que <strong>alguns itens declarados não estavam presentes na embalagem</strong>.</p>
+            <br>
+            {html_itens}
+            <p>O Valor Total do Lote foi recalculado para: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
+            <p>Nossa equipe técnica seguirá com a avaliação dos itens que foram recebidos com sucesso. Se houve algum engano ou se você enviou o item faltante em outra caixa, por favor, responda este e-mail.</p>
+            """
+            assunto = f"{nome_empresa} - Divergência no Recebimento - Protocolo #{numero_protocolo}"
+        else:
+            texto_resultado = f"""
+            <p><strong>Excelente notícia!</strong> Conferimos a sua caixa e <strong>todos os itens declarados chegaram perfeitamente</strong>.</p>
+            <br>
+            {html_itens}
+            <p>O Valor Total do Lote permanece: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
+            <p>Nossa equipe técnica já está seguindo com a avaliação física (Perícia) dos seus itens para liberar o seu pagamento o mais rápido possível.</p>
+            """
+            assunto = f"{nome_empresa} - Caixa Recebida com Sucesso - Protocolo #{numero_protocolo}"
 
         corpo_html = f"""
         <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
@@ -303,11 +328,7 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
             <p>Recebemos a sua caixa referente ao processo de venda!</p>
             <p style="margin-bottom: 5px;"><strong>Protocolo:</strong> {numero_protocolo}</p>
             {bloco_rastreio}
-            <p>No entanto, durante a nossa triagem inicial, notamos que <strong>alguns itens declarados não estavam presentes na embalagem</strong>.</p>
-            <br>
-            {html_itens}
-            <p>O Valor Total do Lote foi recalculado para: <strong>R$ {float(valor_avaliado):.2f}</strong>.</p>
-            <p>Nossa equipe técnica seguirá com a avaliação dos itens que foram recebidos com sucesso. Se houve algum engano ou se você enviou o item faltante em outra caixa, por favor, responda este e-mail.</p>
+            {texto_resultado}
             <br>
             <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
         </div>
@@ -316,7 +337,7 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr((nome_empresa, sender_email))
         msg['To'] = destinatario
-        msg['Subject'] = f"{nome_empresa} - Divergência no Recebimento - Protocolo #{numero_protocolo}"
+        msg['Subject'] = assunto
         
         msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
 
@@ -327,9 +348,8 @@ def enviar_email_divergencia_recebimento(destinatario, nome_cliente, numero_prot
         server.quit()
         return True
     except Exception as e:
-        print(f"Erro ao enviar e-mail de divergência: {e}")
+        print(f"Erro ao enviar e-mail de triagem: {e}")
         return False
-
 
 # [Funções de Protocolo e Esteira de Status]
 def obter_cabecalho_protocolo(protocolo_id):

@@ -4,17 +4,21 @@
   MÓDULO: esteira.html
   DATA DE CRIAÇÃO: 10/06/2026
   HISTÓRICO DE ALTERAÇÕES:
-  - 11/06/2026: Refatoração da UX - Substituição das "gavetas" por um Dropdown Select.
-  - 11/06/2026: Refinamento de UI - Ajuste de textos no label, remoção de option 
-                vazio e limpeza do cabeçalho da tabela de dados.
-  - 25/06/2026: Implementação de Popup (Modal) interativo de busca após a seleção
-                de status. Filtro dinâmico via JS (Chaves: Protocolo, Cliente, Data).
-  - 25/06/2026: Implementação de persistência de filtro via sessionStorage para 
-                evitar reabertura indesejada do Modal no retorno (botão Voltar).
-  - 27/06/2026: Implementação de ordenação dinâmica (Crescente/Decrescente) via JS 
-                para a coluna de "Data Entrada", com feedback visual no cabeçalho.
+  - 11/06/2026: Refatoração da UI: Implementação de Acordeão para itens do lote.
+  - 12/06/2026: UX Fluxo: Substituição por link direto via url_for no botão 'Voltar'.
+  - 27/06/2026: UX UI: Inclusão do painel de Dados Complementares.
+  - 30/06/2026: UX UI/Lógica: Refatoração profunda para Perícia Granular.
+  - 02/07/2026: Refatoração Backend-Driven: Substituição do campo textual 
+                status_item pela flag booleana recebido_fisicamente para 
+                maior segurança e blindagem da máquina de estados.
+  - 03/07/2026: Implementação da Fase de Laudo Técnico: Inclusão de decisão 
+                granulada (Aprovado/Parcial/Negado) e campos de valor final.
+  - 04/07/2026: Implementação de validação de UX no modal de busca: bloqueio 
+                condicional dos botões 'Ver Todos' e 'Aplicar Filtro' com base 
+                no preenchimento do input de termo.
   ==============================================================================
 #}
+
 {% extends 'base.html' %}
 
 {% block title %}Fila de Trabalho - MyGames Admin{% endblock %}
@@ -399,7 +403,32 @@
             }
         }
 
-        // --- LISTENERS DOS BOTÕES DE BUSCA ---
+// --- LISTENERS DOS BOTÕES DE BUSCA ---
+
+        // 1. NOVO CÓDIGO: Monitora a digitação para travar/destravar os botões
+        if (inputTermo) {
+            inputTermo.addEventListener('input', function() {
+                const temTexto = this.value.trim().length > 0;
+                
+                // Botão "Ver Todos" - Desabilita se tiver texto
+                if(btnFechar) {
+                    btnFechar.disabled = temTexto;
+                    btnFechar.style.opacity = temTexto ? '0.5' : '1';
+                    btnFechar.style.cursor = temTexto ? 'not-allowed' : 'pointer';
+                }
+                
+                // Botão "Aplicar Filtro" - Habilita se tiver texto
+                if(btnBuscar) {
+                    btnBuscar.disabled = !temTexto;
+                    btnBuscar.style.opacity = !temTexto ? '0.5' : '1';
+                    btnBuscar.style.cursor = !temTexto ? 'not-allowed' : 'pointer';
+                }
+            });
+            // Dispara o evento logo ao carregar para garantir o estado inicial correto
+            inputTermo.dispatchEvent(new Event('input'));
+        }
+
+        // 2. CÓDIGO ANTIGO (MANTIDO): Executa a ação quando clica nos botões
         if (btnBuscar) btnBuscar.addEventListener('click', executarFiltro);
         
         if (btnFechar) btnFechar.addEventListener('click', () => {

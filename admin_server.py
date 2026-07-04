@@ -29,6 +29,8 @@
 # - 30/06/2026: Atualização da rota salvar_pericia_esteira para processar a Perícia Granular.
 #               Implementação de gatilho inteligente para e-mail de divergência de recebimento.
 # - 02/07/2026: Correção do gatilho de e-mail na salvar_pericia_esteira para usar o novo padrão booleano (recebido_fisicamente).
+# - 04/07/2026: Correção de escopo (BugFix) na injeção da variável codigo_rastreio. 
+#               Alteração da Regra 1 (E-mail de Triagem) para disparar como 'Recibo de Conferência' sempre que houver alteração de recebimento.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -301,7 +303,7 @@ def salvar_pericia_esteira(protocolo_id):
     status_id = request.form.get('status_id')
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
-    payload_itens = request.form.get('payload_itens') # NOVO: Captura os itens do HTML
+    payload_itens = request.form.get('payload_itens')
     
     admin_id = session.get('admin_id')
     is_ajax = request.headers.get('Accept') == 'application/json'
@@ -312,11 +314,10 @@ def salvar_pericia_esteira(protocolo_id):
         flash('Status e Valor Avaliado são obrigatórios.', 'error')
         return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
-    # 1. TIRA UMA "FOTO" DO BANCO ANTES DE ATUALIZAR
-    # Isso serve para saber se o item já era "Não Recebido" antes ou se foi marcado agora
+    # 1. Tira uma "foto" do banco antes de atualizar para rastrear o que mudou
     itens_antigos = admin_engine.obter_itens_protocolo(protocolo_id)
 
-    # Atualiza o banco de dados (agora salva o booleano recebido_fisicamente também)
+    # 2. Atualiza o banco de dados (salvando o booleano de recebimento granular e valores)
     sucesso = admin_engine.atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_avaliado, admin_id, payload_itens)
 
     if sucesso:
@@ -324,50 +325,52 @@ def salvar_pericia_esteira(protocolo_id):
         if protocolo_atualizado and protocolo_atualizado.get('cliente_email'):
             slug = protocolo_atualizado.get('slug_tecnico', '').lower() if protocolo_atualizado.get('slug_tecnico') else ''
             
-            # REGRA 1: Email de Divergência de Recebimento
+            # -------------------------------------------------------------
+            # CORREÇÃO: CONSULTA DE RASTREIO GLOBAL PARA USO NAS REGRAS 1 E 2
+            # -------------------------------------------------------------
+            codigo_rastreio = protocolo_atualizado.get('codigo_rastreio')
+            status_rastreio_reversa = ""
+            if codigo_rastreio:
+                historico = admin_engine.consultar_historico_rastreio(codigo_rastreio)
+                if historico:
+                     status_rastreio_reversa = historico[0].get('status', '')
+            
+            # REGRA 1: Email de Triagem de Recebimento (Sucesso Total ou Divergência)
             if payload_itens:
                 try:
                     itens_json = json.loads(payload_itens)
-                    teve_novo_nao_recebido = False
+                    teve_nova_triagem = False
                     
                     for novo_item in itens_json:
-                        # Se o operador marcou na tela como Não Recebido
-                        if novo_item.get('recebido') is False: 
-                            # Verifica se esse item já tinha o status_item 'Não Recebido' OU recebido_fisicamente = 0 no banco antes do clique de hoje
-                            for antigo in itens_antigos:
-                                if str(antigo['id']) == str(novo_item['id_item']):
-                                    if antigo.get('status_item') != 'Não Recebido' and antigo.get('recebido_fisicamente') != 0:
-                                        teve_novo_nao_recebido = True # É uma marcação inédita!
-                                    break
+                        # Extrai do HTML se o botão foi clicado e marcou o produto como recebido ou não (True/False)
+                        flag_nova_recebido = 1 if novo_item.get('recebido') else 0
+                        
+                        for antigo in itens_antigos:
+                            if str(antigo['id']) == str(novo_item['id_item']):
+                                # Se a situação física mudou comparada à memória do BD, houve triagem.
+                                if antigo.get('recebido_fisicamente') != flag_nova_recebido:
+                                    teve_nova_triagem = True
+                                break
                                     
-                    # Dispara o e-mail apenas se for uma divergência nova detectada
-                    if teve_novo_nao_recebido:
+                    # O email será disparado assim que o operador "Salvar Lote" contendo novas checagens
+                    if teve_nova_triagem:
                         itens_atualizados = admin_engine.obter_itens_protocolo(protocolo_id)
-                        admin_engine.enviar_email_divergencia_recebimento(
+                        admin_engine.enviar_email_triagem_recebimento(
                             destinatario=protocolo_atualizado['cliente_email'],
                             nome_cliente=protocolo_atualizado['cliente_nome'],
                             numero_protocolo=protocolo_atualizado['numero_protocolo'],
                             itens_avaliados=itens_atualizados,
                             valor_avaliado=protocolo_atualizado['valor_avaliado'],
-                            codigo_rastreio=codigo_rastreio,           # <-- INJEÇÃO DO RASTREIO CORRIGIDA
-                            status_rastreio=status_rastreio_reversa    # <-- INJEÇÃO DO STATUS CORRIGIDA
+                            codigo_rastreio=codigo_rastreio,           
+                            status_rastreio=status_rastreio_reversa    
                         )
                 except Exception as e:
-                    print(f"Erro ao processar gatilho de email de divergencia: {e}")
+                    print(f"Erro ao processar gatilho de email de triagem: {e}")
             
             # REGRA 2: Email Final da Perícia Técnica
             if 'aprovado' in slug or 'negado' in slug or 'recusado' in slug or 'parcial' in slug:
-                # Obtém os itens atualizados no banco após o salvamento
                 itens_atualizados_banco = admin_engine.obter_itens_protocolo(protocolo_id)
                 
-                # Obtém o status do rastreio
-                codigo_rastreio = protocolo_atualizado.get('codigo_rastreio')
-                status_rastreio_reversa = ""
-                if codigo_rastreio:
-                    historico = admin_engine.consultar_historico_rastreio(codigo_rastreio)
-                    if historico:
-                         status_rastreio_reversa = historico[0].get('status', '')
-
                 admin_engine.enviar_email_status_pericia(
                     destinatario=protocolo_atualizado['cliente_email'],
                     nome_cliente=protocolo_atualizado['cliente_nome'],
@@ -375,9 +378,9 @@ def salvar_pericia_esteira(protocolo_id):
                     status_nome=protocolo_atualizado['status_nome'],
                     laudo_tecnico=protocolo_atualizado['laudo_tecnico'],
                     valor_avaliado=protocolo_atualizado['valor_avaliado'],
-                    itens_avaliados=itens_atualizados_banco, # Novo parâmetro
-                    codigo_rastreio=codigo_rastreio,         # Novo parâmetro
-                    status_rastreio=status_rastreio_reversa  # Novo parâmetro
+                    itens_avaliados=itens_atualizados_banco,
+                    codigo_rastreio=codigo_rastreio,         
+                    status_rastreio=status_rastreio_reversa  
                 )
 
     if is_ajax:
@@ -387,6 +390,8 @@ def salvar_pericia_esteira(protocolo_id):
         flash('Erro interno ao salvar a perícia.', 'error')
         
     return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
+
+
 
 @app.route('/protocolos/<int:protocolo_id>')
 @requer_permissao('protocolos', 'read')
