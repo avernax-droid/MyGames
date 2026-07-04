@@ -16,6 +16,7 @@
   - 22/06/2026: Correção de UX: Ocultar QR Code ao clicar em Upload do PC.
   - 22/06/2026: Correção de roteamento de imagens no preview do handoff mobile para utilizar caminho com token antes da submissão.
   - 22/06/2026: Melhoria de UX: Ocultar área do QR Code automaticamente após receber as fotos via celular.
+  - 04/07/2026: Implementação do objeto DataTransfer para acúmulo e retenção de múltiplos uploads sucessivos locais via Desktop.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -239,6 +240,9 @@
         
         let pollingInterval;
 
+        // NOVO: Objeto DataTransfer para acumular as fotos selecionadas sucessivamente
+        const acumuladorArquivos = new DataTransfer();
+
         // Ação: Abrir Explorador de Arquivos (PC)
         btnUploadPc.addEventListener('click', () => {
             // Oculta a área do QR Code se estiver aberta e reseta o estilo do botão
@@ -251,11 +255,17 @@
             fileInput.click();
         });
 
-        // Renderização de miniaturas locais
+        // Renderização de miniaturas e ACÚMULO DE ARQUIVOS NO INPUT
         fileInput.addEventListener('change', function() {
             if (this.files.length > 0) {
                 msgVazia.style.display = 'none';
+                
+                // Itera sobre as NOVAS fotos selecionadas no explorador do Windows
                 Array.from(this.files).forEach(file => {
+                    // 1. Adiciona o arquivo no nosso acumulador contínuo
+                    acumuladorArquivos.items.add(file);
+                    
+                    // 2. Renderiza a miniatura na tela
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const img = document.createElement('img');
@@ -265,6 +275,10 @@
                     }
                     reader.readAsDataURL(file);
                 });
+                
+                // 3. Substitui os arquivos do input original pela nossa lista acumulada
+                // Isso garante que no POST (submit), todas as fotos viajem para o servidor
+                this.files = acumuladorArquivos.files;
             }
         });
 

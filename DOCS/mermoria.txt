@@ -859,3 +859,81 @@ Parcial: Habilitar edição manual do valor pelo operador.
 Recálculo Financeiro: Atualizar o total do lote na tela via JavaScript: Valor_Total - Valor_Original_Item + Novo_Valor_Item.
 
 E-mail Técnico: Envio consolidado pós-salvamento, detalhando o parecer técnico e o laudo de cada item (nos casos Parcial/Negado).
+
+======================
+03/07
+
+RELATÓRIO DE ATIVIDADES: OTIMIZAÇÃO E CORREÇÃO DO ECOSISTEMA MYGAMES
+1. Consolidação da Esteira de Perícia (Backoffice)
+Finalização da Fase de Laudo Técnico: Validamos a interface templates/pericia_esteira.html para garantir que o fluxo de avaliação 
+granular estivesse robusto.
+
+Blindagem da Máquina de Estados: Implementamos travas de segurança no front-end para evitar deadlocks, garantindo que o botão 
+"Salvar Lote" só seja habilitado após a conferência física e técnica (Laudo) de todos os itens.
+
+Integração de Dados: O sistema foi ajustado para persistir o novo padrão de dados (flag recebido_fisicamente, valor_final_pix e 
+valor_final_credito), eliminando a dependência de interpretações textuais frágeis.
+
+Notificações Inteligentes: Validamos a orquestração do admin_server.py com o admin_engine.py, assegurando que o disparo de e-mails 
+(divergência, aprovação, negação ou parcial) ocorra corretamente logo após a persistência da perícia, consolidando dados de rastreio de logística reversa.
+
+2. Ajustes no Aplicativo Cliente (Site/Catálogo)
+Diagnóstico de Inconsistência: Identificamos uma inversão de categorias (Jogos e Acessórios) que ocorria devido a um legado no 
+processamento de dados.
+
+Correção do Pipeline de ETL: Ajustamos o módulo utils/sync_catalogo.py corrigindo a função classificar_categoria. O sistema agora 
+classifica corretamente "Jogos" como categoria_id = 4 e "Acessórios" como categoria_id = 3, respeitando o padrão atual do banco de dados.
+
+Sincronização de Dados: Executamos o script de ETL atualizado, que através de um UPSERT em lote (ON DUPLICATE KEY UPDATE), corrigiu os 
+IDs de todas as categorias na tabela catalogo_mestre no MySQL, alinhando a base ao novo padrão.
+
+3. Governança e Versionamento
+Documentação: Atualizamos os registros de memória (IA_memoria.txt e mermoria.txt) para refletir as mudanças na estrutura de banco e nas 
+regras de negócio da triagem.
+
+Versionamento Git: Realizamos o commit e push das alterações em suas respectivas branches (feat-triagem-concluida para o Admin e 
+versao-ajustada para o App Cliente), mantendo todo o histórico de alterações rastreável e seguro.
+
+===============================
+
+03/07
+
+RESUMO DE ATIVIDADES: OTIMIZAÇÃO DE DADOS E COMUNICAÇÃO (BACKOFFICE)
+1. Correção na Persistência de Dados Granulares (Perícia)
+
+Problema: O sistema realizava o update do status de recebimento dos itens, mas os valores finais (valor_final_pix) e os laudos textuais (motivo_recusa) enviados pelo front-end evaporavam, não sendo gravados no banco de dados.
+
+Solução: Refatoração da função atualizar_status_protocolo no módulo admin_engine.py para capturar os campos novo_valor, status_laudo e texto_laudo diretamente do payload em JSON e persisti-los corretamente na tabela itens_periciados.
+
+2. Correção na Leitura de Dados para o E-mail
+
+Problema: A consulta que extraía os dados para montar o e-mail não buscava o valor pós-perícia, forçando a exibição do valor original de catálogo para todos os itens.
+
+Solução: Atualização da instrução SQL na função obter_itens_protocolo (em admin_engine.py) para realizar o SELECT trazendo as colunas i.valor_final_pix e i.motivo_recusa.
+
+3. Injeção Global da Logística Reversa (Rastreio)
+
+Problema: Os e-mails transacionais não exibiam o código de rastreio e o status de transporte do lote.
+
+Solução: Implementação da chamada consultar_historico_rastreio(codigo_rastreio) na rota principal da esteira (salvar_pericia_esteira em admin_server.py). O servidor agora injeta as variáveis codigo_rastreio e status_rastreio tanto no gatilho da Triagem (Regra 1) quanto no gatilho do Laudo Final (Regra 2).
+
+4. Refatoração do E-mail de Perícia Técnica (Laudo Final)
+
+Status Isolados: Lógica condicional reescrita para não misturar itens não enviados pelo cliente com itens reprovados por defeito. "NÃO RECEBIDO" agora possui uma regra e cor exclusivas, separadas de "REPROVADO".
+
+Valores Dinâmicos: Itens reprovados ou não recebidos agora têm o seu valor final forçado a R$ 0.00 visualmente.
+
+Totalizador: Adição de um bloco em destaque ao final da listagem informando o "VALOR TOTAL DA AVALIAÇÃO".
+
+Layout: O bloco contendo o Rastreio Logístico foi reposicionado para o topo do e-mail, imediatamente abaixo do número do Protocolo.
+
+TAREFAS PROGRAMADAS PARA AMANHÃ
+Refino de Layout e Texto no E-mail de Divergência (Triagem Inicial):
+
+Substituição de Nomenclatura: Alterar o texto estático "Valor Total do Lote (PIX)" para exibir apenas "Valor Total do Lote".
+
+Limpeza Visual: Excluir permanentemente o texto "DADOS DE POSTAGEM (LOGÍSTICA REVERSA):" do corpo do e-mail.
+
+Reposicionamento: Mover o bloco de texto "Código de Rastreio dos Correios:" para que fique renderizado exatamente abaixo da linha "Protocolo:".
+
+Todo o contexto da nossa conversa está salvo. Quando você retornar amanhã, basta enviar o arquivo de memória anexado caso inicie um novo chat, ou continuar por aqui, e iniciaremos a execução direta destas três pendências. Bom descanso!
