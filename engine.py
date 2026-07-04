@@ -35,6 +35,8 @@
 # - 23/06/2026: Adição do xml.sax.saxutils (escape) para sanitização rigorosa de caracteres especiais na integração dos Correios.
 # - 26/06/2026: Validação da dinamização do nome fantasia no e-mail (enviar_email_resumo) e remoção de strings "MyGames" hardcoded na integração dos Correios.
 # - 02/07/2026: Correção na função registrar_item_periciado substituindo a coluna inexistente 'quantidade' por 'qtd_declarada' no INSERT do banco de dados.
+# - 04/07/2026: Atualização da dupla barreira em calcular_cotacao_final para permitir consoles desbloqueados específicos (PS1, PS2 e PS Vita).
+# - 04/07/2026: Integração do campo valor_cred_base nas funções calcular_cotacao_final e buscar_produtos_por_categoria.
 # ==============================================================================
 
 import mysql.connector
@@ -197,7 +199,11 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
             if 'não funciona' in texto_estado:
                 raise ValueError("Item recusado pela regra de negócio: Console não funciona.")
             if 'desbloqueado' in texto_extra:
-                raise ValueError("Item recusado pela regra de negócio: Console desbloqueado.")
+                # Nova Regra: Exceção para consoles desbloqueados (PS1, PS2, PS Vita)
+                nome_lower = produto.get('nome_produto', '').lower()
+                excecoes = ['ps1', 'playstation 1', 'ps2', 'playstation 2', 'vita']
+                if not any(exc in nome_lower for exc in excecoes):
+                    raise ValueError("Item recusado pela regra de negócio: Este modelo de console não é aceito desbloqueado.")
                 
         elif categoria_id_str == '2': # Controle
             if 'pirata' in texto_extra:
@@ -217,15 +223,21 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         multiplicador = Decimal(str(multiplicador_regiao))
         qtd = Decimal(str(quantidade))
         
-        base_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
-        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator * multiplicador * qtd
+        base_pix_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
+        base_cred_raw = produto['valor_cred_base'] if produto.get('valor_cred_base') is not None else 0.0
+        
+        valor_final_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador * qtd
+        valor_final_cred = Decimal(str(base_cred_raw).replace(',', '.')) * fator * multiplicador * qtd
         
         return {
             "produto": produto['nome_produto'], 
-            "valor_final": float(valor_final),
+            "valor_final": float(valor_final_pix), # Mantido PIX aqui por compatibilidade com rotas legadas
+            "valor_final_pix": float(valor_final_pix),
+            "valor_final_cred": float(valor_final_cred),
             "multiplicador_aplicado": float(multiplicador_regiao),
             "quantidade_considerada": int(quantidade)
         }
+    
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
@@ -460,8 +472,9 @@ def buscar_produtos_por_categoria(categoria_id):
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True, buffered=True)
-        cursor.execute("SELECT id, nome_produto, plataforma, foto_oficial_url, valor_pix_base FROM catalogo_mestre WHERE categoria_id = %s AND ativo = 1 ORDER BY nome_produto", (categoria_id,))
+        cursor.execute("SELECT id, nome_produto, plataforma, foto_oficial_url, valor_pix_base, valor_cred_base FROM catalogo_mestre WHERE categoria_id = %s AND ativo = 1 ORDER BY nome_produto", (categoria_id,))
         return cursor.fetchall()
+    
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
@@ -816,7 +829,7 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         cursor.execute("SELECT descricao, fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
         
-        # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
         # DUPLA BARREIRA DE VALIDAÇÃO (Regras de Negócio do Backend)
         # -----------------------------------------------------------------
         categoria_id_str = str(produto.get('categoria_id'))
@@ -827,7 +840,11 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
             if 'não funciona' in texto_estado:
                 raise ValueError("Item recusado pela regra de negócio: Console não funciona.")
             if 'desbloqueado' in texto_extra:
-                raise ValueError("Item recusado pela regra de negócio: Console desbloqueado.")
+                # Nova Regra: Exceção para consoles desbloqueados (PS1, PS2, PS Vita)
+                nome_lower = produto.get('nome_produto', '').lower()
+                excecoes = ['ps1', 'playstation 1', 'ps2', 'playstation 2', 'vita']
+                if not any(exc in nome_lower for exc in excecoes):
+                    raise ValueError("Item recusado pela regra de negócio: Este modelo de console não é aceito desbloqueado.")
                 
         elif categoria_id_str == '2': # Controle
             if 'pirata' in texto_extra:
@@ -847,15 +864,24 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         multiplicador = Decimal(str(multiplicador_regiao))
         qtd = Decimal(str(quantidade))
         
-        base_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
-        valor_final = Decimal(str(base_raw).replace(',', '.')) * fator * multiplicador * qtd
+        # Leitura da coluna oficial valor_pix_base
+        base_pix_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
+        
+        # Cálculo oficial baseado no valor_pix_base
+        valor_final_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador * qtd
+        
+        # O valor de crédito continua sendo o PIX + 20% (ou a sua regra de negócio atual)
+        valor_final_cred = valor_final_pix * Decimal('1.2')
         
         return {
             "produto": produto['nome_produto'], 
-            "valor_final": float(valor_final),
+            "valor_final": float(valor_final_pix),
+            "valor_final_pix": float(valor_final_pix),
+            "valor_final_cred": float(valor_final_cred),
             "multiplicador_aplicado": float(multiplicador_regiao),
             "quantidade_considerada": int(quantidade)
         }
+    
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 

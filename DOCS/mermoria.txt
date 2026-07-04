@@ -901,25 +901,32 @@ versao-ajustada para o App Cliente), mantendo todo o histórico de alterações 
 RESUMO DE ATIVIDADES: OTIMIZAÇÃO DE DADOS E COMUNICAÇÃO (BACKOFFICE)
 1. Correção na Persistência de Dados Granulares (Perícia)
 
-Problema: O sistema realizava o update do status de recebimento dos itens, mas os valores finais (valor_final_pix) e os laudos textuais (motivo_recusa) enviados pelo front-end evaporavam, não sendo gravados no banco de dados.
+Problema: O sistema realizava o update do status de recebimento dos itens, mas os valores finais (valor_final_pix) e os laudos textuais 
+(motivo_recusa) enviados pelo front-end evaporavam, não sendo gravados no banco de dados.
 
-Solução: Refatoração da função atualizar_status_protocolo no módulo admin_engine.py para capturar os campos novo_valor, status_laudo e texto_laudo diretamente do payload em JSON e persisti-los corretamente na tabela itens_periciados.
+Solução: Refatoração da função atualizar_status_protocolo no módulo admin_engine.py para capturar os campos novo_valor, status_laudo e 
+texto_laudo diretamente do payload em JSON e persisti-los corretamente na tabela itens_periciados.
 
 2. Correção na Leitura de Dados para o E-mail
 
-Problema: A consulta que extraía os dados para montar o e-mail não buscava o valor pós-perícia, forçando a exibição do valor original de catálogo para todos os itens.
+Problema: A consulta que extraía os dados para montar o e-mail não buscava o valor pós-perícia, forçando a exibição do valor original 
+de catálogo para todos os itens.
 
-Solução: Atualização da instrução SQL na função obter_itens_protocolo (em admin_engine.py) para realizar o SELECT trazendo as colunas i.valor_final_pix e i.motivo_recusa.
+Solução: Atualização da instrução SQL na função obter_itens_protocolo (em admin_engine.py) para realizar o SELECT trazendo as colunas 
+i.valor_final_pix e i.motivo_recusa.
 
 3. Injeção Global da Logística Reversa (Rastreio)
 
 Problema: Os e-mails transacionais não exibiam o código de rastreio e o status de transporte do lote.
 
-Solução: Implementação da chamada consultar_historico_rastreio(codigo_rastreio) na rota principal da esteira (salvar_pericia_esteira em admin_server.py). O servidor agora injeta as variáveis codigo_rastreio e status_rastreio tanto no gatilho da Triagem (Regra 1) quanto no gatilho do Laudo Final (Regra 2).
+Solução: Implementação da chamada consultar_historico_rastreio(codigo_rastreio) na rota principal da esteira (salvar_pericia_esteira em 
+admin_server.py). O servidor agora injeta as variáveis codigo_rastreio e status_rastreio tanto no gatilho da Triagem (Regra 1) quanto 
+no gatilho do Laudo Final (Regra 2).
 
 4. Refatoração do E-mail de Perícia Técnica (Laudo Final)
 
-Status Isolados: Lógica condicional reescrita para não misturar itens não enviados pelo cliente com itens reprovados por defeito. "NÃO RECEBIDO" agora possui uma regra e cor exclusivas, separadas de "REPROVADO".
+Status Isolados: Lógica condicional reescrita para não misturar itens não enviados pelo cliente com itens reprovados por defeito. 
+"NÃO RECEBIDO" agora possui uma regra e cor exclusivas, separadas de "REPROVADO".
 
 Valores Dinâmicos: Itens reprovados ou não recebidos agora têm o seu valor final forçado a R$ 0.00 visualmente.
 
@@ -934,6 +941,6 @@ Substituição de Nomenclatura: Alterar o texto estático "Valor Total do Lote (
 
 Limpeza Visual: Excluir permanentemente o texto "DADOS DE POSTAGEM (LOGÍSTICA REVERSA):" do corpo do e-mail.
 
-Reposicionamento: Mover o bloco de texto "Código de Rastreio dos Correios:" para que fique renderizado exatamente abaixo da linha "Protocolo:".
+Reposicionamento: Mover o bloco de texto "Código de Rastreio dos Correios:" para que fique renderizado exatamente abaixo da linha 
+"Protocolo:".
 
-Todo o contexto da nossa conversa está salvo. Quando você retornar amanhã, basta enviar o arquivo de memória anexado caso inicie um novo chat, ou continuar por aqui, e iniciaremos a execução direta destas três pendências. Bom descanso!

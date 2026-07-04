@@ -22,6 +22,7 @@
   - 23/06/2026: Alteração do botão principal para "FECHAR VENDA AGORA!" e aplicação do filtro moeda_real (Paridade Mobile).
   - 23/06/2026: Alteração do rótulo do botão "VOLTAR" para "ADICIONAR MAIS PRODUTOS".
   - 23/06/2026: Alteração da cor do botão "ADICIONAR MAIS PRODUTOS" para branco para melhorar a hierarquia visual.
+  - 04/07/2026: Inclusão de alerta de bloqueio de valor mínimo do lote (< R$ 300) baseado no crédito e ajuste nas exibições de valor.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -42,7 +43,7 @@
                         <th style="width: 60px;"></th>
                         <th style="width: auto;">Item</th>
                         <th style="width: 60px; text-align: center;">QTD</th>
-                        <th style="width: 110px; text-align: right;">Valor PIX</th>
+                        <th style="width: 110px; text-align: right;">Valor Oferta</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -85,7 +86,7 @@
                             {% if item.is_outros %}
                                 <span style="color: #ffaa00; font-size: 11px; text-transform: uppercase; font-weight: bold; border: 1px dashed #ffaa00; padding: 3px 6px; border-radius: 4px; font-family: sans-serif; display: inline-block;">Sob Consulta</span>
                             {% else %}
-                                R$ {{ (item.valor_pix_unitario * item.quantidade) | moeda_real }}
+                                R$ {{ (item.valor_cred_unitario * item.quantidade) | moeda_real }}
                             {% endif %}
                         </td>
                     </tr>
@@ -95,9 +96,16 @@
         </div>
 
         <div class="total-lote-box">
-            <span>TOTAL DO LOTE:</span>
+            <span>TOTAL DO LOTE (CRÉDITO):</span>
             <strong>R$ {{ total_lote | moeda_real }}</strong>
         </div>
+
+        {% if bloqueio_valor %}
+        <div class="alerta-valor-minimo" style="background: rgba(255, 68, 68, 0.1); border: 2px solid #ff4444; border-radius: 12px; padding: 15px; margin-bottom: 25px; text-align: center; color: var(--texto-br); font-family: sans-serif; font-size: 14px; line-height: 1.4;">
+            <span style="font-size: 18px; margin-right: 8px; vertical-align: middle;">⚠️</span>
+            Atenção: Não realizamos transações para lotes com valor total de avaliação inferior a <strong>R$ 300,00</strong>. Por favor, adicione mais produtos para liberar o fechamento.
+        </div>
+        {% endif %}
         
         <div class="acoes-finais">
             <div class="botoes-nav" style="gap: 15px;">
@@ -107,7 +115,9 @@
                     NÃO QUERO VENDER
                 </button>
 
+                {% if not bloqueio_valor %}
                 <a href="{{ url_for('termos_oferta') }}" class="btn-primary">FECHAR VENDA AGORA!</a>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -16,6 +16,8 @@
     "Adicionar mais produtos" para branco.
   - 23/06/2026: Alteração do botão principal para "FECHAR VENDA AGORA!" e 
     ajuste na formatação da moeda para BRL (vírgula).
+  - 04/07/2026: Adequação para uso de valor_cred_unitario e inclusão da trava condicional
+    (bloqueio_valor) para bloquear fechamento de lotes menores que R$ 300,00.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -70,11 +72,11 @@
                             {% if item.is_outros %}
                                 <span class="sob-consulta-badge">Sob Consulta</span>
                             {% else %}
-                                R$ {{ ("%.2f"|format(item.valor_pix_unitario * item.quantidade))|replace('.', ',') }}
+                                R$ {{ ("%.2f"|format(item.valor_cred_unitario * item.quantidade))|replace('.', ',') }}
                             {% endif %}
                         </div>
                         {% if not item.is_outros %}
-                            <div class="texto-enfase-discreta">O valor informado se refere para pagamento via PIX</div>
+                            <div class="texto-enfase-discreta">Valor de Oferta (Crédito)</div>
                         {% endif %}
                     </div>
                 </div>
@@ -84,18 +86,27 @@
         </div>
 
         <div class="total-lote-box-mobile">
-            <span>TOTAL DO LOTE:</span>
+            <span>TOTAL DO LOTE (CRÉDITO):</span>
             <strong>R$ {{ ("%.2f"|format(total_lote))|replace('.', ',') }}</strong>
         </div>
+
+        {% if bloqueio_valor %}
+        <div class="alerta-valor-minimo" style="background: rgba(255, 68, 68, 0.1); border: 2px solid #ff4444; border-radius: 12px; padding: 15px; margin-bottom: 25px; text-align: center; color: var(--texto-br); font-family: sans-serif; font-size: 13px; line-height: 1.4;">
+            <span style="font-size: 18px; margin-right: 8px; vertical-align: middle;">⚠️</span>
+            Atenção: Não realizamos transações para lotes com valor total de avaliação inferior a <strong>R$ 300,00</strong>. Por favor, adicione mais produtos para liberar o fechamento.
+        </div>
+        {% endif %}
         
         <div class="acoes-finais-mobile">
             <a href="{{ url_for('produto') }}" class="btn-secondary" style="width: 100%; text-align: center; display: block; padding: 15px 0; color: #ffffff; border-color: #ffffff;">
                 ADICIONAR MAIS PRODUTOS
             </a>
 
+            {% if not bloqueio_valor %}
             <a href="{{ url_for('termos_oferta') }}" class="btn-primary" style="width: 100%; text-align: center; display: block; padding: 15px 0;">
                 FECHAR VENDA AGORA!
             </a>
+            {% endif %}
             
             <button type="button" onclick="abrirModalFeedback()" class="btn-secondary btn-descartar-mobile" style="width: 100%; padding: 15px 0;">
                 NÃO QUERO VENDER

@@ -34,6 +34,9 @@
 # - 22/06/2026: Implementação do Flask-Session (filesystem) para resolver estouro de limite de cookies e persistir o carrinho no servidor.
 # - 23/06/2026: Atualização da rota /cotar para capturar 'pergunta_extra' do frontend e tratamento de exceção (ValueError) para a dupla barreira de validação do motor.
 # - 25/06/2026: Extração dinâmica da URL do YouTube do .env na rota index para o modal de vídeo em boas_vindas.html.
+# - 04/07/2026: Alteração na rota /resumo para calcular total_lote baseado no crédito e injetar a flag bloqueio_valor para a trava de R$ 300,00.
+# - 04/07/2026: Alteração na rota /pericia para incluir a regra de exceção e injeção da flag 'permite_desbloqueio' para consoles (PS1, PS2 e PS Vita).
+# - 04/07/2026: Refatoração da rota /cotar para utilizar valor_final_pix e valor_final_cred oficiais vindos do engine.py.
 # ==============================================================================
 
 import os
@@ -213,6 +216,17 @@ def pericia(produto_id):
     
     token_sessao = str(uuid.uuid4())
     
+    # Nova Regra: Exceção para consoles desbloqueados (PS1, PS2, PS Vita)
+    permite_desbloqueio = False
+    if str(categoria_id) == '1' or categoria_nome == 'Console':
+        nome_lower = produto_nome.lower()
+        excecoes = ['ps1', 'playstation 1', 'ps2', 'playstation 2', 'vita']
+        if any(exc in nome_lower for exc in excecoes):
+            permite_desbloqueio = True
+    else:
+        # Se não for console, a regra de desbloqueio não se aplica (liberado por padrão ou irrelevante)
+        permite_desbloqueio = True 
+    
     return render_smart_template(
         'pericia.html', 
         opcoes=opcoes, 
@@ -221,7 +235,8 @@ def pericia(produto_id):
         categoria_id=categoria_id, 
         token_sessao=token_sessao,
         produto_nome=produto_nome,
-        categoria_nome=categoria_nome
+        categoria_nome=categoria_nome,
+        permite_desbloqueio=permite_desbloqueio
     )
 
 # 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
@@ -361,11 +376,15 @@ def cotar():
         qtd_divisor = qtd_final_calculo if qtd_final_calculo > 0 else 1
         valor_unit_real = float(resultado['valor_final']) / qtd_divisor
 
+        # Calculamos os unitários baseados nos totais que o engine já entregou
+        valor_unit_pix = float(resultado['valor_final_pix']) / qtd_divisor
+        valor_unit_cred = float(resultado['valor_final_cred']) / qtd_divisor
+
         novo_item = {
             'produto_id': produto_id,
             'produto_nome': resultado['produto'],
-            'valor_pix_unitario': valor_unit_real,
-            'valor_cred_unitario': valor_unit_real * 1.2,
+            'valor_pix_unitario': valor_unit_pix,
+            'valor_cred_unitario': valor_unit_cred,
             'fotos_json': json.dumps(fotos_salvas), 
             'comentarios': comentarios,
             'quantidade': qtd_final_calculo,
@@ -393,8 +412,11 @@ def resumo():
     if not itens:
         return redirect(url_for('produto'))
     
-    total_lote = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
-    return render_smart_template('resumo_lote.html', itens=itens, total_lote=total_lote, fase_atual=4)
+    # Nova Regra Universal: O total do lote e a validação agora consideram o valor_cred_unitario
+    total_lote = sum(item['valor_cred_unitario'] * item.get('quantidade', 1) for item in itens)
+    bloqueio_valor = total_lote < 300.0
+    
+    return render_smart_template('resumo_lote.html', itens=itens, total_lote=total_lote, bloqueio_valor=bloqueio_valor, fase_atual=4)
 
 @app.route('/descartar-lote')
 def descartar_lote():

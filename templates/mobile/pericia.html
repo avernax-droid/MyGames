@@ -15,7 +15,9 @@
   - 23/06/2026: Ajuste no modal de bloqueio para ocultar o botão "Cancelar".
   - 23/06/2026: Implementação de feedback visual e UX para campos obrigatórios 
     não preenchidos (interceptação do evento invalid nativo).
-  ==============================================================================
+  - 04/07/2026: Inclusão da regra de exceção para consoles desbloqueados via flag 'permite_desbloqueio'.
+  ==============================================================================  
+  
 #}
 {% extends 'mobile/base_mobile.html' %}
 
@@ -173,6 +175,7 @@
         const campoComentarios = document.getElementById('campo-comentarios');
         const formPericia = document.getElementById('form-pericia');
         const categoriaIdStr = "{{ categoria_id|string }}";
+        const permiteDesbloqueio = {{ 'true' if permite_desbloqueio else 'false' }};
 
         // ---------------------------------------------------------------------
         // Feedback de Validação UI/UX Mobile
@@ -256,8 +259,8 @@
 
             if (categoriaIdStr === '1') { 
                 if (textoEstado.includes('não funciona')) mensagemBloqueio = "Infelizmente, não compramos consoles que não funcionam.";
-                else if (textoExtra.includes('desbloqueado')) mensagemBloqueio = "Infelizmente, não compramos consoles desbloqueados.";
-            } else if (categoriaIdStr === '2') { 
+                else if (textoExtra.includes('desbloqueado') && !permiteDesbloqueio) mensagemBloqueio = "Infelizmente, não compramos este modelo específico de console desbloqueado.";
+            } else if (categoriaIdStr === '2') {
                 if (textoExtra.includes('pirata')) mensagemBloqueio = "Só compramos controles originais.";
             } else if (categoriaIdStr === '4') { 
                 if (textoEstado.includes('não funciona')) mensagemBloqueio = "Infelizmente, não compramos jogos que não funcionam.";

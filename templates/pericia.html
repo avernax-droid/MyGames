@@ -12,11 +12,12 @@
   - 02/06/2026: Ajuste de layout dos botões de ação e bloqueios de quantidade.
   - 19/06/2026: Inclusão de validação no Front-end e condicionais Jinja2.
   - 22/06/2026: Refatoração da UI de Upload (Desktop). Remoção de textos inúteis, 
-    botão PC abrindo o explorador diretamente e criação de galeria unificada.
+                botão PC abrindo o explorador diretamente e criação de galeria unificada.
   - 22/06/2026: Correção de UX: Ocultar QR Code ao clicar em Upload do PC.
   - 22/06/2026: Correção de roteamento de imagens no preview do handoff mobile para utilizar caminho com token antes da submissão.
   - 22/06/2026: Melhoria de UX: Ocultar área do QR Code automaticamente após receber as fotos via celular.
   - 04/07/2026: Implementação do objeto DataTransfer para acúmulo e retenção de múltiplos uploads sucessivos locais via Desktop.
+  - 04/07/2026: Inclusão da regra de exceção para consoles desbloqueados via flag 'permite_desbloqueio'.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -164,6 +165,9 @@
         const campoComentarios = document.getElementById('campo-comentarios');
         const formPericia = document.getElementById('form-pericia');
         const categoriaIdStr = "{{ categoria_id|string }}";
+        const permiteDesbloqueio = {{ 'true' if permite_desbloqueio else 'false' }};
+
+        // Lógica de obrigatoriedade de comentários
 
         // Lógica de obrigatoriedade de comentários
         radiosOpcoes.forEach(radio => {
@@ -194,10 +198,10 @@
             if (categoriaIdStr === '1') { 
                 if (textoEstado.includes('não funciona')) {
                     mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles que não funcionam.";
-                } else if (textoExtra.includes('desbloqueado')) {
-                    mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles desbloqueados.";
+                } else if (textoExtra.includes('desbloqueado') && !permiteDesbloqueio) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra deste modelo específico de console desbloqueado.";
                 }
-            } else if (categoriaIdStr === '2') { 
+            } else if (categoriaIdStr === '2') {
                 if (textoExtra.includes('pirata')) {
                     mensagemBloqueio = "Só realizamos a compra de controles originais.";
                 }
