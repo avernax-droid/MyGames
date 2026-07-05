@@ -49,6 +49,8 @@
 #               por enviar_email_triagem_recebimento para disparar notificação com texto adaptável (100% sucesso ou faltantes).
 # - 05/07/2026: Refatoração Backend: Substituição da coluna textual status_item pela flag numérica status_laudo_id. 
 #               Otimização das consultas de banco e regras de disparo de e-mails usando lógica estrita de flags (1, 2, 3).
+# - 05/07/2026: Atualização do e-mail de perícia: Inclusão de formatação em negrito/maiúsculo
+#               para "DEPRECIAÇÃO PARCIAL" e adição do botão Call-to-Action "RESPONDER AVALIAÇÃO".
 # ==============================================================================
 import mysql.connector
 import os
@@ -201,6 +203,10 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
         corpo_html = ""
 
         if 'parcial' in slug_status:
+            # Recupera e-mail de contato para o link "Responder"
+            dados_empresa = obter_dados_empresa()
+            email_resposta = dados_empresa.get('email_contato', sender_email)
+            
             corpo_html = f"""
             <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
                 <p>Olá {nome_cliente},</p>
@@ -210,8 +216,16 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
                 {bloco_rastreio}
                 <br>
                 {html_itens}
-                <p style="margin-top: 20px;">Como pode notar no laudo acima, alguns de seus itens foram <strong>APROVADOS</strong> na perícia técnica enquanto outros sofreram depreciação parcial ou foram <strong>REPROVADOS</strong>.</p>
-                <p>Nossa equipe entrará em contato com você para definirmos o que fazer com os ítens reprovados para que possamos seguir com o PAGAMENTO!</p>
+                <p style="margin-top: 20px;">Como pode notar no laudo acima, alguns de seus itens foram <strong>APROVADOS</strong> na perícia técnica enquanto outros sofreram <strong>DEPRECIAÇÃO PARCIAL</strong> ou foram <strong>REPROVADOS</strong>.</p>
+                
+                <p>Caso esteja de acordo com a nova avaliação responder este e-mail com a palavra: <strong>APROVADO</strong>!</p>
+                
+                <a href="mailto:{email_resposta}?subject=Re: Protocolo #{numero_protocolo}&body=APROVADO" 
+                   style="background-color: #198754; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                   RESPONDER AVALIAÇÃO
+                </a>
+                
+                <p style="margin-top: 20px;">Nossa equipe entrará em contato com você para definirmos o que fazer com os ítens reprovados para que possamos seguir com o PAGAMENTO!</p>
                 <p>Está sendo um grande prazer fazer negócio com você e tê-lo como nosso cliente.</p>
                 <br>
                 <p>Atenciosamente,<br>Equipe <strong>{nome_empresa}</strong></p>
