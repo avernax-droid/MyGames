@@ -409,29 +409,17 @@ def obter_itens_protocolo(protocolo_id):
     try:
         cursor = db.cursor(dictionary=True)
         query = """
-            SELECT 
-                i.id, 
-                i.qtd_declarada, 
-                i.qtd_recebida,
-                i.status_item, 
-                i.recebido_fisicamente,
-                i.fotos_json, 
-                i.valor_pix_unitario,
-                i.valor_final_pix, 
-                i.comentarios AS descricao_estado,
-                i.motivo_recusa,
-                cm.nome_produto,
-                CASE cm.categoria_id
-                    WHEN 1 THEN 'Consoles'
-                    WHEN 2 THEN 'Controles'
-                    WHEN 3 THEN 'Jogos Físicos'
-                    WHEN 4 THEN 'Acessórios'
-                    ELSE 'Produto'
-                END AS categoria
-            FROM itens_periciados i 
-            LEFT JOIN catalogo_mestre cm ON i.produto_id = cm.id 
-            WHERE i.protocolo_id = %s
-        """
+        SELECT 
+            i.id, i.qtd_declarada, i.qtd_recebida, i.status_item, i.recebido_fisicamente,
+            i.fotos_json, i.valor_pix_unitario, i.valor_final_pix, 
+            i.comentarios AS descricao_estado, i.motivo_recusa,
+            cm.nome_produto,
+            cat.nome AS categoria
+        FROM itens_periciados i 
+        LEFT JOIN catalogo_mestre cm ON i.produto_id = cm.id 
+        LEFT JOIN categorias cat ON cm.categoria_id = cat.id
+        WHERE i.protocolo_id = %s
+    """
         cursor.execute(query, (protocolo_id,))
         itens = cursor.fetchall()
         return itens
