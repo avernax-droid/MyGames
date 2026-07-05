@@ -13,6 +13,9 @@
                 maior segurança e blindagem da máquina de estados.
   - 03/07/2026: Implementação da Fase de Laudo Técnico: Inclusão de decisão 
                 granulada (Aprovado/Parcial/Negado) e campos de valor final.
+  - 05/07/2026: Correção UI/UX (Máquina de Estados): Inversão da prioridade de 
+                renderização do Jinja para priorizar a exibição do status do 
+                laudo (status_item) sobre o status de triagem.                
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -157,7 +160,13 @@
                             R$ {% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
                         </span>
                         
-                        {% if item.recebido_fisicamente == 0 %}
+                        {% if item.status_item and 'Aprovado' in item.status_item %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #198754; color: #fff; display: inline-block;">LAUDO: APROVADO</span>
+                        {% elif item.status_item and 'Parcial' in item.status_item %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fd7e14; color: #fff; display: inline-block;">LAUDO: PARCIAL</span>
+                        {% elif item.status_item and 'Negado' in item.status_item %}
+                            <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">LAUDO: NEGADO</span>
+                        {% elif item.recebido_fisicamente == 0 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">NÃO RECEBIDO</span>
                         {% elif item.recebido_fisicamente == 1 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #0dcaf0; color: #000; display: inline-block;">RECEBIDO</span>
