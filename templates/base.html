@@ -12,6 +12,7 @@
   - 15/06/2026: Ajuste de UX: Ordenação das categorias por ID e redução da largura do destaque (fit-content).
   - 15/06/2026: Correção do menu "Opções de Estado" para expandir subcategorias em 3º nível diretamente na Sidebar e adição de scripts correspondentes.
   - 15/06/2026: Inclusão do link "Dados da Empresa" no submenu de Configurações e atualização da validação de rotas ativas.
+  - 05/07/2026: Inclusão do link para a nova tela de Monitor de SLA na Sidebar principal.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -129,6 +130,10 @@
 
             <a href="{{ url_for('esteira_protocolos') }}" class="menu-item {% if request.endpoint == 'esteira_protocolos' %}active{% endif %}">
                 <i class="fas fa-tasks"></i> Fila de Trabalho
+            </a>
+
+            <a href="{{ url_for('monitor_sla') }}" class="menu-item {% if request.endpoint == 'monitor_sla' %}active{% endif %}">
+                <i class="fas fa-clock"></i> Monitor de SLA
             </a>
 
             <a href="{{ url_for('listar_catalogo') }}" class="menu-item {% if request.endpoint == 'listar_catalogo' %}active{% endif %}">

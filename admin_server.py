@@ -31,6 +31,7 @@
 # - 02/07/2026: Correção do gatilho de e-mail na salvar_pericia_esteira para usar o novo padrão booleano (recebido_fisicamente).
 # - 04/07/2026: Correção de escopo (BugFix) na injeção da variável codigo_rastreio. 
 #               Alteração da Regra 1 (E-mail de Triagem) para disparar como 'Recibo de Conferência' sempre que houver alteração de recebimento.
+# - 05/07/2026: Criação da rota /monitor-sla (GET) para suportar o painel de auditoria de SLA e Aging de protocolos.
 # ==============================================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
@@ -245,6 +246,33 @@ def listar_protocolos():
     lista_protocolos = admin_engine.obter_todos_protocolos_listagem()
     return render_template('protocolos.html', protocolos=lista_protocolos)
 
+# --- ROTA: MONITOR DE SLA (AGING) ---
+@app.route('/monitor-sla', methods=['GET'])
+@requer_permissao('protocolos', 'read')
+def monitor_sla():
+    """
+    Controlador do Relatório de SLA (Aging).
+    Recebe os parâmetros via GET, aciona o motor de busca e renderiza o painel.
+    """
+    status_id = request.args.get('status_id')
+    dias_parados = request.args.get('dias_parados')
+    numero_protocolo = request.args.get('numero_protocolo')
+    
+    if status_id and status_id.strip() != '':
+        status_id = int(status_id)
+    else:
+        status_id = None
+        
+    lista_status = admin_engine.buscar_status_ativos()
+    protocolos_atrasados = admin_engine.obter_relatorio_sla(status_id, dias_parados, numero_protocolo)
+    
+    return render_template('monitor_sla.html',
+                           protocolos=protocolos_atrasados,
+                           lista_status=lista_status,
+                           filtro_status=status_id,
+                           filtro_dias=dias_parados,
+                           filtro_protocolo=numero_protocolo)
+
 # --- ROTA: FILA DE TRABALHO (ESTEIRA) ---
 @app.route('/esteira')
 @app.route('/esteira/<int:status_id>')
@@ -304,6 +332,7 @@ def salvar_pericia_esteira(protocolo_id):
     laudo_tecnico = request.form.get('laudo_tecnico')
     valor_avaliado = request.form.get('valor_avaliado')
     payload_itens = request.form.get('payload_itens')
+    origem = request.form.get('origem')  # <--- NOVA VARIÁVEL CAPTURADA
     
     admin_id = session.get('admin_id')
     is_ajax = request.headers.get('Accept') == 'application/json'
@@ -388,9 +417,13 @@ def salvar_pericia_esteira(protocolo_id):
 
     if not sucesso:
         flash('Erro interno ao salvar a perícia.', 'error')
-        
-    return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
+        return redirect(url_for('periciar_na_esteira', protocolo_id=protocolo_id))
 
+    # --- DESVIO INTELIGENTE (FALLBACK SEM AJAX) ---
+    if origem == 'monitor_sla':
+        return redirect(url_for('monitor_sla'))
+        
+    return redirect(url_for('esteira_protocolos'))
 
 
 @app.route('/protocolos/<int:protocolo_id>')

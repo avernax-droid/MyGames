@@ -19,6 +19,8 @@
   - 05/07/2026: Refatoração Estrutural (Jinja): Substituição da validação de texto 
                 (status_item) pela verificação da flag numérica (status_laudo_id) 
                 na renderização das badges de laudo.
+  - 05/07/2026: UX Fluxo: Implementação de roteamento dinâmico (parâmetro 'origem') 
+                no botão Voltar e no formulário de perícia para integração com o Monitor SLA.
   ==============================================================================
 #}
 
@@ -255,6 +257,7 @@
         <h3 class="titulo-painel"><i class="fas fa-gavel"></i> Decisão Técnica e Financeira</h3>
         
         <form id="form-pericia" action="/esteira/salvar_pericia/{{ protocolo.id }}" method="POST">
+            <input type="hidden" name="origem" value="{{ request.args.get('origem', '') }}">
             <input type="hidden" name="payload_itens" id="payload_itens" value="[]">
 
             <div class="form-group">
@@ -277,7 +280,10 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
-                <a href="/esteira/{{ protocolo.status_id }}" class="btn-voltar">Voltar</a>
+                {% set origem = request.args.get('origem') %}
+                <a href="{{ url_for('monitor_sla') if origem == 'monitor_sla' else url_for('esteira_protocolos', status_id=protocolo.status_id) }}" class="btn-voltar" style="text-decoration: none; color: var(--texto-dim); display: inline-block;">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
                 <button type="submit" class="btn-salvar-lote" id="btn-salvar-lote" disabled>Salvar Lote</button>
             </div>
         </form>
@@ -558,7 +564,12 @@
                     btnSalvarLote.style.color = "#000";
                     
                     setTimeout(() => {
-                        window.location.href = "/esteira/{{ protocolo.status_id }}";
+                        const origem = "{{ request.args.get('origem', '') }}";
+                        if (origem === 'monitor_sla') {
+                            window.location.href = "/monitor-sla";
+                        } else {
+                            window.location.href = "/esteira/{{ protocolo.status_id }}";
+                        }
                     }, 2000);
                 } else {
                     alert("Erro ao salvar: " + (data.mensagem || "Desconhecido."));

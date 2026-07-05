@@ -51,6 +51,8 @@
 #               Otimização das consultas de banco e regras de disparo de e-mails usando lógica estrita de flags (1, 2, 3).
 # - 05/07/2026: Atualização do e-mail de perícia: Inclusão de formatação em negrito/maiúsculo
 #               para "DEPRECIAÇÃO PARCIAL" e adição do botão Call-to-Action "RESPONDER AVALIAÇÃO".
+# - 05/07/2026: Adição da função obter_relatorio_sla para gerar o Relatório de Aging 
+#               com cálculo dinâmico de DATEDIFF via banco de dados.
 # ==============================================================================
 import mysql.connector
 import os
@@ -587,6 +589,69 @@ def obter_protocolos_por_status(status_id):
         """
         cursor.execute(query, (status_id,))
         return cursor.fetchall()
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+def obter_relatorio_sla(status_id=None, dias_parados=None, numero_protocolo=None):
+    """
+    Gera o relatório de SLA calculando dinamicamente há quantos dias o protocolo
+    está sem movimentação, filtrando por status, dias ou protocolo específico.
+    """
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        
+        # A query cruza os protocolos com o histórico para encontrar a ÚLTIMA data de alteração
+        query = """
+            SELECT p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao,
+                   IFNULL(c.nome_completo, 'Cliente Não Vinculado') as cliente_nome, 
+                   s.nome_exibicao as status_nome, s.cor_badge,
+                   IFNULL(MAX(h.data_alteracao), p.data_criacao) as data_ultima_alteracao,
+                   DATEDIFF(NOW(), IFNULL(MAX(h.data_alteracao), p.data_criacao)) as dias_no_status
+            FROM protocolos_recompra p 
+            LEFT JOIN clientes_usuarios c ON p.cliente_id = c.id 
+            LEFT JOIN status_protocolos s ON p.status_id = s.id
+            LEFT JOIN historico_status_protocolo h ON p.id = h.protocolo_id
+            WHERE 1=1
+        """
+        
+        params = []
+        
+        # Filtro 1: Número do Protocolo (Busca flexível)
+        if numero_protocolo:
+            query += " AND p.numero_protocolo LIKE %s "
+            params.append(f"%{numero_protocolo}%")
+            
+        # Filtro 2: Status Específico
+        if status_id:
+            query += " AND p.status_id = %s "
+            params.append(status_id)
+        else:
+            # Se não escolheu status, oculta os finalizados (ID 9) por padrão para limpar a tela
+            query += " AND (p.status_id IS NULL OR p.status_id <> 9) "
+            
+        # Fechamento do agrupamento para o MAX(data_alteracao) funcionar
+        query += """
+            GROUP BY p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao, 
+                     c.nome_completo, s.nome_exibicao, s.cor_badge
+        """
+        
+        # Filtro 3: Dias Parados (Usa HAVING porque é aplicado APÓS o cálculo do DATEDIFF)
+        if dias_parados is not None and str(dias_parados).strip() != '':
+            query += " HAVING dias_no_status >= %s "
+            params.append(int(dias_parados))
+            
+        # Ordena os mais atrasados (maior SLA) primeiro
+        query += " ORDER BY dias_no_status DESC, p.data_criacao ASC "
+        
+        cursor.execute(query, tuple(params))
+        return cursor.fetchall()
+    except mysql.connector.Error as err:
+        print(f"Erro ao gerar relatório SLA: {err}")
+        return []
     finally:
         if db and db.is_connected():
             cursor.close()
