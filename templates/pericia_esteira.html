@@ -15,9 +15,13 @@
                 granulada (Aprovado/Parcial/Negado) e campos de valor final.
   - 05/07/2026: Correção UI/UX (Máquina de Estados): Inversão da prioridade de 
                 renderização do Jinja para priorizar a exibição do status do 
-                laudo (status_item) sobre o status de triagem.                
+                laudo (status_item) sobre o status de triagem.
+  - 05/07/2026: Refatoração Estrutural (Jinja): Substituição da validação de texto 
+                (status_item) pela verificação da flag numérica (status_laudo_id) 
+                na renderização das badges de laudo.
   ==============================================================================
 #}
+
 {% extends 'base.html' %}
 
 {% block title %}Perícia #{{ protocolo.numero_protocolo }} - MyGames Admin{% endblock %}
@@ -154,17 +158,17 @@
                          data-status-recebido="{% if item.recebido_fisicamente == 1 %}true{% elif item.recebido_fisicamente == 0 %}false{% else %}null{% endif %}"
                          data-avaliado="false">
                     
-                         <summary class="acordeao-header">
+                        <summary class="acordeao-header">
                         {{ item.qtd_declarada | default(1) }}x {{ item.categoria | default('Produto') }} - {{ item.nome_produto }} 
                         <span class="span-valor-item" style="color: #4CAF50; float: right; margin-right: 15px;">
                             R$ {% if item.recebido_fisicamente == 0 %}0.00{% else %}{{ "%.2f"|format(valor_calc) }}{% endif %}
                         </span>
                         
-                        {% if item.status_item and 'Aprovado' in item.status_item %}
+                        {% if item.status_laudo_id == 1 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #198754; color: #fff; display: inline-block;">LAUDO: APROVADO</span>
-                        {% elif item.status_item and 'Parcial' in item.status_item %}
+                        {% elif item.status_laudo_id == 2 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fd7e14; color: #fff; display: inline-block;">LAUDO: PARCIAL</span>
-                        {% elif item.status_item and 'Negado' in item.status_item %}
+                        {% elif item.status_laudo_id == 3 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">LAUDO: NEGADO</span>
                         {% elif item.recebido_fisicamente == 0 %}
                             <span class="badge-status-item" style="float: right; margin-right: 15px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #dc3545; color: #fff; display: inline-block;">NÃO RECEBIDO</span>

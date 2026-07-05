@@ -47,6 +47,8 @@
 # - 02/07/2026: Atualização da engine para ler e persistir o novo campo recebido_fisicamente nas operações da esteira.
 # - 04/07/2026: Refatoração inteligente do e-mail de triagem: Substituição da função enviar_email_divergencia_recebimento 
 #               por enviar_email_triagem_recebimento para disparar notificação com texto adaptável (100% sucesso ou faltantes).
+# - 05/07/2026: Refatoração Backend: Substituição da coluna textual status_item pela flag numérica status_laudo_id. 
+#               Otimização das consultas de banco e regras de disparo de e-mails usando lógica estrita de flags (1, 2, 3).
 # ==============================================================================
 import mysql.connector
 import os
@@ -125,7 +127,7 @@ def enviar_email_recuperacao(destinatario, nova_senha):
 def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, status_nome, laudo_tecnico, valor_avaliado, itens_avaliados=None, codigo_rastreio=None, status_rastreio=None):
     """
     Envia notificação em HTML ao usuário sobre a decisão da perícia técnica.
-    Formata o e-mail dinamicamente separando status de 'Não Recebido' de 'Reprovado' e injeta totalizador.
+    Formata o e-mail dinamicamente separando status de 'Não Recebido' de 'Reprovado' via numeração de flags.
     """
     try:
         dados_empresa = obter_dados_empresa()
@@ -153,24 +155,26 @@ def enviar_email_status_pericia(destinatario, nome_cliente, numero_protocolo, st
                 valor_final = float(valor_final_bd) if valor_final_bd is not None else valor_original
                 
                 motivo_recusa = item.get('motivo_recusa', '')
-                status_item_atual = item.get('status_item', '')
+                recebido_fisicamente = item.get('recebido_fisicamente')
+                status_laudo_id = item.get('status_laudo_id')
+                
                 status_exibicao = ""
                 laudo_exibicao = ""
 
-                # SEPARAÇÃO DE REGRAS: Não Recebido X Reprovado
-                if 'não recebido' in status_item_atual.lower():
+                # SEPARAÇÃO DE REGRAS USANDO FLAGS (1=Aprovado, 2=Parcial, 3=Negado, Físico=0/1)
+                if recebido_fisicamente == 0:
                     status_exibicao = " - <span style='color: #dc3545;'>NÃO RECEBIDO</span>"
                     valor_final = 0.0
-                elif 'reprovado' in status_item_atual.lower() or 'negado' in status_item_atual.lower():
+                elif status_laudo_id == 3:
                     status_exibicao = " - <span style='color: #dc3545;'>REPROVADO</span>"
                     valor_final = 0.0
                     if motivo_recusa:
                         laudo_exibicao = f"<strong>Laudo Técnico:</strong> <span style='color: #888;'>{motivo_recusa}</span><br>"
-                elif 'parcial' in status_item_atual.lower():
+                elif status_laudo_id == 2:
                      status_exibicao = " - <span style='color: #fd7e14;'>APROVAÇÃO PARCIAL</span>"
                      if motivo_recusa:
                         laudo_exibicao = f"<strong>Laudo Técnico:</strong> <span style='color: #888;'>{motivo_recusa}</span><br>"
-                else:
+                else: # status_laudo_id == 1 ou aprovado base
                     status_exibicao = " - <span style='color: #198754;'>APROVADO</span>"
 
                 html_itens += f"<div style='border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;'>"
@@ -286,11 +290,13 @@ def enviar_email_triagem_recebimento(destinatario, nome_cliente, numero_protocol
         
         for item in itens_avaliados:
             nome_produto = item.get('nome_produto', 'Produto não identificado')
-            status = item.get('status_item', '')
+            recebido_fisicamente = item.get('recebido_fisicamente')
+            status_laudo_id = item.get('status_laudo_id')
             
-            if status == 'Não Recebido' or status == 'Laudo: Negado':
+            # Avalia ausências usando flags diretas em vez de texto
+            if recebido_fisicamente == 0 or status_laudo_id == 3:
                 itens_faltantes += 1
-                html_itens += f"<span style='color: #dc3545;'><strong>Produto: {nome_produto} - ITEM NÃO RECEBIDO NA CAIXA</strong></span><br><br>"
+                html_itens += f"<span style='color: #dc3545;'><strong>Produto: {nome_produto} - ITEM NÃO RECEBIDO OU NEGADO NA CAIXA</strong></span><br><br>"
             else:
                 html_itens += f"Produto: {nome_produto} - Recebido com Sucesso<br><br>"
 
@@ -408,9 +414,10 @@ def obter_itens_protocolo(protocolo_id):
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
+        # UPDATE MIGRATION: Substituição da coluna status_item para status_laudo_id
         query = """
         SELECT 
-            i.id, i.qtd_declarada, i.qtd_recebida, i.status_item, i.recebido_fisicamente,
+            i.id, i.qtd_declarada, i.qtd_recebida, i.status_laudo_id, i.recebido_fisicamente,
             i.fotos_json, i.valor_pix_unitario, i.valor_final_pix, 
             i.comentarios AS descricao_estado, i.motivo_recusa,
             cm.nome_produto,
@@ -475,15 +482,13 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
             """
             cursor.execute(query_log, (protocolo_id, status_id, admin_id))
             
-        # 3. Processamento Granular (Salva Recebimento Física, Valores e Laudos)
+        # 3. Processamento Granular (Salva Recebimento Física, Valores e Laudos via Numeração)
         if payload_itens:
             try:
                 itens = json.loads(payload_itens) if isinstance(payload_itens, str) else payload_itens
                 for item in itens:
                     id_item = item.get('id_item')
                     recebido = item.get('recebido')
-                    
-                    # NOVOS CAMPOS CAPTURADOS DO PAYLOAD
                     novo_valor = item.get('novo_valor')
                     status_laudo = item.get('status_laudo')
                     texto_laudo = item.get('texto_laudo')
@@ -492,21 +497,20 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
                     flag_fisica = 1 if recebido else 0
                     qtd_rec = 1 if recebido else 0
                     
-                    # Hierarquia de Status Textual: Se já tem laudo, o status reflete o laudo.
+                    # Hierarquia Numérica Estrita: 1 (Aprovado), 2 (Parcial), 3 (Negado). NULL se não avaliado.
+                    laudo_id = None
                     if status_laudo:
                         if status_laudo == 'negado':
-                            status_texto = 'Laudo: Negado'
+                            laudo_id = 3
                         elif status_laudo == 'parcial':
-                            status_texto = 'Laudo: Parcial'
-                        else:
-                            status_texto = 'Laudo: Aprovado'
-                    else:
-                        status_texto = 'Recebido' if recebido else 'Não Recebido'
+                            laudo_id = 2
+                        elif status_laudo == 'aprovado':
+                            laudo_id = 1
                     
-                    # UPDATE ATUALIZADO: Agora persiste valor_final_pix e motivo_recusa (texto do laudo)
+                    # UPDATE ATUALIZADO: Persiste o laudo_id ao invés de texto
                     query_item = """
                         UPDATE itens_periciados 
-                        SET status_item = %s, 
+                        SET status_laudo_id = %s, 
                             qtd_recebida = %s, 
                             recebido_fisicamente = %s,
                             valor_final_pix = %s,
@@ -517,7 +521,7 @@ def atualizar_status_protocolo(protocolo_id, status_id, laudo_tecnico, valor_ava
                     # Tratamento numérico seguro
                     v_final = float(novo_valor) if novo_valor is not None else None
                     
-                    cursor.execute(query_item, (status_texto, qtd_rec, flag_fisica, v_final, texto_laudo, id_item, protocolo_id))
+                    cursor.execute(query_item, (laudo_id, qtd_rec, flag_fisica, v_final, texto_laudo, id_item, protocolo_id))
             except Exception as e:
                 print(f"Erro ao processar itens granulares: {e}")
 
