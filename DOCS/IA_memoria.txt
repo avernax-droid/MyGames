@@ -40,6 +40,7 @@ pasta MyGames:
 ├── 01_add_pericia_granular.sql
 ├── DOCS
 │   ├── Cloudflare.txt
+│   ├── Crontab.txt
 │   ├── Docker_MySQL.txt
 │   ├── IA_memoria.txt
 │   ├── acesso_supabase.txt
@@ -54,13 +55,15 @@ pasta MyGames:
 │   └── server.cpython-312.pyc
 ├── backup_mygames_pre_pericia_item.sql
 ├── dev.sh
+├── doc_modulos.txt
 ├── engine.py
 ├── estrutura_tabelada.txt
-├── extrai_funcoes.py
 ├── flask_session
 │   ├── 0215a74a7e8bd9ffeb0b1979df9e0441
 │   ├── 03327dc8b425d881c0f088049db95fb9
 │   ├── 0941f572dc4681eb2185b7f1a8f5baf0
+│   ├── 12275faff250c9cf0cd5906a7b5fded4
+│   ├── 167757b1a0c59dcff716c2df6eb4952f
 │   ├── 2029240f6d1128be89ddc32729463129
 │   ├── 20c667fff7ab1cfb736fa92adfbd4dfe
 │   ├── 21512c2bd9b02754bd524146df2c2157
@@ -69,9 +72,12 @@ pasta MyGames:
 │   ├── 24ad110699dd4725a44337d3729b03bc
 │   ├── 27f88379bac4aa7122627c99d3596eba
 │   ├── 2afa1121a195dbcd60875931ea39cbee
+│   ├── 2c58c386397a09adfaf1a930f6c5053d
+│   ├── 2d33afeef9d5497bd95ee2a1adf73cdc
 │   ├── 30af99a9b0dc88703180d0623406cdec
 │   ├── 346d2e61d1a5c6742ebc29991fb8f784
 │   ├── 3723d15b37092300408eab228225a892
+│   ├── 3b5b484c13182a440314bbe0226b4f08
 │   ├── 3e83a655f2370a9e612edbb39c0e54b9
 │   ├── 40dd7a5cc49bcf6bbc0bbd2c2fcfc271
 │   ├── 42c38f01237a0c11143d7b905975056b
@@ -85,12 +91,17 @@ pasta MyGames:
 │   ├── 59dde9fe6b6a29b54486ac09090f33ea
 │   ├── 5a8419e072a786a09476df6ca54ab362
 │   ├── 5c76586274247e1684970f054397a1e7
+│   ├── 60be86d2dec2f2de10e00162bd06afe2
+│   ├── 61029eb934127d76ef0b93af2313800a
+│   ├── 67a57c264b8ad4dd6a1c75754dafac73
+│   ├── 68cb5665a0badc5b585ab2202a4abc4c
 │   ├── 6974e96fbb157d73601c940097139001
 │   ├── 6fc9bbe91bc4ed0837201f73c506364c
 │   ├── 720b64ae6be2460e4b1459e81c6236ca
 │   ├── 7991953a5bdbe97c0c462e091d635cc7
 │   ├── 79a06213243b5f0f8808722e44906742
 │   ├── 79a7ede1ed7cbf70592de03294c31b4e
+│   ├── 7c1dcae347eadff9083b310b69a2517a
 │   ├── 7e7b87e4117eccfe51f876c8932408c2
 │   ├── 830987c8afb4dc57af802c5a3e020265
 │   ├── 848fb8386b19017e47f862577afa3907
@@ -100,12 +111,14 @@ pasta MyGames:
 │   ├── 89f969c1c2acbc12217c0c5f0e4678de
 │   ├── 8ad116705e4ff40d94f62b617d4b799d
 │   ├── 8c545dc30a3ac94b8cd1f00fcbd3cff7
+│   ├── 9592ae5c2fa5e86996d51e3974147570
 │   ├── 9b0f695be7f1ab65096ff45d86bc592a
 │   ├── 9bdb2e349af96980e7c583412812d139
 │   ├── a52165c728f9298e2ea7a51a74d2bb73
 │   ├── a7f17aa94458d490158d2d04d4bb5ce7
 │   ├── a835ec2c48100f53cf9016fdd6d2ebd4
 │   ├── afddf6c666001c99cf304c0d5503f35b
+│   ├── b169bb67d4f6b4bf7d2d908fab0aeb38
 │   ├── b23f3f52b17c08de0284040e1ff4d5f8
 │   ├── b4ee392c32d50f94dc2a99862b1e44d0
 │   ├── b62d27a86489f3c0acbab5912273f768
@@ -116,15 +129,18 @@ pasta MyGames:
 │   ├── bede242ad60eafb23a70e1bce0126914
 │   ├── c533c6f439a61b42418a96cd4a9ed7e5
 │   ├── c79a9bd88d921214800dcf7cbb234886
+│   ├── cc580cbbae3b4d5cf9fa2c614c925d53
 │   ├── cc68a8d98dccab7684f90060d6016947
 │   ├── ce70565bacac0c6c0d468483a0a278a4
 │   ├── d119ba3e2f471bf31a11bce992365de8
+│   ├── d30ac9b8286db9f29928eeb0c73e65ec
 │   ├── d452f3da0dbfea4d4a49b5258c780f99
 │   ├── d4f739449f447ce0e0b88b4b3a5a8893
 │   ├── d70001aac43bab476dcbb4eac349e43d
 │   ├── d706c33685bd236363bf7459ae1e471b
 │   ├── d77a950fcfd73c493090f341b4011983
 │   ├── d7e9103b474b4ee2f7884761ad60fc12
+│   ├── da1ef192b0170fa83687be1c656f8c28
 │   ├── da35399e4ae5fafe6ba6b67385dc64bf
 │   ├── e1478629b745a6fbb20af51e7f21a345
 │   ├── e4f29e415268d7e1c69064499f869cad
@@ -136,8 +152,17 @@ pasta MyGames:
 │   ├── f8d37a27f23f5943b617d505e99c3d8c
 │   ├── fb5900e74e14debcc786ebcd7f2fe87e
 │   ├── fea87e2097e2e62b54d0de4bbfccc3c8
+│   ├── fed9041e4d24d9c6257a09f98384af32
 │   └── ff25e27a777eccd41a99e99951b94c40
+├── modulos.txt
 ├── requirements.txt
+├── schema.txt
+├── scripts
+│   ├── export_schema.py
+│   ├── extrai_funcoes.py
+│   ├── parms
+│   ├── rastrear_correios.py
+│   └── teste_correios.py
 ├── server.py
 ├── static
 │   ├── css
@@ -174,7 +199,6 @@ pasta MyGames:
 │   ├── sucesso.html
 │   ├── termos_oferta.html
 │   └── upload_mobile.html
-├── teste_correios.py
 ├── utils
 │   └── sync_catalogo.py
 └── venv
@@ -195,7 +219,63 @@ pasta MyGames:
     │   └── python3.12
     ├── lib64 -> lib
     └── pyvenv.cfg
-    
+
+Pasta MyGames_Admin:
+
+├── DOC
+│   ├── IA_memoria_admin.txt
+│   └── memoria.txt
+├── __pycache__
+│   └── admin_engine.cpython-312.pyc
+├── admin_engine.py
+├── admin_modulos.txt
+├── admin_server.py
+├── requirements.txt
+├── schema.txt
+├── static
+│   └── images
+│       └── catalogo
+├── templates
+│   ├── base.html
+│   ├── catalogo.html
+│   ├── configuracoes
+│   │   ├── canais.html
+│   │   ├── categorias.html
+│   │   ├── empresa.html
+│   │   ├── opcoes_estado.html
+│   │   ├── perguntas.html
+│   │   ├── regioes.html
+│   │   ├── status.html
+│   │   └── usuarios.html
+│   ├── dashboard.html
+│   ├── detalhes_protocolo.html
+│   ├── esteira.html
+│   ├── login.html
+│   ├── monitor_sla.html
+│   ├── mudar_senha.html
+│   ├── pericia_esteira.html
+│   └── protocolos.html
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── dotenv
+    │   ├── flask
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.12
+    │   ├── python -> python3.12
+    │   ├── python3 -> python3.12
+    │   └── python3.12 -> /usr/bin/python3.12
+    ├── include
+    │   └── python3.12
+    ├── lib
+    │   └── python3.12
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+
 DESCRIÇÃO DOS MÓDULOS PRINCIPAIS:
 - engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados, gestão de UUIDs e gestão segura de leads via UPSERT (validação por CPF). Persiste também logs de feedback de recusa de ofertas.
 - server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, detecta o dispositivo (Mobile/Desktop via user-agents) realizando roteamento dinâmico, processa uploads e atende endpoints de Handoff Remoto.
@@ -233,8 +313,11 @@ ARQUIVO                                  | TÍTULO                              
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 admin_engine.py                          | Motor de Regras e Integração de Banco de Dados | Motor de persistência e regras de negócio do painel administrativo. Centraliza a execução de queries SQL complexas e o isolamento da camada de dados.
 admin_server.py                          | Servidor Web e Roteamento Flask               | Servidor Controller principal do painel administrativo. Gerencia a autenticação via identidade do usuário, sessão e permissões RBAC.
+templates/detalhes_protocolo.html        | Detalhes do Protocolo                         | Página de detalhes do protocolo, exibindo informações do cliente, itens periciados, fotos de inspeção e rastreio dos Correios.
 templates/dashboard.html                 | Visão Geral do Sistema (Dashboard)            | Página inicial do painel administrativo exibida logo após o login  bem-sucedido. Herda a estrutura principal do base.html e servirá futuramente  para exibir métricas gerais (resumo de protocolos abertos, itens pendentes, etc).
+templates/monitor_sla.html               | Monitoramento de SLA (Atrasos)                | Tela de monitoramento de protocolos em atraso, com filtros e exportação de dados.
 templates/login.html                     | Tela de Autenticação e Registro da Equipe     | Interface pública do painel administrativo. Gerencia o login tradicional e o fluxo de Auto-Cadastro (Solicitação de Acesso) para novos membros.
+templates/catalogo.html                  | Catálogo Mestre de Produtos                   | Interface de listagem e gestão (CRUD) do Catálogo Mestre de produtos. Utiliza janela Modal nativa para criação e edição ágil de itens sem  necessidade de recarregar páginas separadas.
 templates/mudar_senha.html               | Tela de Alteração Obrigatória de Senha        | Interface de segurança que força o usuário a trocar a senha provisória gerada pelo sistema antes de acessar qualquer módulo do backoffice.
 templates/protocolos.html                | Gestão de Protocolos (Recompras)              | Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.
 templates/base.html                      | Template Base do Painel Administrativo        | Template mestre, layout global e barra de navegação principal (Sidebar)
@@ -250,6 +333,7 @@ templates/configuracoes/opcoes_estado.html | Gestão de Opções de Estado de Co
 4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
 
 TABELA                    COLUNA                    TIPO                                                         CHAVE      ORD_TABELA           ORD_COLUNA   ORDEM_TIPO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
 avaliacoes_manuais        id                        int                                                          PK,AI      avaliacoes_manuais   1            0
                           nome_produto_informado    varchar(255)                                                 -          avaliacoes_manuais   2            0
                           descricao_estado          text                                                         -          avaliacoes_manuais   3            0
@@ -335,7 +419,7 @@ historico_status_protocolo id                        int                        
 itens_periciados          id                        int                                                          PK,AI      itens_periciados     1            0
                           protocolo_id              int                                                          FK         itens_periciados     2            0
                           produto_id                int                                                          FK         itens_periciados     3            0
-                          status_item               varchar(50)                                                  -          itens_periciados     4            0
+                          status_laudo_id           tinyint                                                      -          itens_periciados     4            0
                           recebido_fisicamente      tinyint(1)                                                   -          itens_periciados     5            0
                           qtd_declarada             int                                                          -          itens_periciados     6            0
                           qtd_recebida              int                                                          -          itens_periciados     7            0

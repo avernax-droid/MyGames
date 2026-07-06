@@ -24,6 +24,11 @@
     e aplicação de margem superior negativa no logo para subir todo o bloco.
   - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização") 
     com destaque visual e tipográfico na palavra COMEÇAR.
+  - 06/07/2026: Resolução de anomalia de intermitência mobile na busca de municípios: 
+    implementação de técnica de debounce, sanitização de entrada (.trim()) 
+    e tratamento de erros na requisição assíncrona.
+  - 06/07/2026: Correção de bug no scroll da lista de cidades em smartphones,
+    substituindo touchstart agressivo por click nativo e validação de container (.contains).
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -117,7 +122,7 @@
         <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
             <span style="width: 35px; text-align: center; display: flex; justify-content: center;">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="26" height="26" fill="#00ff00">
-                    <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0 85.961 85.961 0 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/>
+                    <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0s192 85.961 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/>
                 </svg>
             </span>
             <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">5 lojas em SP e região</span>
@@ -190,44 +195,67 @@
     const inputUf = document.getElementById('campo-uf');
     const modalCanal = document.getElementById('secao-canal-overlay');
     const btnEntrar = document.getElementById('btn-entrar');
+    
+    // Variável para controle do timer do Debounce
+    let debounceTimeout;
 
-    inputCidade.addEventListener('input', async () => {
-        const termo = inputCidade.value;
-        if (termo.length < 3) { listaCidades.style.display = 'none'; return; }
+    inputCidade.addEventListener('input', () => {
+        clearTimeout(debounceTimeout);
+        const termo = inputCidade.value.trim();
+        
+        if (termo.length < 3) { 
+            listaCidades.style.display = 'none'; 
+            return; 
+        }
 
-        const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
-        const dados = await response.json();
-
-        listaCidades.innerHTML = '';
-        if (dados.length > 0) {
-            dados.forEach(item => {
-                const div = document.createElement('div');
-                div.textContent = `${item.cidade} - ${item.uf}`;
+        debounceTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
+                if (!response.ok) throw new Error('Falha na resposta do servidor');
                 
-                const selectCity = (e) => {
-                    e.preventDefault();
-                    inputCidade.value = item.cidade;
-                    inputUf.value = item.uf;
+                const dados = await response.json();
+
+                listaCidades.innerHTML = '';
+                if (dados.length > 0) {
+                    dados.forEach(item => {
+                        const div = document.createElement('div');
+                        div.textContent = `${item.cidade} - ${item.uf}`;
+                        
+                        const selectCity = (e) => {
+                            e.preventDefault();
+                            inputCidade.value = item.cidade;
+                            inputUf.value = item.uf;
+                            listaCidades.style.display = 'none';
+                            modalCanal.style.display = 'flex';
+                        };
+                        
+                        // Utilizamos click nativo, permitindo que o navegador mobile diferencie scroll de tap
+                        div.addEventListener('click', selectCity);
+                        
+                        listaCidades.appendChild(div);
+                    });
+                    listaCidades.style.display = 'block';
+                } else {
                     listaCidades.style.display = 'none';
-                    modalCanal.style.display = 'flex';
-                };
-                
-                div.addEventListener('mousedown', selectCity);
-                div.addEventListener('touchstart', selectCity, {passive: false});
-                
-                listaCidades.appendChild(div);
-            });
-            listaCidades.style.display = 'block';
-        } else {
+                }
+            } catch (error) {
+                console.error('Erro na busca de municípios:', error);
+                listaCidades.style.display = 'none';
+            }
+        }, 350);
+    });
+
+    // Só esconde a lista se o usuário clicar FORA do input e FORA da lista
+    document.addEventListener('click', (e) => {
+        if (e.target !== inputCidade && !listaCidades.contains(e.target)) {
             listaCidades.style.display = 'none';
         }
     });
-
-    document.addEventListener('click', (e) => {
-        if (e.target !== inputCidade) listaCidades.style.display = 'none';
-    });
+    
     document.addEventListener('touchstart', (e) => {
-        if (e.target !== inputCidade) listaCidades.style.display = 'none';
+        if (e.target !== inputCidade && !listaCidades.contains(e.target)) {
+            listaCidades.style.display = 'none';
+        }
     }, {passive: true});
 
     function selecionouCanal() {
@@ -249,20 +277,16 @@
         const iframe = document.getElementById('iframe-video');
         const overlay = document.getElementById('modal-video-overlay');
         
-        // Injeta a URL do embed tratada vinda dinamicamente do backend Flask
         iframe.src = "{{ url_video_como_funciona }}";
-
         modal.style.display = 'flex';
 
-        // Tenta entrar em fullscreen para habilitar a rotação de tela
         if (overlay.requestFullscreen) {
             overlay.requestFullscreen().then(() => {
-                // Se o fullscreen for permitido, tenta forçar o landscape
                 if (screen.orientation && screen.orientation.lock) {
                     screen.orientation.lock('landscape').catch(err => console.log('Orientação bloqueada pelo navegador.', err));
                 }
             }).catch(err => console.log('Fullscreen bloqueado pelo navegador.', err));
-        } else if (overlay.webkitRequestFullscreen) { /* Safari */
+        } else if (overlay.webkitRequestFullscreen) {
             overlay.webkitRequestFullscreen();
         }
     }
@@ -273,18 +297,16 @@
         const iframe = document.getElementById('iframe-video');
         
         modal.style.display = 'none';
-        iframe.src = ""; // Estanca o áudio e para o vídeo
+        iframe.src = ""; 
 
-        // Desfaz o fullscreen
         if (document.fullscreenElement) {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) { /* Safari */
+            } else if (document.webkitExitFullscreen) { 
                 document.webkitExitFullscreen();
             }
         }
 
-        // Desfaz a orientação travada
         if (screen.orientation && screen.orientation.unlock) {
             screen.orientation.unlock();
         }
