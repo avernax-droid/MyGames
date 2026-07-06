@@ -29,6 +29,8 @@
     e tratamento de erros na requisição assíncrona.
   - 06/07/2026: Correção de bug no scroll da lista de cidades em smartphones,
     substituindo touchstart agressivo por click nativo e validação de container (.contains).
+  - 06/07/2026: Refatoração da UX inicial: Ocultação do formulário de localização e criação 
+    de botão de entrada "COMEÇAR!" com efeito luminoso, revelando o form via transição.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -72,6 +74,29 @@
     }
 
     #btn-entrar { display: none; margin-top: 15px; animation: fadeIn 0.5s; width: 100%; }
+
+    /* ESTILO DO NOVO BOTÃO DE INÍCIO */
+    .btn-start-glow {
+        width: 100%;
+        background-color: #003300; /* Verde escuro para fundo */
+        color: #ffffff; /* Texto branco brilhante */
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 16px;
+        border: 2px solid #005500;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 15px rgba(0, 255, 0, 0.1);
+    }
+    .btn-start-glow:active {
+        transform: scale(0.96);
+        background-color: #004400;
+        box-shadow: 0 2px 8px rgba(0, 255, 0, 0.2);
+    }
 
     /* MODAL DE VÍDEO IN-PAGE (MOBILE) */
     .modal-video-overlay {
@@ -144,37 +169,48 @@
 </div>
 
 <div class="card-padrao">
-    <p style="text-align: center; color: var(--texto-dim); margin-bottom: 25px; font-size: 14px;">
-        <span style="color: #ffffff; font-weight: bold; font-size: 16px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">COMEÇAR</span> -> Informe sua localização
-    </p>
     
-    <form action="{{ url_for('definir_regiao') }}" method="POST">
-        <div class="form-group">
-            <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
-            <div id="lista-cidades"></div>
-        </div>
-        <div class="form-group">
-            <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
-        </div>
+    <!-- BLOCO DO BOTÃO COMEÇAR (Visível inicialmente) -->
+    <div id="bloco-btn-comecar" style="text-align: center; padding: 10px 0;">
+        <button type="button" class="btn-start-glow" onclick="iniciarFluxoLocalizacao()">
+            COMEÇAR!
+        </button>
+    </div>
 
-        <div id="secao-canal-overlay">
-            <div class="modal-canal-box">
-                <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 20px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
-                    Como você nos conheceu?
-                </h3>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
-                        <option value="" disabled selected>Selecione uma opção...</option>
-                        {% for canal in canais %}
-                        <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
-                        {% endfor %}
-                    </select>
+    <!-- BLOCO DO FORMULÁRIO (Oculto inicialmente) -->
+    <div id="bloco-formulario" style="display: none; animation: fadeIn 0.4s ease-out;">
+        <p style="text-align: center; color: #ffffff; font-weight: bold; margin-bottom: 25px; font-size: 18px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">
+            Informe sua localização
+        </p>
+        
+        <form action="{{ url_for('definir_regiao') }}" method="POST">
+            <div class="form-group">
+                <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
+                <div id="lista-cidades"></div>
+            </div>
+            <div class="form-group">
+                <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
+            </div>
+
+            <div id="secao-canal-overlay">
+                <div class="modal-canal-box">
+                    <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 20px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
+                        Como você nos conheceu?
+                    </h3>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
+                            <option value="" disabled selected>Selecione uma opção...</option>
+                            {% for canal in canais %}
+                            <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <button type="submit" id="btn-entrar" class="btn-primary">INICIAR COTAÇÃO</button>
-    </form>
+            <button type="submit" id="btn-entrar" class="btn-primary">INICIAR COTAÇÃO</button>
+        </form>
+    </div>
 </div>
 
 <div id="modal-video-overlay" class="modal-video-overlay" onclick="fecharModalVideo(event)">
@@ -195,9 +231,22 @@
     const inputUf = document.getElementById('campo-uf');
     const modalCanal = document.getElementById('secao-canal-overlay');
     const btnEntrar = document.getElementById('btn-entrar');
+    const blocoBotaoComecar = document.getElementById('bloco-btn-comecar');
+    const blocoFormulario = document.getElementById('bloco-formulario');
     
     // Variável para controle do timer do Debounce
     let debounceTimeout;
+
+    // Função para alternar entre o botão inicial e o formulário
+    function iniciarFluxoLocalizacao() {
+        blocoBotaoComecar.style.display = 'none';
+        blocoFormulario.style.display = 'block';
+        
+        // Foca suavemente no input da cidade após a transição
+        setTimeout(() => {
+            inputCidade.focus();
+        }, 100);
+    }
 
     inputCidade.addEventListener('input', () => {
         clearTimeout(debounceTimeout);

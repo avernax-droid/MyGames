@@ -11,17 +11,15 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
-  - 19/06/2026: Refatoração visual (Hero section, Badges e Chamada para Vídeo) e alteração do botão principal para "INICIAR COTAÇÃO".
-  - 19/06/2026: Ajustes de tipografia no Hero (tamanho e fonte), aumento do logo, destaque em verde para os badges e redimensionamento de ícones.
-  - 19/06/2026: Substituição do emoji de localização por um ícone vetorial (SVG) no formato "gota invertida" (Map Marker).
-  - 19/06/2026: Refinamento final: título encurtado, aumento dos ícones (36px), mudança na cor do texto dos badges para verde claro (#b3ffb3) e redução da fonte do CTA de vídeo.
-  - 19/06/2026: Reposicionamento da seção "Como Funciona" (vídeo CTA) para cima do quadro de localização para melhor visualização na primeira dobra.
-  - 19/06/2026: Conversão da seleção de Canal de Aquisição em um Modal Sobreposto para evitar scroll, exibindo o botão Iniciar Cotação na sequência.
-  - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe), substituindo o redirecionamento externo para o YouTube para manter a UX fluida.
-  - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável dinâmica url_video_como_funciona configurada via .env.
-  - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo (tirinhas-desktop.mp4) no topo (abaixo do logo), com ajuste de margens negativas para otimização de espaço.
-  - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização") 
-    com destaque visual e tipográfico na palavra COMEÇAR.
+  - 19/06/2026: Refatoração visual (Hero section, Badges e Chamada para Vídeo).
+  - 19/06/2026: Conversão da seleção de Canal de Aquisição em um Modal Sobreposto.
+  - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe).
+  - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável dinâmica via .env.
+  - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo no topo.
+  - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização").
+  - 06/07/2026: Refatoração da UX inicial. Ocultação do formulário de localização.
+  - 06/07/2026: Alteração do quadro de localização para um Modal Flutuante (Overlay) 
+    para evitar o salto ("pulo") e rolagem indesejada da página ao clicar no botão iniciar.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -30,7 +28,6 @@
 
 {% block content %}
 <style>
-    /* Estilos locais específicos para a página de Boas-vindas */
     /* Otimização de espaço: Reduz as margens do logo puxando para cima */
     .logo-header { max-width: 180px !important; margin-top: -20px !important; margin-bottom: 5px !important; }
 
@@ -49,6 +46,26 @@
     
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+    /* ESTILO DO NOVO BOTÃO DE INÍCIO (Totalmente solto) */
+    .btn-start-glow {
+        width: 100%; max-width: 300px;
+        background-color: #003300;
+        color: #ffffff;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 16px;
+        border: 2px solid #005500;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 15px rgba(0, 255, 0, 0.1);
+        margin: 0 auto; display: block;
+    }
+    .btn-start-glow:hover { background-color: #004400; transform: scale(1.02); }
+
     /* Estilos específicos para os inputs e lista de cidades */
     .form-group { margin-bottom: 20px; position: relative; }
     input, select { width: 100%; padding: 14px; background: #222; border: var(--borda-fina); color: #fff; border-radius: 6px; font-size: 16px; transition: border 0.3s; }
@@ -63,10 +80,22 @@
     #lista-cidades div { padding: 12px 15px; cursor: pointer; color: #ddd; border-bottom: 1px solid #333; }
     #lista-cidades div:hover { background: var(--cor-destaque); color: #000; }
     
-    /* MODAL DO CANAL DE AQUISIÇÃO */
+    /* NOVO: MODAL FLUTUANTE DE LOCALIZAÇÃO (Evita rolagem) */
+    #modal-localizacao-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9998;
+        animation: fadeIn 0.3s ease-out;
+    }
+    .modal-form-box {
+        background: var(--bg-fundo); border: 2px solid var(--cor-destaque); border-radius: 12px;
+        padding: 30px 20px; max-width: 400px; width: 90%; position: relative;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    /* MODAL DO CANAL DE AQUISIÇÃO (Sobreposto ao modal de localização) */
     #secao-canal-overlay { 
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-        background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; 
+        background: rgba(0, 0, 0, 0.90); display: none; justify-content: center; align-items: center; z-index: 9999; 
     }
     .modal-canal-box { 
         background: var(--bg-fundo); border: 2px solid var(--cor-destaque); border-radius: 12px; 
@@ -76,10 +105,10 @@
 
     #btn-entrar { display: none; margin-top: 20px; animation: fadeIn 0.5s; }
 
-    /* NOVO: MODAL DE VÍDEO IN-PAGE */
+    /* MODAL DE VÍDEO IN-PAGE */
     .modal-video-overlay {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0, 0, 0, 0.9); display: none; justify-content: center; align-items: center; z-index: 10000;
+        background: rgba(0, 0, 0, 0.95); display: none; justify-content: center; align-items: center; z-index: 10000;
         animation: fadeIn 0.3s ease-out;
     }
     .modal-video-box {
@@ -143,38 +172,48 @@
     </a>
 </div>
 
-<div class="card-padrao">
-    <p style="text-align: center; color: var(--texto-dim); margin-bottom: 30px; font-size: 14px;">
-        <span style="color: #ffffff; font-weight: bold; font-size: 16px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">COMEÇAR</span> -> Informe sua localização
-    </p>
-    
-    <form action="{{ url_for('definir_regiao') }}" method="POST">
-        <div class="form-group">
-            <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
-            <div id="lista-cidades"></div>
-        </div>
-        <div class="form-group">
-            <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
-        </div>
+<div id="bloco-btn-comecar" style="text-align: center; margin: 10px auto 40px auto; width: 100%;">
+    <button type="button" class="btn-start-glow" onclick="abrirModalLocalizacao()">
+        COMEÇAR!
+    </button>
+</div>
 
-        <div id="secao-canal-overlay">
-            <div class="modal-canal-box">
-                <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
-                    Como você nos conheceu?
-                </h3>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
-                        <option value="" disabled selected>Selecione uma opção...</option>
-                        {% for canal in canais %}
-                        <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
-                        {% endfor %}
-                    </select>
+<div id="modal-localizacao-overlay">
+    <div class="modal-form-box">
+        <button type="button" class="btn-fechar-video" onclick="fecharModalLocalizacao()">✖</button>
+
+        <p style="text-align: center; color: var(--texto-dim); margin-bottom: 30px; font-size: 14px;">
+            <span style="color: #ffffff; font-weight: bold; font-size: 16px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">INFORME SUA LOCALIZAÇÃO</span>
+        </p>
+        
+        <form action="{{ url_for('definir_regiao') }}" method="POST">
+            <div class="form-group">
+                <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
+                <div id="lista-cidades"></div>
+            </div>
+            <div class="form-group">
+                <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
+            </div>
+
+            <div id="secao-canal-overlay">
+                <div class="modal-canal-box">
+                    <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
+                        Como você nos conheceu?
+                    </h3>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
+                            <option value="" disabled selected>Selecione uma opção...</option>
+                            {% for canal in canais %}
+                            <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <button type="submit" id="btn-entrar" class="btn-primary" style="width: 100%;">INICIAR COTAÇÃO</button>
-    </form>
+            <button type="submit" id="btn-entrar" class="btn-primary" style="width: 100%;">INICIAR COTAÇÃO</button>
+        </form>
+    </div>
 </div>
 
 <div id="modal-video-overlay" class="modal-video-overlay" onclick="fecharModalVideo(event)">
@@ -196,6 +235,19 @@
     const modalCanal = document.getElementById('secao-canal-overlay');
     const btnEntrar = document.getElementById('btn-entrar');
 
+    // NOVO: Funções para abrir e fechar o Modal de Localização sem mover a página
+    function abrirModalLocalizacao() {
+        document.getElementById('modal-localizacao-overlay').style.display = 'flex';
+        setTimeout(() => {
+            inputCidade.focus({ preventScroll: true });
+        }, 100);
+    }
+
+    function fecharModalLocalizacao() {
+        document.getElementById('modal-localizacao-overlay').style.display = 'none';
+        inputCidade.value = ''; // Limpa o input caso feche
+    }
+
     inputCidade.addEventListener('input', async () => {
         const termo = inputCidade.value;
         if (termo.length < 3) { listaCidades.style.display = 'none'; return; }
@@ -212,7 +264,7 @@
                     inputCidade.value = item.cidade;
                     inputUf.value = item.uf;
                     listaCidades.style.display = 'none';
-                    // Abre o modal sobreposto em vez de expandir a tela
+                    // Abre o modal sobreposto de canais
                     modalCanal.style.display = 'flex';
                 };
                 listaCidades.appendChild(div);
@@ -230,19 +282,18 @@
     function selecionouCanal() {
         const select = document.getElementById('canal_id_input');
         if (select.value !== "") {
-            // Fecha o modal e exibe o botão principal
+            // Fecha o modal e exibe o botão principal de cotação
             modalCanal.style.display = 'none';
             btnEntrar.style.display = 'block';
         }
     }
 
-    // NOVO: LÓGICA DO MODAL DE VÍDEO
+    // LÓGICA DO MODAL DE VÍDEO
     function abrirModalVideo(e) {
         e.preventDefault();
         const modal = document.getElementById('modal-video-overlay');
         const iframe = document.getElementById('iframe-video');
         
-        // Injeta a URL do embed tratada vinda dinamicamente do backend Flask
         iframe.src = "{{ url_video_como_funciona }}";
         modal.style.display = 'flex';
     }
@@ -252,7 +303,6 @@
         const modal = document.getElementById('modal-video-overlay');
         const iframe = document.getElementById('iframe-video');
         
-        // Oculta o modal e remove o src para estancar o áudio imediatamente
         modal.style.display = 'none';
         iframe.src = "";
     }
