@@ -9,6 +9,8 @@
 # - 27/06/2026: Criação do script de sincronização ETL.
 # - 03/07/2026: Correção na função classificar_categoria invertendo os IDs 
 #               de Jogos (para 4) e Acessórios (para 3) para alinhar com o banco local.
+# - 06/07/2026: Inclusão do campo 'plataforma' no bloco ON DUPLICATE KEY UPDATE
+#               para garantir a atualização da marca/console na base local.
 # ==============================================================================
 
 import os
@@ -125,6 +127,7 @@ def sincronizar_catalogo():
             ON DUPLICATE KEY UPDATE
                 nome_produto = VALUES(nome_produto),
                 categoria_id = VALUES(categoria_id),
+                plataforma = VALUES(plataforma),
                 valor_venda_ref = VALUES(valor_venda_ref),
                 valor_pix_base = VALUES(valor_pix_base),
                 valor_cred_base = VALUES(valor_cred_base),

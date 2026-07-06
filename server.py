@@ -37,6 +37,7 @@
 # - 04/07/2026: Alteração na rota /resumo para calcular total_lote baseado no crédito e injetar a flag bloqueio_valor para a trava de R$ 300,00.
 # - 04/07/2026: Alteração na rota /pericia para incluir a regra de exceção e injeção da flag 'permite_desbloqueio' para consoles (PS1, PS2 e PS Vita).
 # - 04/07/2026: Refatoração da rota /cotar para utilizar valor_final_pix e valor_final_cred oficiais vindos do engine.py.
+# - 06/07/2026: Correção de KeyError na rota /cotar aplicando tratamento seguro (.get) para extrair valores ausentes em itens 'Sob Consulta'.
 # ==============================================================================
 
 import os
@@ -374,11 +375,11 @@ def cotar():
         resultado['descricao'] = descricao_estado
 
         qtd_divisor = qtd_final_calculo if qtd_final_calculo > 0 else 1
-        valor_unit_real = float(resultado['valor_final']) / qtd_divisor
+        valor_unit_real = float(resultado.get('valor_final', 0.0)) / qtd_divisor
 
-        # Calculamos os unitários baseados nos totais que o engine já entregou
-        valor_unit_pix = float(resultado['valor_final_pix']) / qtd_divisor
-        valor_unit_cred = float(resultado['valor_final_cred']) / qtd_divisor
+        # CORREÇÃO: Tratamento seguro para itens fora do catálogo (fallback para o valor_final seguro que é 0.0)
+        valor_unit_pix = float(resultado.get('valor_final_pix', resultado.get('valor_final', 0.0))) / qtd_divisor
+        valor_unit_cred = float(resultado.get('valor_final_cred', resultado.get('valor_final', 0.0))) / qtd_divisor
 
         novo_item = {
             'produto_id': produto_id,
