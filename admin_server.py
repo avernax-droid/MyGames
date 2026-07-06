@@ -32,9 +32,11 @@
 # - 04/07/2026: Correção de escopo (BugFix) na injeção da variável codigo_rastreio. 
 #               Alteração da Regra 1 (E-mail de Triagem) para disparar como 'Recibo de Conferência' sempre que houver alteração de recebimento.
 # - 05/07/2026: Criação da rota /monitor-sla (GET) para suportar o painel de auditoria de SLA e Aging de protocolos.
+# - 06/07/2026: Ajuste na rota /monitor-sla para abrir painel vazio, exigindo uso de filtros para consulta.
+# - 06/07/2026: Refatoração da rota /monitor-sla: Implementação de cabeçalhos anti-cache (no-store) e lógica de busca condicional (apenas com filtros).
 # ==============================================================================
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify, make_response
 import mysql.connector
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -252,11 +254,14 @@ def listar_protocolos():
 def monitor_sla():
     """
     Controlador do Relatório de SLA (Aging).
-    Recebe os parâmetros via GET, aciona o motor de busca e renderiza o painel.
+    Ajustado para forçar renovação de cache e processar busca apenas com filtros.
     """
     status_id = request.args.get('status_id')
     dias_parados = request.args.get('dias_parados')
     numero_protocolo = request.args.get('numero_protocolo')
+    
+    # Verifica se algum filtro foi aplicado
+    tem_filtro = any([status_id, dias_parados, numero_protocolo])
     
     if status_id and status_id.strip() != '':
         status_id = int(status_id)
@@ -264,14 +269,26 @@ def monitor_sla():
         status_id = None
         
     lista_status = admin_engine.buscar_status_ativos()
-    protocolos_atrasados = admin_engine.obter_relatorio_sla(status_id, dias_parados, numero_protocolo)
     
-    return render_template('monitor_sla.html',
+    # Executa a busca apenas se houver filtro, caso contrário, retorna lista vazia
+    if tem_filtro:
+        protocolos_atrasados = admin_engine.obter_relatorio_sla(status_id, dias_parados, numero_protocolo)
+    else:
+        protocolos_atrasados = []
+    
+    # Cria a resposta e define cabeçalhos para evitar cache do navegador
+    response = make_response(render_template('monitor_sla.html',
                            protocolos=protocolos_atrasados,
                            lista_status=lista_status,
                            filtro_status=status_id,
                            filtro_dias=dias_parados,
-                           filtro_protocolo=numero_protocolo)
+                           filtro_protocolo=numero_protocolo))
+                           
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    return response
 
 # --- ROTA: FILA DE TRABALHO (ESTEIRA) ---
 @app.route('/esteira')

@@ -3,11 +3,15 @@
   PROJETO: MyGames - Backoffice
   MÓDULO: monitor_sla.html
   DATA DE CRIAÇÃO: 05/07/2026
+  TÍTULO: Monitoramento de SLA (Atrasos)
+  FUNÇÃO: Tela de monitoramento de protocolos em atraso, com filtros e exportação de dados.
+  
   HISTÓRICO DE ALTERAÇÕES:
-  - 05/07/2026: Ajuste de UI: Redimensionamento do campo 'Dias' (Grid CSS).
-  - 05/07/2026: Nova Funcionalidade: Script JS nativo para exportação CSV/XLS.
-  - 05/07/2026: UX Fluxo: Remoção de nova aba (target=_blank) e injeção do 
+  05/07/2026: Ajuste de UI: Redimensionamento do campo 'Dias' (Grid CSS).
+  05/07/2026: Nova Funcionalidade: Script JS nativo para exportação CSV/XLS.
+  05/07/2026: UX Fluxo: Remoção de nova aba (target=_blank) e injeção do 
                 parâmetro ?origem=monitor_sla na rota de Ação.
+  06/07/2026: UX UI: Refatoração do bloco de listagem vazia para exibir instrução de busca caso nenhum filtro tenha sido aplicado.                
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -263,9 +267,15 @@
         </table>
     {% else %}
         <div style="text-align: center; padding: 40px; color: var(--texto-dim); border: 1px dashed #333; border-radius: 8px;">
-            <i class="fas fa-check-double" style="font-size: 40px; color: #333; margin-bottom: 15px;"></i>
-            <p style="font-size: 16px;">Nenhum protocolo encontrado com estes critérios.</p>
-            <p style="font-size: 13px; margin-top: 5px;">Sua esteira está perfeitamente em dia!</p>
+            {% if filtro_status or filtro_dias or filtro_protocolo %}
+                <i class="fas fa-check-double" style="font-size: 40px; color: #333; margin-bottom: 15px;"></i>
+                <p style="font-size: 16px;">Nenhum protocolo encontrado com estes critérios.</p>
+                <p style="font-size: 13px; margin-top: 5px;">Sua esteira está perfeitamente em dia!</p>
+            {% else %}
+                <i class="fas fa-search" style="font-size: 40px; color: #333; margin-bottom: 15px;"></i>
+                <p style="font-size: 16px;">Painel de Auditoria de SLA</p>
+                <p style="font-size: 13px; margin-top: 5px;">Utilize os filtros acima para iniciar a pesquisa de protocolos.</p>
+            {% endif %}
         </div>
     {% endif %}
 </div>
@@ -334,4 +344,20 @@ function gerarExcel() {
     a.click();
 }
 </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const formFiltro = document.querySelector('form'); // Ajuste o seletor conforme o ID do seu form
+        if (formFiltro) {
+            formFiltro.addEventListener('submit', function() {
+                // Limpa o conteúdo da tabela ou container de resultados antes do reload
+                const containerResultados = document.getElementById('container-resultados'); 
+                if (containerResultados) {
+                    containerResultados.innerHTML = '<div style="text-align: center; padding: 20px;">Carregando novos resultados...</div>';
+                }
+            });
+        }
+    });
+</script>
+
 {% endblock %}
