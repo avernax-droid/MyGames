@@ -18,6 +18,7 @@
     ajuste na formatação da moeda para BRL (vírgula).
   - 04/07/2026: Adequação para uso de valor_cred_unitario e inclusão da trava condicional
     (bloqueio_valor) para bloquear fechamento de lotes menores que R$ 300,00.
+  - 06/07/2026: Atualização da mensagem de alerta de bloqueio de valor mínimo para instruir o usuário sobre a exceção de itens sob consulta.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -91,9 +92,10 @@
         </div>
 
         {% if bloqueio_valor %}
-        <div class="alerta-valor-minimo" style="background: rgba(255, 68, 68, 0.1); border: 2px solid #ff4444; border-radius: 12px; padding: 15px; margin-bottom: 25px; text-align: center; color: var(--texto-br); font-family: sans-serif; font-size: 13px; line-height: 1.4;">
+        <div class="alerta-valor-minimo" style="background: rgba(255, 68, 68, 0.1); border: 2px solid #ff4444; border-radius: 12px; padding: 15px; margin-bottom: 25px; text-align: center; color: var(--texto-br); font-family: sans-serif; font-size: 14px; line-height: 1.4;">
             <span style="font-size: 18px; margin-right: 8px; vertical-align: middle;">⚠️</span>
-            Atenção: Não realizamos transações para lotes com valor total de avaliação inferior a <strong>R$ 300,00</strong>. Por favor, adicione mais produtos para liberar o fechamento.
+            Atenção: O valor mínimo para fechamento é de <strong>R$ 300,00</strong>. <br>
+            Por favor, adicione mais produtos ao lote ou inclua um item <strong>"Outro produto não listado"</strong> (avaliação sob consulta) para liberar o avanço.
         </div>
         {% endif %}
         

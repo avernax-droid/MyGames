@@ -38,6 +38,7 @@
 # - 04/07/2026: Alteração na rota /pericia para incluir a regra de exceção e injeção da flag 'permite_desbloqueio' para consoles (PS1, PS2 e PS Vita).
 # - 04/07/2026: Refatoração da rota /cotar para utilizar valor_final_pix e valor_final_cred oficiais vindos do engine.py.
 # - 06/07/2026: Correção de KeyError na rota /cotar aplicando tratamento seguro (.get) para extrair valores ausentes em itens 'Sob Consulta'.
+# - 06/07/2026: Implementação de exceção para itens sob consulta (is_outros) na trava de valor mínimo de R$ 300,00 na rota /resumo.
 # ==============================================================================
 
 import os
@@ -415,7 +416,12 @@ def resumo():
     
     # Nova Regra Universal: O total do lote e a validação agora consideram o valor_cred_unitario
     total_lote = sum(item['valor_cred_unitario'] * item.get('quantidade', 1) for item in itens)
-    bloqueio_valor = total_lote < 300.0
+    
+    # NOVA EXCEÇÃO: Identifica se existe algum item configurado como "Sob Consulta" (fora do catálogo mestre)
+    tem_item_sob_consulta = any(item.get('is_outros') for item in itens)
+    
+    # A trava de valor mínimo só será ativada se o total for menor que R$ 300,00 E não houver itens sob consulta
+    bloqueio_valor = total_lote < 300.0 and not tem_item_sob_consulta
     
     return render_smart_template('resumo_lote.html', itens=itens, total_lote=total_lote, bloqueio_valor=bloqueio_valor, fase_atual=4)
 
