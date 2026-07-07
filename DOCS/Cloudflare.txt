@@ -9,7 +9,7 @@ Ambiente Docker (docker-compose.yml) rodando os aplicativos localmente nas porta
 Passo 1: Criar o Túnel e Gerar o Token
 Esta etapa substitui os links dinâmicos (trycloudflare.com) por uma conexão permanente e autenticada com a sua conta Cloudflare.
 
-1. Acesse o Painel da Cloudflare e faça login.
+1. Acesse o Painel da Cloudflare  e faça login.
 2. No menu lateral esquerdo, clique em Zero Trust.
 3. Dentro do painel Zero Trust, navegue até Networks > Tunnels.
 4. Clique no botão Create a tunnel.
@@ -87,3 +87,5 @@ docker compose up -d
 
 4. Acesse as URLs oficiais (ex: https://site-homolog.seudominio.com.br) no navegador para testar. O certificado SSL/HTTPS já estará 
 configurado automaticamente.
+
+docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token eyJhIjoiYmQxODYxMTk3MGZiY2Q0NmUyNDQxZWY0MTBmNmFmZjkiLCJ0IjoiNGRkYWYzZGUtNTJiOC00MmIxLTg0MTYtYTVmMzUyZDliM2RhIiwicyI6IlpqWTNOREl3TlRNdE1EVTBPUzAwWkRZNUxUazRNbU10T0dNNE5XVXdOREV4TjJFeSJ9

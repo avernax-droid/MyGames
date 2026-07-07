@@ -24,6 +24,7 @@
   - 23/06/2026: Alteração da cor do botão "ADICIONAR MAIS PRODUTOS" para branco para melhorar a hierarquia visual.
   - 04/07/2026: Inclusão de alerta de bloqueio de valor mínimo do lote (< R$ 300) baseado no crédito e ajuste nas exibições de valor.
   - 06/07/2026: Atualização da mensagem de alerta de bloqueio de valor mínimo para instruir o usuário sobre a exceção de itens sob consulta.
+  - 07/07/2026: Correção na exibição da tabela e do rótulo do totalizador para refletir os valores de venda (PIX) em vez de troca (Crédito).
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -87,17 +88,17 @@
                             {% if item.is_outros %}
                                 <span style="color: #ffaa00; font-size: 11px; text-transform: uppercase; font-weight: bold; border: 1px dashed #ffaa00; padding: 3px 6px; border-radius: 4px; font-family: sans-serif; display: inline-block;">Sob Consulta</span>
                             {% else %}
-                                R$ {{ (item.valor_cred_unitario * item.quantidade) | moeda_real }}
+                                R$ {{ (item.valor_pix_unitario * item.quantidade) | moeda_real }}
                             {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
+                </tbody><div class="total-lote-box">
             </table>
         </div>
 
         <div class="total-lote-box">
-            <span>TOTAL DO LOTE (CRÉDITO):</span>
+            <span>TOTAL DO LOTE (PIX):</span>
             <strong>R$ {{ total_lote | moeda_real }}</strong>
         </div>
 

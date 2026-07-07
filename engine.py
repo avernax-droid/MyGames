@@ -39,6 +39,7 @@
 # - 04/07/2026: Atualização da dupla barreira em calcular_cotacao_final para permitir consoles desbloqueados específicos (PS1, PS2 e PS Vita).
 # - 04/07/2026: Integração do campo valor_cred_base nas funções calcular_cotacao_final e buscar_produtos_por_categoria.
 # - 05/07/2026: Correção na função enviar_email_resumo para multiplicar o valor unitário pela quantidade do item na listagem do e-mail.
+# - 07/07/2026: Refatoração na função calcular_cotacao_final para remover a multiplicação por quantidade, garantindo o retorno estrito do valor unitário.
 # ==============================================================================
 
 import mysql.connector
@@ -223,21 +224,22 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
         multiplicador = Decimal(str(multiplicador_regiao))
-        qtd = Decimal(str(quantidade))
         
         base_pix_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
         base_cred_raw = produto['valor_cred_base'] if produto.get('valor_cred_base') is not None else 0.0
         
-        valor_final_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador * qtd
-        valor_final_cred = Decimal(str(base_cred_raw).replace(',', '.')) * fator * multiplicador * qtd
+        # CORREÇÃO CIRÚRGICA: A quantidade foi removida da equação matemática base.
+        # O motor agora calcula EXCLUSIVAMENTE o valor unitário final daquele produto.
+        valor_unitario_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador
+        valor_unitario_cred = Decimal(str(base_cred_raw).replace(',', '.')) * fator * multiplicador
         
         return {
             "produto": produto['nome_produto'], 
-            "valor_final": float(valor_final_pix),
-            "valor_final_pix": float(valor_final_pix),
-            "valor_final_cred": float(valor_final_cred),
+            "valor_final": float(valor_unitario_pix), # Mantido por retrocompatibilidade no dict
+            "valor_final_pix": float(valor_unitario_pix),
+            "valor_final_cred": float(valor_unitario_cred),
             "multiplicador_aplicado": float(multiplicador_regiao),
-            "quantidade_considerada": int(quantidade)
+            "quantidade_considerada": int(quantidade) # Mantido apenas para repassar o estado, sem afetar o cálculo
         }
     
     finally:

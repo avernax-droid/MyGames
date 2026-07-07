@@ -39,6 +39,8 @@
 # - 04/07/2026: Refatoração da rota /cotar para utilizar valor_final_pix e valor_final_cred oficiais vindos do engine.py.
 # - 06/07/2026: Correção de KeyError na rota /cotar aplicando tratamento seguro (.get) para extrair valores ausentes em itens 'Sob Consulta'.
 # - 06/07/2026: Implementação de exceção para itens sob consulta (is_outros) na trava de valor mínimo de R$ 300,00 na rota /resumo.
+# - 07/07/2026: Refatoração na rota /cotar para remover divisão manual de quantidades e corrigir estruturação do dicionário para itens lote (PIX e Crédito).
+# - 07/07/2026: Correção na rota /resumo para calcular o total_lote utilizando valor_pix_unitario, alinhando com a intenção de venda do usuário e travando corretamente em R$ 300,00.
 # ==============================================================================
 
 import os
@@ -247,7 +249,7 @@ def cotar():
     produto_id = session.get('produto_selecionado_id')
     estado_id = request.form.get('estado_id')
     comentarios = request.form.get('comentarios', '')
-    pergunta_extra = request.form.get('pergunta_extra', '') # NOVO: Captura a pergunta extra do form
+    pergunta_extra = request.form.get('pergunta_extra', '') 
     
     qtd_fisica_str = str(request.form.get('qtd_fisica', '1')).strip()
     qtd_digital_str = str(request.form.get('qtd_digital', '0')).strip()
@@ -316,29 +318,36 @@ def cotar():
             except ValueError:
                 est_id_int = 0
 
-            # NOVO: Tratamento de exceção da dupla barreira do motor
             try:
                 resultado_unitario = engine.calcular_cotacao_final(cat_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo, pergunta_extra=pergunta_extra)
             except ValueError as e:
                 return f"Bloqueio de Segurança: {str(e)}", 403
             
             if resultado_unitario and resultado_unitario.get('valor_final') is not None:
-                 valor_lote = float(resultado_unitario['valor_final'])
+                 # CORREÇÃO: Resgata explicitamente PIX e Crédito do motor
+                 valor_unitario_pix = float(resultado_unitario.get('valor_final_pix', resultado_unitario.get('valor_final', 0.0)))
+                 valor_unitario_cred = float(resultado_unitario.get('valor_final_cred', resultado_unitario.get('valor_final', 0.0)))
                  resultado = {
                     "produto": f"Lote de Jogos ({qtd_final_calculo}x)",
-                    "valor_final": valor_lote,
+                    "valor_final": valor_unitario_pix, 
+                    "valor_final_pix": valor_unitario_pix,
+                    "valor_final_cred": valor_unitario_cred,
                     "multiplicador_aplicado": multiplicador
                  }
             else:
                 resultado = {
                     "produto": f"Lote de Jogos ({qtd_final_calculo}x)",
                     "valor_final": 0.0,
+                    "valor_final_pix": 0.0,
+                    "valor_final_cred": 0.0,
                     "multiplicador_aplicado": multiplicador
                 }
         else:
             resultado = {
                 "produto": "Produto não listado",
                 "valor_final": 0.0,
+                "valor_final_pix": 0.0,
+                "valor_final_cred": 0.0,
                 "multiplicador_aplicado": multiplicador
             }
             
@@ -352,7 +361,6 @@ def cotar():
             prod_id_int = produto_id
             est_id_int = estado_id
 
-        # NOVO: Tratamento de exceção da dupla barreira do motor
         try:
             resultado = engine.calcular_cotacao_final(prod_id_int, est_id_int, multiplicador, quantidade=qtd_final_calculo, pergunta_extra=pergunta_extra)
         except ValueError as e:
@@ -375,12 +383,10 @@ def cotar():
         
         resultado['descricao'] = descricao_estado
 
-        qtd_divisor = qtd_final_calculo if qtd_final_calculo > 0 else 1
-        valor_unit_real = float(resultado.get('valor_final', 0.0)) / qtd_divisor
-
-        # CORREÇÃO: Tratamento seguro para itens fora do catálogo (fallback para o valor_final seguro que é 0.0)
-        valor_unit_pix = float(resultado.get('valor_final_pix', resultado.get('valor_final', 0.0))) / qtd_divisor
-        valor_unit_cred = float(resultado.get('valor_final_cred', resultado.get('valor_final', 0.0))) / qtd_divisor
+        # CORREÇÃO CIRÚRGICA: Remoção da divisão por quantidade. 
+        # O motor agora devolve o valor unitário purificado.
+        valor_unit_pix = float(resultado.get('valor_final_pix', resultado.get('valor_final', 0.0)))
+        valor_unit_cred = float(resultado.get('valor_final_cred', resultado.get('valor_final', 0.0)))
 
         novo_item = {
             'produto_id': produto_id,
@@ -389,7 +395,7 @@ def cotar():
             'valor_cred_unitario': valor_unit_cred,
             'fotos_json': json.dumps(fotos_salvas), 
             'comentarios': comentarios,
-            'quantidade': qtd_final_calculo,
+            'quantidade': qtd_final_calculo, # Quantidade preservada para uso futuro no carrinho e e-mail
             'estado_descricao': descricao_estado,
             'foto_url': foto_url_final,
             'is_outros': session.get('is_outros', False),
@@ -403,9 +409,14 @@ def cotar():
         
         cat_nome = session.get('categoria_nome', 'Produto')
         
+        # --- ADICIONE ESTA LINHA AQUI ---
+        # Multiplicamos o valor unitário pela quantidade apenas para o visual da tela de resultado
+        resultado['valor_final'] = valor_unit_pix * qtd_final_calculo
+        
         return render_smart_template('resultado.html', cotacao=resultado, fase_atual=2, categoria_nome=cat_nome)
     
     return "Erro ao calcular cotação.", 500
+
 
 # 4ª TELA: NOVO RESUMO DO LOTE
 @app.route('/resumo')
@@ -414,8 +425,8 @@ def resumo():
     if not itens:
         return redirect(url_for('produto'))
     
-    # Nova Regra Universal: O total do lote e a validação agora consideram o valor_cred_unitario
-    total_lote = sum(item['valor_cred_unitario'] * item.get('quantidade', 1) for item in itens)
+    # CORREÇÃO: O total do lote e a validação agora consideram estritamente o valor PIX (venda real)
+    total_lote = sum(item['valor_pix_unitario'] * item.get('quantidade', 1) for item in itens)
     
     # NOVA EXCEÇÃO: Identifica se existe algum item configurado como "Sob Consulta" (fora do catálogo mestre)
     tem_item_sob_consulta = any(item.get('is_outros') for item in itens)

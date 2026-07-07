@@ -19,6 +19,7 @@
   - 04/07/2026: Adequação para uso de valor_cred_unitario e inclusão da trava condicional
     (bloqueio_valor) para bloquear fechamento de lotes menores que R$ 300,00.
   - 06/07/2026: Atualização da mensagem de alerta de bloqueio de valor mínimo para instruir o usuário sobre a exceção de itens sob consulta.
+  - 07/07/2026: Correção na exibição dos valores (unitário e total) para refletir a venda por PIX em vez de Crédito.
   ==============================================================================
 #}
 {% extends 'mobile/base_mobile.html' %}
@@ -73,11 +74,11 @@
                             {% if item.is_outros %}
                                 <span class="sob-consulta-badge">Sob Consulta</span>
                             {% else %}
-                                R$ {{ ("%.2f"|format(item.valor_cred_unitario * item.quantidade))|replace('.', ',') }}
+                                R$ {{ ("%.2f"|format(item.valor_pix_unitario * item.quantidade))|replace('.', ',') }}
                             {% endif %}
                         </div>
                         {% if not item.is_outros %}
-                            <div class="texto-enfase-discreta">Valor de Oferta (Crédito)</div>
+                            <div class="texto-enfase-discreta">Valor de Oferta (PIX)</div>
                         {% endif %}
                     </div>
                 </div>
@@ -87,7 +88,7 @@
         </div>
 
         <div class="total-lote-box-mobile">
-            <span>TOTAL DO LOTE (CRÉDITO):</span>
+            <span>TOTAL DO LOTE (PIX):</span>
             <strong>R$ {{ ("%.2f"|format(total_lote))|replace('.', ',') }}</strong>
         </div>
 

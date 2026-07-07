@@ -11,16 +11,24 @@
 #               de Jogos (para 4) e Acessórios (para 3) para alinhar com o banco local.
 # - 06/07/2026: Inclusão do campo 'plataforma' no bloco ON DUPLICATE KEY UPDATE
 #               para garantir a atualização da marca/console na base local.
+# - 07/07/2026: Alteração no carregamento do .env utilizando pathlib para resolver
+#               o caminho absoluto e uso de override=True para sobrescrever 
+#               variáveis de sistema (Docker), garantindo o apontamento correto da base.
 # ==============================================================================
 
 import os
 import requests
 import logging
 import mysql.connector
+from pathlib import Path
 from dotenv import load_dotenv
 from decimal import Decimal
 
-load_dotenv()
+# Descobre o caminho absoluto da pasta raiz (MyGames) a partir da pasta utils/
+caminho_env = Path(__file__).resolve().parent.parent / '.env'
+
+# Força o carregamento deste .env específico e SOBRESCREVE as variáveis do container/sistema
+load_dotenv(dotenv_path=caminho_env, override=True)
 
 # Configuração de log
 logging.basicConfig(
