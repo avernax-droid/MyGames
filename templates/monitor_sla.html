@@ -11,7 +11,9 @@
   05/07/2026: Nova Funcionalidade: Script JS nativo para exportação CSV/XLS.
   05/07/2026: UX Fluxo: Remoção de nova aba (target=_blank) e injeção do 
                 parâmetro ?origem=monitor_sla na rota de Ação.
-  06/07/2026: UX UI: Refatoração do bloco de listagem vazia para exibir instrução de busca caso nenhum filtro tenha sido aplicado.                
+  06/07/2026: UX UI: Refatoração do bloco de listagem vazia para exibir instrução de busca caso nenhum filtro tenha sido aplicado. 
+  07/07/2026: Nova Funcionalidade: Inclusão de colunas ocultas (telefone, endereço, rastreio) para exportação de relatórios enriquecidos.
+  07/07/2026: Aplicação de máscara de formatação nativa (Jinja2) na coluna oculta do WhatsApp para exportação de relatórios.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -228,6 +230,15 @@
                     <th>Cliente</th>
                     <th>Status Atual</th>
                     <th>Tempo Parado (SLA)</th>
+                    <th class="coluna-export" style="display: none;">WhatsApp</th>
+                    <th class="coluna-export" style="display: none;">Rastreio Correios</th>
+                    <th class="coluna-export" style="display: none;">CEP</th>
+                    <th class="coluna-export" style="display: none;">Endereço</th>
+                    <th class="coluna-export" style="display: none;">Número</th>
+                    <th class="coluna-export" style="display: none;">Complemento</th>
+                    <th class="coluna-export" style="display: none;">Bairro</th>
+                    <th class="coluna-export" style="display: none;">Cidade</th>
+                    <th class="coluna-export" style="display: none;">UF</th>
                     <th style="text-align: center;" class="coluna-acao">Ação</th>
                 </tr>
             </thead>
@@ -256,6 +267,26 @@
                                 <span class="badge-atraso atraso-ok"><i class="fas fa-check-circle"></i> {{ dias }} {{ 'dia' if dias == 1 else 'dias' }}</span>
                             {% endif %}
                         </td>
+                        <td class="coluna-export" style="display: none;">
+                            {%- if p.whatsapp -%}
+                                {%- set w = p.whatsapp | string | trim -%}
+                                {%- if w | length == 11 -%}
+                                    ({{ w[:2] }}) {{ w[2:7] }}-{{ w[7:] }}
+                                {%- elif w | length == 10 -%}
+                                    ({{ w[:2] }}) {{ w[2:6] }}-{{ w[6:] }}
+                                {%- else -%}
+                                    {{ w }}
+                                {%- endif -%}
+                            {%- endif -%}
+                        </td>
+                        <td class="coluna-export" style="display: none;">{{ p.codigo_rastreio | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.cep | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.endereco | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.numero | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.complemento | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.bairro | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.cidade | default('') }}</td>
+                        <td class="coluna-export" style="display: none;">{{ p.estado_uf | default('') }}</td>
                         <td style="text-align: center;" class="coluna-acao">
                             <a href="{{ url_for('periciar_na_esteira', protocolo_id=p.id, origem='monitor_sla') }}" class="btn-acao">
                                 <i class="fas fa-external-link-alt"></i> Acessar
@@ -304,8 +335,8 @@ function gerarCSV() {
     for (var i = 0; i < rows.length; i++) {
         var row = [], cols = rows[i].querySelectorAll("td:not(.coluna-acao), th:not(.coluna-acao)");
         for (var j = 0; j < cols.length; j++) {
-            // Limpa quebras de linha e injeta aspas duplas de escape
-            var dadoTexto = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""').trim();
+            // Utilizamos textContent em vez de innerText para ler os dados que possuem display: none
+            var dadoTexto = cols[j].textContent.replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""').trim();
             row.push('"' + dadoTexto + '"');
         }
         // Usa ponto e vírgula para compatibilidade nativa com Excel PT-BR
@@ -331,6 +362,12 @@ function gerarExcel() {
     var tds = tabelaClone.querySelectorAll('td.coluna-acao');
     ths.forEach(th => th.remove());
     tds.forEach(td => td.remove());
+
+    // Remove o display: none das colunas ocultas para que o Excel renderize os dados
+    var colsExport = tabelaClone.querySelectorAll('.coluna-export');
+    colsExport.forEach(col => {
+        col.style.display = '';
+    });
 
     var uri = 'data:application/vnd.ms-excel;base64,';
     var template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table>{table}</table></body></html>';

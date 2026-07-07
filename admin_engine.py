@@ -53,6 +53,8 @@
 #               para "DEPRECIAÇÃO PARCIAL" e adição do botão Call-to-Action "RESPONDER AVALIAÇÃO".
 # - 05/07/2026: Adição da função obter_relatorio_sla para gerar o Relatório de Aging 
 #               com cálculo dinâmico de DATEDIFF via banco de dados.
+# - 07/07/2026: Enriquecimento da query na função obter_relatorio_sla com adição de colunas do cliente 
+#               (whatsapp, endereço completo) e rastreio, preparando os dados para a exportação otimizada.
 # ==============================================================================
 import mysql.connector
 import os
@@ -606,8 +608,9 @@ def obter_relatorio_sla(status_id=None, dias_parados=None, numero_protocolo=None
         
         # A query cruza os protocolos com o histórico para encontrar a ÚLTIMA data de alteração
         query = """
-            SELECT p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao,
+            SELECT p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao, p.codigo_rastreio,
                    IFNULL(c.nome_completo, 'Cliente Não Vinculado') as cliente_nome, 
+                   c.whatsapp, c.cep, c.endereco, c.numero, c.complemento, c.bairro, c.cidade, c.estado_uf,
                    s.nome_exibicao as status_nome, s.cor_badge,
                    IFNULL(MAX(h.data_alteracao), p.data_criacao) as data_ultima_alteracao,
                    DATEDIFF(NOW(), IFNULL(MAX(h.data_alteracao), p.data_criacao)) as dias_no_status
@@ -635,8 +638,9 @@ def obter_relatorio_sla(status_id=None, dias_parados=None, numero_protocolo=None
             
         # Fechamento do agrupamento para o MAX(data_alteracao) funcionar
         query += """
-            GROUP BY p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao, 
-                     c.nome_completo, s.nome_exibicao, s.cor_badge
+            GROUP BY p.id, p.numero_protocolo, p.valor_total_pix, p.data_criacao, p.codigo_rastreio,
+                     c.nome_completo, c.whatsapp, c.cep, c.endereco, c.numero, c.complemento, c.bairro, c.cidade, c.estado_uf,
+                     s.nome_exibicao, s.cor_badge
         """
         
         # Filtro 3: Dias Parados (Usa HAVING porque é aplicado APÓS o cálculo do DATEDIFF)
