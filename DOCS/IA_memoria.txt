@@ -1,0 +1,531 @@
+📋 ARQUIVO DE MEMÓRIA: PROJETO MYGAMES (V3.0 - Mobile Otimizado)
+
+-----------------------------------------------------------------------------------------------------------------
+OBJETIVO DESTE ARQUIVO:
+- Manter a memória do projeto para ser utilizada principalmente pela IA.
+- O conteúdo deste arquivo deve ser atualizado, pela IA, sempre que necessário.
+- Sempre que o desenvolvedor iniciar um novo chat com a IA, este arquivo será anexado para conhecimento da IA.
+------------------------------------------------------------------------------------------------------------------
+
+NUNCA ALTERAR, EXCLUIR, MELHORAR OU MODIFICAR QUALQUER PARTE DO CÓDIGO, ESTRUTURA OU ARQUIVOS QUE NÃO SEJA O FOCO DIRETO E ESTRITO DA 
+ALTERAÇÃO OU PROBLEMA SOLICITADO, SEM AUTORIZAÇÃO EXPRESSA.
+
+Regra: Nunca gerar codigo sem antes descrever o motivo e ser autorizado.
+
+Usar o portugues do Brasil.
+Sempre inserir/atualizar registros na base de dados os campos como: CEP, CPF... sem mascara de edção.
+
+1. VISÃO GERAL
+Nome: MyGames
+Objetivo: Sistema de recompra (Buyback) de jogos e consoles usados para um cliente de e-commerce.
+O sistema capta o lead, permite ao usuário selecionar produtos, indicar o estado de conservação (perícia), calcula a depreciação e exibe uma 
+oferta.
+
+Fluxo do Usuário (Stepper):
+Boas-vindas/Canal > Seleção de Produto > Perícia/Fotos > Resultado da Oferta > Resumo do Lote > Termos da Oferta/Política > Identificação > 
+Sucesso/Protocolo.
+
+2. AMBIENTE E TECNOLOGIAS
+- Linguagem/Framework: Python com Flask.
+- Bibliotecas Core: mysql-connector-python, user-agents (detecção mobile), dotenv.
+- Banco de Dados: MySQL (Banco: mygames_dev).
+- Infraestrutura: Docker (planejado/em uso), Ngrok (para túnel de testes web/mobile).
+- Ambiente de Desenvolvimento: Host em Windows 11 utilizando VS Code (Tema Dark Mode) com terminal integrado em Linux - Ubuntu.
+- Metodologia: "Design First" (As interfaces visuais, regras de UX e estruturas de banco são definidas antes da codificação).
+
+3. ESTRUTURA DE DIRETÓRIOS (MÓDULOS)
+
+pasta MyGames:
+
+├── 01_add_pericia_granular.sql
+├── DOCS
+│   ├── Cloudflare.txt
+│   ├── Crontab.txt
+│   ├── Docker_MySQL.txt
+│   ├── IA_memoria.txt
+│   ├── acesso_supabase.txt
+│   ├── agenteIA_MyGames.txt
+│   ├── especificação.txt
+│   ├── especificação_V0.txt
+│   ├── estimativa.txt
+│   ├── mermoria.txt
+│   └── proposta.txt
+├── __pycache__
+│   ├── engine.cpython-312.pyc
+│   └── server.cpython-312.pyc
+├── backup_mygames_pre_pericia_item.sql
+├── dev.sh
+├── doc_modulos.txt
+├── engine.py
+├── estrutura_tabelada.txt
+├── flask_session
+│   ├── 0215a74a7e8bd9ffeb0b1979df9e0441
+│   ├── 03327dc8b425d881c0f088049db95fb9
+│   ├── 0941f572dc4681eb2185b7f1a8f5baf0
+│   ├── 12275faff250c9cf0cd5906a7b5fded4
+│   ├── 167757b1a0c59dcff716c2df6eb4952f
+│   ├── 2029240f6d1128be89ddc32729463129
+│   ├── 20c667fff7ab1cfb736fa92adfbd4dfe
+│   ├── 21512c2bd9b02754bd524146df2c2157
+│   ├── 22b7adc921a96e6fb44370660f2f6dc6
+│   ├── 23c7449e5a0ddda8837098e7b4e0ac59
+│   ├── 24ad110699dd4725a44337d3729b03bc
+│   ├── 27f88379bac4aa7122627c99d3596eba
+│   ├── 2afa1121a195dbcd60875931ea39cbee
+│   ├── 2c58c386397a09adfaf1a930f6c5053d
+│   ├── 2d33afeef9d5497bd95ee2a1adf73cdc
+│   ├── 30af99a9b0dc88703180d0623406cdec
+│   ├── 346d2e61d1a5c6742ebc29991fb8f784
+│   ├── 3723d15b37092300408eab228225a892
+│   ├── 3b5b484c13182a440314bbe0226b4f08
+│   ├── 3e83a655f2370a9e612edbb39c0e54b9
+│   ├── 40dd7a5cc49bcf6bbc0bbd2c2fcfc271
+│   ├── 42c38f01237a0c11143d7b905975056b
+│   ├── 48db4b5ed6cbd0dd3e3f50111be433f8
+│   ├── 4929531d30d4efd6ecc7f3c6ca0f66b5
+│   ├── 4ba1fd55786331b95f0eab1705f5d1b7
+│   ├── 4e0b091bd401015f526fface6c49adc6
+│   ├── 50ce7854355b085f48169a1ff00c2f5b
+│   ├── 50f824f29bed44363e93d15cd4e57861
+│   ├── 57dad7ce3bf2ad76494716e2954c803e
+│   ├── 59dde9fe6b6a29b54486ac09090f33ea
+│   ├── 5a8419e072a786a09476df6ca54ab362
+│   ├── 5c76586274247e1684970f054397a1e7
+│   ├── 60be86d2dec2f2de10e00162bd06afe2
+│   ├── 61029eb934127d76ef0b93af2313800a
+│   ├── 67a57c264b8ad4dd6a1c75754dafac73
+│   ├── 68cb5665a0badc5b585ab2202a4abc4c
+│   ├── 6974e96fbb157d73601c940097139001
+│   ├── 6fc9bbe91bc4ed0837201f73c506364c
+│   ├── 720b64ae6be2460e4b1459e81c6236ca
+│   ├── 7991953a5bdbe97c0c462e091d635cc7
+│   ├── 79a06213243b5f0f8808722e44906742
+│   ├── 79a7ede1ed7cbf70592de03294c31b4e
+│   ├── 7c1dcae347eadff9083b310b69a2517a
+│   ├── 7e7b87e4117eccfe51f876c8932408c2
+│   ├── 830987c8afb4dc57af802c5a3e020265
+│   ├── 848fb8386b19017e47f862577afa3907
+│   ├── 86d81ddfb47b14ddbdf0e7cc6a57b2e2
+│   ├── 87acd67819fadec56c985301a6ee69a8
+│   ├── 8969fd10188fa0483805a94396a5ca70
+│   ├── 89f969c1c2acbc12217c0c5f0e4678de
+│   ├── 8ad116705e4ff40d94f62b617d4b799d
+│   ├── 8c545dc30a3ac94b8cd1f00fcbd3cff7
+│   ├── 9592ae5c2fa5e86996d51e3974147570
+│   ├── 9b0f695be7f1ab65096ff45d86bc592a
+│   ├── 9bdb2e349af96980e7c583412812d139
+│   ├── a52165c728f9298e2ea7a51a74d2bb73
+│   ├── a7f17aa94458d490158d2d04d4bb5ce7
+│   ├── a835ec2c48100f53cf9016fdd6d2ebd4
+│   ├── afddf6c666001c99cf304c0d5503f35b
+│   ├── b169bb67d4f6b4bf7d2d908fab0aeb38
+│   ├── b23f3f52b17c08de0284040e1ff4d5f8
+│   ├── b4ee392c32d50f94dc2a99862b1e44d0
+│   ├── b62d27a86489f3c0acbab5912273f768
+│   ├── b97787c62751b609448c162b63f4c90a
+│   ├── bc94740880e6188a28587ff9daff2a7c
+│   ├── bd80065cae217313d8b08a3d3b8b4a86
+│   ├── be745039ca3ed364da685031c56ce117
+│   ├── bede242ad60eafb23a70e1bce0126914
+│   ├── c533c6f439a61b42418a96cd4a9ed7e5
+│   ├── c79a9bd88d921214800dcf7cbb234886
+│   ├── cc580cbbae3b4d5cf9fa2c614c925d53
+│   ├── cc68a8d98dccab7684f90060d6016947
+│   ├── ce70565bacac0c6c0d468483a0a278a4
+│   ├── d119ba3e2f471bf31a11bce992365de8
+│   ├── d30ac9b8286db9f29928eeb0c73e65ec
+│   ├── d452f3da0dbfea4d4a49b5258c780f99
+│   ├── d4f739449f447ce0e0b88b4b3a5a8893
+│   ├── d70001aac43bab476dcbb4eac349e43d
+│   ├── d706c33685bd236363bf7459ae1e471b
+│   ├── d77a950fcfd73c493090f341b4011983
+│   ├── d7e9103b474b4ee2f7884761ad60fc12
+│   ├── da1ef192b0170fa83687be1c656f8c28
+│   ├── da35399e4ae5fafe6ba6b67385dc64bf
+│   ├── e1478629b745a6fbb20af51e7f21a345
+│   ├── e4f29e415268d7e1c69064499f869cad
+│   ├── e5bf0d9a134cddaabd143245cf088762
+│   ├── eed5fbc261258875d139d2986ef8d542
+│   ├── ef75952301eb0915d2ee4f5b76bf7997
+│   ├── f1055790ce46a4f727c628befa348d01
+│   ├── f1888550bb6e8690db502cbad51f13b7
+│   ├── f8d37a27f23f5943b617d505e99c3d8c
+│   ├── fb5900e74e14debcc786ebcd7f2fe87e
+│   ├── fea87e2097e2e62b54d0de4bbfccc3c8
+│   ├── fed9041e4d24d9c6257a09f98384af32
+│   └── ff25e27a777eccd41a99e99951b94c40
+├── modulos.txt
+├── requirements.txt
+├── schema.txt
+├── scripts
+│   ├── export_schema.py
+│   ├── extrai_funcoes.py
+│   ├── parms
+│   ├── rastrear_correios.py
+│   └── teste_correios.py
+├── server.py
+├── static
+│   ├── css
+│   │   └── style.css
+│   ├── images
+│   │   └── catalogo
+│   ├── img
+│   │   ├── logo.jpeg
+│   │   ├── mobile-tirinhas.mp4
+│   │   └── tirinhas-desktop.mp4
+│   ├── js
+│   │   ├── main.js
+│   │   └── ux-helper.js
+│   └── uploads
+│       └── pericia
+├── templates
+│   ├── base.html
+│   ├── boas_vindas.html
+│   ├── cadastro_complementar.html
+│   ├── mobile
+│   │   ├── base_mobile.html
+│   │   ├── boas_vindas.html
+│   │   ├── cadastro_complementar.html
+│   │   ├── pericia.html
+│   │   ├── produto.html
+│   │   ├── resultado.html
+│   │   ├── resumo_lote.html
+│   │   ├── sucesso.html
+│   │   └── termos_oferta.html
+│   ├── pericia.html
+│   ├── produto.html
+│   ├── resultado.html
+│   ├── resumo_lote.html
+│   ├── sucesso.html
+│   ├── termos_oferta.html
+│   └── upload_mobile.html
+├── utils
+│   └── sync_catalogo.py
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.12
+    │   ├── python -> python3.12
+    │   ├── python3 -> python3.12
+    │   └── python3.12 -> /usr/bin/python3.12
+    ├── include
+    │   └── python3.12
+    ├── lib
+    │   └── python3.12
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+
+Pasta MyGames_Admin:
+
+├── DOC
+│   ├── IA_memoria_admin.txt
+│   └── memoria.txt
+├── __pycache__
+│   └── admin_engine.cpython-312.pyc
+├── admin_engine.py
+├── admin_modulos.txt
+├── admin_server.py
+├── requirements.txt
+├── schema.txt
+├── static
+│   └── images
+│       └── catalogo
+├── templates
+│   ├── base.html
+│   ├── catalogo.html
+│   ├── configuracoes
+│   │   ├── canais.html
+│   │   ├── categorias.html
+│   │   ├── empresa.html
+│   │   ├── opcoes_estado.html
+│   │   ├── perguntas.html
+│   │   ├── regioes.html
+│   │   ├── status.html
+│   │   └── usuarios.html
+│   ├── dashboard.html
+│   ├── detalhes_protocolo.html
+│   ├── esteira.html
+│   ├── login.html
+│   ├── monitor_sla.html
+│   ├── mudar_senha.html
+│   ├── pericia_esteira.html
+│   └── protocolos.html
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── dotenv
+    │   ├── flask
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.12
+    │   ├── python -> python3.12
+    │   ├── python3 -> python3.12
+    │   └── python3.12 -> /usr/bin/python3.12
+    ├── include
+    │   └── python3.12
+    ├── lib
+    │   └── python3.12
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+
+DESCRIÇÃO DOS MÓDULOS PRINCIPAIS:
+- engine.py [MÓDULO PRINCIPAL CORE]: É o coração do sistema. Gerencia toda a camada de persistência (MySQL), cálculos matemáticos de perícia (depreciação e multiplicadores regionais), integração com APIs externas (IBGE), envio de e-mails automatizados, gestão de UUIDs e gestão segura de leads via UPSERT (validação por CPF). Persiste também logs de feedback de recusa de ofertas.
+- server.py: Servidor web Flask. Atua como controller. Gerencia as rotas, o fluxo da session do usuário, detecta o dispositivo (Mobile/Desktop via user-agents) realizando roteamento dinâmico, processa uploads e atende endpoints de Handoff Remoto.
+
+Modulos do aplicativo site/cliente - pasta MyGames
+
+ARQUIVO                                  | TÍTULO                                        | FUNÇÃO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+engine.py                                | Motor de Regras e Integração de Banco de Dados | Módulo core do sistema responsável por toda a camada de persistência  de dados (MySQL), cálculos de perícia (depreciação de valores), integração com  APIs externas (IBGE) e envio de comunicações automatizadas (e-mail). Orquestra  a lógica entre o front-end e o banco de dados.
+server.py                                | Servidor Web e Roteamento Flask               | Controladora principal da aplicação web. Gerencia todas as rotas (endpoints) do sistema, controla o fluxo de sessão do usuário (stepper), processa formulários,  gerencia uploads de arquivos e integra as chamadas ao módulo 'engine.py'.  Atua como a camada de interface entre o usuário e a lógica de negócio.
+templates/cadastro_complementar.html     | Finalização de Cadastro (Identificação)       | Tela responsável por coletar e validar os dados pessoais, de endereço  e de pagamento (chave PIX) do usuário. Possui lógica integrada para buscar e  preencher automaticamente os dados de clientes recorrentes a partir do CPF,  preparando a sessão para a geração do protocolo final do lote.
+templates/upload_mobile.html             | Interface Mobile de Câmera (Handoff Remoto)   | Tela ultra-leve acessada via QR Code pelo smartphone do usuário.  Permite o acesso nativo à câmera do dispositivo ou galeria para captura de fotos  da perícia. Envia os arquivos diretamente para o servidor via AJAX e informa a  conclusão para que o desktop possa prosseguir.
+templates/resumo_lote.html               | Resumo e Revisão do Lote de Produtos          | Exibe uma lista detalhada de todos os itens avaliados pelo usuário até  o momento, com seus respectivos estados de conservação, fotos (se houver),  observações e valores calculados (ou indicação de análise manual). Oferece  opções para retornar à seleção de produtos, prosseguir para os termos da oferta  ou descartar todo o lote atual.
+templates/pericia.html                   | Avaliação Técnica e Conservação do Produto    | Tela responsável por coletar informações detalhadas sobre o estado de  conservação do item selecionado.
+templates/produto.html                   | Seleção de Categoria e Busca de Produtos      | Tela responsável por permitir que o usuário escolha uma categoria  (Console, Controle, Jogo, Acessório) e pesquise dinamicamente itens do catálogo.  O módulo filtra os resultados em tempo real via JavaScript, priorizando produtos  que começam com o termo digitado, e também fornece a opção de "Outro produto  não listado" como rota de fuga para itens ausentes no banco.
+templates/sucesso.html                   | Tela de Conclusão e Protocolo                 | Exibe o número do protocolo gerado, confirma o envio do e-mail de  resumo e apresenta os dados de contato da empresa dinamicamente.
+templates/termos_oferta.html             | Termos da Oferta e Política de Recompra       | Exibe as políticas da empresa após a cotação. Exige o aceite explícito  (checkbox) para avançar à identificação, ou permite recusar exibindo uma área  de feedback inline e descartando o lote.
+templates/boas_vindas.html               | Landing Page e Captura de Localização         | Ponto de entrada do sistema MyGames. Sua principal responsabilidade  é recepcionar o usuário, capturar sua localização geográfica (Cidade e UF)  através de busca em tempo real (API do IBGE) e registrar o canal de aquisição  (como ele conheceu a empresa) antes de liberar o acesso ao catálogo.
+templates/resultado.html                 | Exibição de Oferta e Revisão de Perícia       | Apresenta o resultado da avaliação técnica de um produto individual.  Exibe o valor da oferta gerada (ou o aviso de avaliação sob consulta para itens  personalizados) e uma galeria de revisão com fotos e comentários enviados pelo usuário.  Inclui funcionalidade para descartar a avaliação atual do item.
+templates/base.html                      | Template Base e Design System Globais         | Serve como o esqueleto principal (layout mestre) para todas as outras  telas do sistema. Define a estrutura HTML global, importa fontes, estabelece as  variáveis CSS globais do Design System (cores, botões, cards) e renderiza a barra  de progresso (stepper) de fases de navegação do usuário.
+utils/sync_catalogo.py                   | ETL de Sincronização de Catálogo (Supabase -> MySQL) - OTIMIZADO | Processo batch (lote) autônomo para sincronização de catálogo.
+templates/mobile/cadastro_complementar.html | Finalização de Cadastro Mobile                | Versão exclusiva para smartphones. Desfaz o layout de colunas do desktop e empilha os inputs em 100% da largura. Adiciona atributos inputmode para abrir o teclado numérico correto.
+templates/mobile/resumo_lote.html        | Resumo e Revisão do Lote de Produtos (Mobile Otimizado) | Versão exclusiva para smartphones. Exibe todos os itens avaliados  agrupados em um único quadro contínuo (List-View).
+templates/mobile/pericia.html            | Avaliação Técnica e Conservação do Produto (Mobile) | Tela otimizada para smartphones responsável por coletar informações do  produto.
+templates/mobile/produto.html            | Seleção de Categoria e Busca de Produtos (Mobile) | Tela otimizada para smartphones responsável por permitir a escolha  de categoria e busca no catálogo.
+templates/mobile/base_mobile.html        | Template Base e Design System (Mobile)        | Serve como o esqueleto principal para o fluxo de usuários em smartphones. Contém meta tags exclusivas de viewport para bloquear zoom acidental, adapta o  stepper de navegação e os touch-targets (botões/modais) para telas menores.
+templates/mobile/sucesso.html            | Tela de Conclusão e Protocolo (Mobile)        | Exibe o número do protocolo gerado, código de rastreio e contato. Otimizado para smartphones, aplicando quebra de linha (word-break) em  códigos longos e extraindo estilos inline para classes limpas.
+templates/mobile/termos_oferta.html      | Termos da Oferta e Política de Recompra (Mobile) | Exibe as políticas da empresa otimizadas para leitura em telas pequenas.  Transforma os pequenos checkboxes de aceite em "Cards Acionáveis" e empilha  os botões de ação final.
+templates/mobile/boas_vindas.html        | Landing Page e Captura de Localização (Mobile) | Ponto de entrada do sistema MyGames otimizado para smartphones.
+templates/mobile/resultado.html          | Exibição de Oferta e Revisão de Perícia (Mobile) | Apresenta o resultado da avaliação técnica de um produto no celular.
+
+Modulos do aplicativo admin/backoffice - pasta MyGames_Admin
+
+ARQUIVO                                  | TÍTULO                                        | FUNÇÃO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+admin_engine.py                          | Motor de Regras e Integração de Banco de Dados | Motor de persistência e regras de negócio do painel administrativo. Centraliza a execução de queries SQL complexas e o isolamento da camada de dados.
+admin_server.py                          | Servidor Web e Roteamento Flask               | Servidor Controller principal do painel administrativo. Gerencia a autenticação via identidade do usuário, sessão e permissões RBAC.
+templates/detalhes_protocolo.html        | Detalhes do Protocolo                         | Página de detalhes do protocolo, exibindo informações do cliente, itens periciados, fotos de inspeção e rastreio dos Correios.
+templates/dashboard.html                 | Visão Geral do Sistema (Dashboard)            | Página inicial do painel administrativo exibida logo após o login  bem-sucedido. Herda a estrutura principal do base.html e servirá futuramente  para exibir métricas gerais (resumo de protocolos abertos, itens pendentes, etc).
+templates/monitor_sla.html               | Monitoramento de SLA (Atrasos)                | Tela de monitoramento de protocolos em atraso, com filtros e exportação de dados.
+templates/login.html                     | Tela de Autenticação e Registro da Equipe     | Interface pública do painel administrativo. Gerencia o login tradicional e o fluxo de Auto-Cadastro (Solicitação de Acesso) para novos membros.
+templates/catalogo.html                  | Catálogo Mestre de Produtos                   | Interface de listagem e gestão (CRUD) do Catálogo Mestre de produtos. Utiliza janela Modal nativa para criação e edição ágil de itens sem  necessidade de recarregar páginas separadas.
+templates/mudar_senha.html               | Tela de Alteração Obrigatória de Senha        | Interface de segurança que força o usuário a trocar a senha provisória gerada pelo sistema antes de acessar qualquer módulo do backoffice.
+templates/protocolos.html                | Gestão de Protocolos (Recompras)              | Exibe a listagem de todos os pedidos de recompra gerados pelos clientes.
+templates/base.html                      | Template Base do Painel Administrativo        | Template mestre, layout global e barra de navegação principal (Sidebar)
+templates/configuracoes/perguntas.html   | Gestão de Perguntas de Conservação            | Interface de CRUD focada na tabela de perguntas da categoria selecionada.
+templates/configuracoes/empresa.html     | Dados da Empresa                              | Interface para gerenciamento dos dados corporativos (Remetente/Termos).
+templates/configuracoes/status.html      | Gestão de Status de Protocolos                | Interface de CRUD (Listagem, Inserção e Edição) para os Status da Esteira
+templates/configuracoes/regioes.html     | Gestão de Regiões de Atendimento              | Interface de listagem e configuração (CRUD) das praças logísticas atendidas. Permite definir o multiplicador de preço por região através de janela Modal nativa, restrito ao nível de acesso de Administrador.
+templates/configuracoes/categorias.html  | Gestão de Categorias de Produtos              | Interface de CRUD (Listagem, Inserção e Edição) de Categorias
+templates/configuracoes/usuarios.html    | Gestão de Usuários Admin                      | Interface para gerenciamento de permissões da equipe.
+templates/configuracoes/canais.html      | Gestão de Canais de Aquisição                 | Interface de CRUD (Listagem, Inserção e Edição) de Canais de Aquisição
+templates/configuracoes/opcoes_estado.html | Gestão de Opções de Estado de Conservação     | CRUD dos estados (Novo, Usado, Com Detalhes, etc) e seus impactos no preço.
+
+4. ESTRUTURA DO BANCO DE DADOS (mygames_dev)
+
+TABELA                    COLUNA                    TIPO                                                         CHAVE      ORD_TABELA           ORD_COLUNA   ORDEM_TIPO
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+avaliacoes_manuais        id                        int                                                          PK,AI      avaliacoes_manuais   1            0
+                          nome_produto_informado    varchar(255)                                                 -          avaliacoes_manuais   2            0
+                          descricao_estado          text                                                         -          avaliacoes_manuais   3            0
+                          email_contato             varchar(150)                                                 -          avaliacoes_manuais   4            0
+                          data_solicitacao          datetime                                                     -          avaliacoes_manuais   5            0
+                          status                    enum('Pendente','Avaliado','Recusado')                       -          avaliacoes_manuais   6            0
+----------                ----------                ----------                                                   ---------- avaliacoes_manuais   999          1
+canais_aquisicao          id                        int                                                          PK,AI      canais_aquisicao     1            0
+                          slug_tecnico              varchar(50)                                                  -          canais_aquisicao     2            0
+                          nome_exibicao             varchar(100)                                                 -          canais_aquisicao     3            0
+                          ativo                     tinyint(1)                                                   -          canais_aquisicao     4            0
+----------                ----------                ----------                                                   ---------- canais_aquisicao     999          1
+catalogo_mestre           id                        int                                                          PK,AI      catalogo_mestre      1            0
+                          nome_produto              varchar(255)                                                 -          catalogo_mestre      2            0
+                          categoria_id              int                                                          FK         catalogo_mestre      3            0
+                          plataforma                varchar(50)                                                  -          catalogo_mestre      4            0
+                          valor_venda_ref           decimal(10,2)                                                -          catalogo_mestre      5            0
+                          valor_pix_base            decimal(10,2)                                                -          catalogo_mestre      6            0
+                          valor_cred_base           decimal(10,2)                                                -          catalogo_mestre      7            0
+                          foto_oficial_url          varchar(255)                                                 -          catalogo_mestre      8            0
+                          sku_interno               varchar(50)                                                  -          catalogo_mestre      9            0
+                          ativo                     tinyint(1)                                                   -          catalogo_mestre      10           0
+----------                ----------                ----------                                                   ---------- catalogo_mestre      999          1
+categorias                id                        int                                                          PK,AI      categorias           1            0
+                          nome                      varchar(50)                                                  -          categorias           2            0
+                          ativo                     tinyint(1)                                                   -          categorias           3            0
+----------                ----------                ----------                                                   ---------- categorias           999          1
+categorias_avaliacao      id                        int                                                          PK,AI      categorias_avaliacao 1            0
+                          nome_categoria            varchar(100)                                                 -          categorias_avaliacao 2            0
+                          slug                      varchar(50)                                                  -          categorias_avaliacao 3            0
+                          categoria_id              int                                                          FK         categorias_avaliacao 4            0
+                          obrigatorio               tinyint(1)                                                   -          categorias_avaliacao 5            0
+----------                ----------                ----------                                                   ---------- categorias_avaliacao 999          1
+clientes_usuarios         id                        int                                                          PK,AI      clientes_usuarios    1            0
+                          nome_completo             varchar(255)                                                 -          clientes_usuarios    2            0
+                          email                     varchar(150)                                                 -          clientes_usuarios    3            0
+                          whatsapp                  varchar(20)                                                  -          clientes_usuarios    4            0
+                          cidade                    varchar(100)                                                 -          clientes_usuarios    5            0
+                          estado_nome               varchar(100)                                                 -          clientes_usuarios    6            0
+                          estado_uf                 char(2)                                                      -          clientes_usuarios    7            0
+                          origem_lead               varchar(50)                                                  -          clientes_usuarios    8            0
+                          cpf                       varchar(14)                                                  -          clientes_usuarios    9            0
+                          chave_pix                 varchar(100)                                                 -          clientes_usuarios    10           0
+                          cep                       varchar(9)                                                   -          clientes_usuarios    11           0
+                          endereco                  varchar(255)                                                 -          clientes_usuarios    12           0
+                          numero                    varchar(20)                                                  -          clientes_usuarios    13           0
+                          complemento               varchar(100)                                                 -          clientes_usuarios    14           0
+                          bairro                    varchar(100)                                                 -          clientes_usuarios    15           0
+                          data_cadastro             timestamp                                                    -          clientes_usuarios    16           0
+----------                ----------                ----------                                                   ---------- clientes_usuarios    999          1
+dados_empresa             id                        int                                                          PK,AI      dados_empresa        1            0
+                          razao_social              varchar(150)                                                 -          dados_empresa        2            0
+                          nome_fantasia             varchar(150)                                                 -          dados_empresa        3            0
+                          cnpj                      varchar(20)                                                  -          dados_empresa        4            0
+                          cep                       varchar(10)                                                  -          dados_empresa        5            0
+                          logradouro                varchar(150)                                                 -          dados_empresa        6            0
+                          numero                    varchar(20)                                                  -          dados_empresa        7            0
+                          complemento               varchar(100)                                                 -          dados_empresa        8            0
+                          bairro                    varchar(100)                                                 -          dados_empresa        9            0
+                          cidade                    varchar(100)                                                 -          dados_empresa        10           0
+                          estado_uf                 char(2)                                                      -          dados_empresa        11           0
+                          telefone_contato          varchar(20)                                                  -          dados_empresa        12           0
+                          email_contato             varchar(150)                                                 -          dados_empresa        13           0
+----------                ----------                ----------                                                   ---------- dados_empresa        999          1
+feedbacks_recusa          id                        int                                                          PK,AI      feedbacks_recusa     1            0
+                          sessao_uuid               varchar(50)                                                  -          feedbacks_recusa     2            0
+                          motivo_texto              text                                                         -          feedbacks_recusa     3            0
+                          cidade_informada          varchar(100)                                                 -          feedbacks_recusa     4            0
+                          estado_uf                 varchar(2)                                                   -          feedbacks_recusa     5            0
+                          canal_aquisicao           varchar(50)                                                  -          feedbacks_recusa     6            0
+                          valor_oferta_recusada     decimal(10,2)                                                -          feedbacks_recusa     7            0
+                          itens_carrinho_json       json                                                         -          feedbacks_recusa     8            0
+                          user_agent                varchar(255)                                                 -          feedbacks_recusa     9            0
+                          ip_origem                 varchar(45)                                                  -          feedbacks_recusa     10           0
+                          data_recusa               datetime                                                     -          feedbacks_recusa     11           0
+----------                ----------                ----------                                                   ---------- feedbacks_recusa     999          1
+historico_status_protocolo id                        int                                                          PK,AI      historico_status_protocolo 1            0
+                          protocolo_id              int                                                          FK         historico_status_protocolo 2            0
+                          status_id                 int                                                          FK         historico_status_protocolo 3            0
+                          usuario_admin_id          int                                                          FK         historico_status_protocolo 4            0
+                          data_alteracao            datetime                                                     -          historico_status_protocolo 5            0
+----------                ----------                ----------                                                   ---------- historico_status_protocolo 999          1
+itens_periciados          id                        int                                                          PK,AI      itens_periciados     1            0
+                          protocolo_id              int                                                          FK         itens_periciados     2            0
+                          produto_id                int                                                          FK         itens_periciados     3            0
+                          status_laudo_id           tinyint                                                      -          itens_periciados     4            0
+                          recebido_fisicamente      tinyint(1)                                                   -          itens_periciados     5            0
+                          qtd_declarada             int                                                          -          itens_periciados     6            0
+                          qtd_recebida              int                                                          -          itens_periciados     7            0
+                          fotos_json                json                                                         -          itens_periciados     8            0
+                          comentarios               text                                                         -          itens_periciados     9            0
+                          motivo_recusa             text                                                         -          itens_periciados     10           0
+                          data_pericia              timestamp                                                    -          itens_periciados     11           0
+                          valor_pix_unitario        decimal(10,2)                                                -          itens_periciados     12           0
+                          valor_cred_unitario       decimal(10,2)                                                -          itens_periciados     13           0
+                          valor_final_pix           decimal(10,2)                                                -          itens_periciados     14           0
+                          valor_final_credito       decimal(10,2)                                                -          itens_periciados     15           0
+----------                ----------                ----------                                                   ---------- itens_periciados     999          1
+opcoes_estado             id                        int                                                          PK,AI      opcoes_estado        1            0
+                          categoria_id              int                                                          FK         opcoes_estado        2            0
+                          descricao                 varchar(255)                                                 -          opcoes_estado        3            0
+                          fator_depreciacao         decimal(5,2)                                                 -          opcoes_estado        4            0
+                          valor_fixo_extra          decimal(10,2)                                                -          opcoes_estado        5            0
+                          exibir_ordem              int                                                          -          opcoes_estado        6            0
+----------                ----------                ----------                                                   ---------- opcoes_estado        999          1
+perguntas_conservacao     id                        int                                                          PK,AI      perguntas_conservacao 1            0
+                          categoria_id              int                                                          FK         perguntas_conservacao 2            0
+                          texto_pergunta            varchar(255)                                                 -          perguntas_conservacao 3            0
+                          tipo_resposta             enum('Sim/Nao','Multipla_Escolha')                           -          perguntas_conservacao 4            0
+                          impacto_valor             decimal(10,2)                                                -          perguntas_conservacao 5            0
+----------                ----------                ----------                                                   ---------- perguntas_conservacao 999          1
+pericia_selecionada       item_id                   int                                                          PK         pericia_selecionada  1            0
+                          opcao_id                  int                                                          PK         pericia_selecionada  2            0
+----------                ----------                ----------                                                   ---------- pericia_selecionada  999          1
+propostas_venda           id                        int                                                          PK,AI      propostas_venda      1            0
+                          usuario_id                int                                                          -          propostas_venda      2            0
+                          produto_id                int                                                          -          propostas_venda      3            0
+                          categoria_id              int                                                          FK         propostas_venda      4            0
+                          quantidade                int                                                          -          propostas_venda      5            0
+                          observacoes               text                                                         -          propostas_venda      6            0
+                          fotos_caminho             varchar(500)                                                 -          propostas_venda      7            0
+                          valor_preliminar          decimal(10,2)                                                -          propostas_venda      8            0
+                          status_avaliacao          enum('Pendente','Em Análise Física','Concluída')             -          propostas_venda      9            0
+                          data_proposta             datetime                                                     -          propostas_venda      10           0
+----------                ----------                ----------                                                   ---------- propostas_venda      999          1
+protocolos_recompra       id                        int                                                          PK,AI      protocolos_recompra  1            0
+                          cliente_id                int                                                          FK         protocolos_recompra  2            0
+                          numero_protocolo          varchar(20)                                                  -          protocolos_recompra  3            0
+                          status_id                 int                                                          FK         protocolos_recompra  4            0
+                          status                    enum('Aberto','Aguardando Fotos','Aceito','Recusado','Finalizado') -          protocolos_recompra  5            0
+                          valor_total_pix           decimal(10,2)                                                -          protocolos_recompra  6            0
+                          valor_total_credito       decimal(10,2)                                                -          protocolos_recompra  7            0
+                          valor_avaliado            decimal(10,2)                                                -          protocolos_recompra  8            0
+                          qtd_caixas                int                                                          -          protocolos_recompra  9            0
+                          codigo_rastreio           varchar(50)                                                  -          protocolos_recompra  10           0
+                          laudo_tecnico             text                                                         -          protocolos_recompra  11           0
+                          data_criacao              timestamp                                                    -          protocolos_recompra  12           0
+                          canal_aquisicao_id        int                                                          FK         protocolos_recompra  13           0
+                          e_ticket                  varchar(20)                                                  -          protocolos_recompra  14           0
+----------                ----------                ----------                                                   ---------- protocolos_recompra  999          1
+regioes_atendimento       id                        int                                                          PK,AI      regioes_atendimento  1            0
+                          cidade                    varchar(100)                                                 FK         regioes_atendimento  2            0
+                          estado_uf                 char(2)                                                      -          regioes_atendimento  3            0
+                          multiplicador_preco       decimal(4,2)                                                 -          regioes_atendimento  4            0
+                          ativo                     tinyint(1)                                                   -          regioes_atendimento  5            0
+----------                ----------                ----------                                                   ---------- regioes_atendimento  999          1
+status_protocolos         id                        int                                                          PK,AI      status_protocolos    1            0
+                          slug_tecnico              varchar(50)                                                  -          status_protocolos    2            0
+                          nome_exibicao             varchar(100)                                                 -          status_protocolos    3            0
+                          cor_badge                 varchar(30)                                                  -          status_protocolos    4            0
+                          ativo                     tinyint(1)                                                   -          status_protocolos    5            0
+----------                ----------                ----------                                                   ---------- status_protocolos    999          1
+usuarios_admin            id                        int                                                          PK,AI      usuarios_admin       1            0
+                          nome_completo             varchar(150)                                                 -          usuarios_admin       2            0
+                          usuario_login             varchar(50)                                                  -          usuarios_admin       3            0
+                          email                     varchar(150)                                                 -          usuarios_admin       4            0
+                          senha_hash                varchar(255)                                                 -          usuarios_admin       5            0
+                          nivel_acesso              enum('Administrador','Operador')                             -          usuarios_admin       6            0
+                          ativo                     tinyint(1)                                                   -          usuarios_admin       7            0
+                          data_criacao              datetime                                                     -          usuarios_admin       8            0
+                          ultimo_login              datetime                                                     -          usuarios_admin       9            0
+                          requer_nova_senha         tinyint(1)                                                   -          usuarios_admin       10           0
+----------                ----------                ----------                                                   ---------- usuarios_admin       999          1
+
+5. REGRAS DE NEGÓCIO E MECÂNICAS IMPORTANTES
+
+- Arquitetura de Roteamento (Smart Template): A função `render_smart_template` (via user-agents) em `server.py` determina o fluxo do usuário 
+  em tempo real. Dispositivos móveis buscam preferencialmente interfaces na pasta `/mobile`. Se não existir (Fallback Seguro), renderizam o 
+  template Desktop para não gerar erros (ex: `boas_vindas.html`).
+
+- Precificação Regional: O front-end e o e-mail exibem a ancoragem do preço ajustado se a cidade tiver multiplicador diferente de 1.0 na 
+  tabela regioes_atendimento.
+- Itens "Outros" / Sob Consulta: Produtos com prefixo cat_ ou outro_cat_ ativam a flag is_outros. O preço não é calculado na hora; o sistema 
+  avisa sobre a avaliação humana em até 24h úteis.
+- Política de Avaliação: O e-mail final contém o valor total do lote destacado no topo e uma cláusula jurídica informando que a oferta está 
+  sujeita à avaliação técnica presencial.
+- Modal de Descarte: O usuário pode ejetar itens individuais do lote em resumo_lote.html sem recarregar a tela (AJAX) ou descartar o lote 
+  inteiro.
+- Gestão de Leads (UPSERT): Para evitar duplicação de clientes na base, a função salvar_lead realiza um UPSERT manual. Se o CPF fornecido já 
+  existir no banco, o sistema faz um UPDATE nos dados de contato/endereço em vez de gerar um novo ID.
+- Handoff Mobile (QR Code): Funciona estritamente para acessos via Desktop. O sistema gera uma sessão com Token UUID e exibe um QR Code, 
+  acumulando fotos via mobile. Para usuários já no smartphone, a rotação ignora o QR e utiliza `capture="environment"`.
+- Barreira de Validação e Feedback de Recusa: Em termos_oferta.html, o usuário só avança se der o aceite. A recusa recolhe feedback opcional 
+  e salva na tabela feedbacks_recusa, utilizando `X-Forwarded-For` para contornar Proxies e capturar IP, além de registrar a origem, UUID da sessão e User-Agent, limpando a sessão logo em seguida.
+
+6. DIRETRIZES GERAIS DE DESENVOLVIMENTO (INSTRUÇÕES PARA A IA)
+
+- Não altere a estrutura base de arquivos a menos que solicitado.
+- Mantenha a divisão clara: Regras de negócio e queries SQL vivem no engine.py. Roteamento e manipulação de sessão vivem no server.py.
+- Forneça os códigos um módulo por vez.
+- Sempre atualize o cabeçalho de documentação dos módulos (Data de Criação, Título, Função e Histórico de Alterações) ao fornecer um código 
+  atualizado.
+- Siga a metodologia "Design First": planeje a UX/UI e a estrutura antes de codar a lógica profunda.
+- Mantenha a UX fluida: evite quebras de layout, adote feedback visual (spinners/loaders) e previna toques/cliques acidentais em dispositivos 
+  móveis.

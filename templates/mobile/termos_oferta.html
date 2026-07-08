@@ -1,0 +1,235 @@
+{# ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: templates/mobile/termos_oferta.html
+  DATA DE CRIAÇÃO: 22/06/2026
+  TÍTULO: Termos da Oferta e Política de Recompra (Mobile)
+  FUNÇÃO: Exibe as políticas da empresa otimizadas para leitura em telas pequenas. 
+  Transforma os pequenos checkboxes de aceite em "Cards Acionáveis" e empilha 
+  os botões de ação final.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 22/06/2026: Criação do arquivo mobile isolado.
+  - 22/06/2026: Implementação de List-View para os termos (redução de fadiga visual)
+    e conversão dos checkboxes em touch-targets amplos.
+  - 22/06/2026: Ocultação condicional do botão de descarte (só aparece se recusar).
+  ============================================================================== #}
+
+{% extends 'mobile/base_mobile.html' %}
+
+{% block content %}
+<div class="container-oferta-mobile" style="padding: 15px; width: 100%; box-sizing: border-box;">
+    <div class="card-padrao-mobile">
+        <header style="text-align: center; margin-bottom: 25px;">
+            <h2 class="titulo-pagina-mobile" style="margin-bottom: 8px;">Termos da Oferta</h2>
+            <p style="color: var(--texto-dim); font-size: 13px; line-height: 1.4; padding: 0 10px;">Antes de prosseguirmos, por favor, leia nossa política de recompra.</p>
+        </header>
+
+        <div class="termos-lista-mobile">
+            <div class="termo-item-mobile">
+                <div class="termo-icone">🔍</div>
+                <div class="termo-texto">
+                    <strong style="color: var(--cor-destaque);">Avaliação Física Obrigatória:</strong> 
+                    Os valores são pré-avaliações. A oferta final está estritamente sujeita à aprovação na avaliação técnica presencial.
+                </div>
+            </div>
+            
+            <div class="termo-item-mobile">
+                <div class="termo-icone">⏱️</div>
+                <div class="termo-texto">
+                    <strong style="color: #00d2ff;">Prazo de Pagamento:</strong> 
+                    Após o recebimento e aprovação, o pagamento será realizado via PIX em até 48 horas úteis.
+                </div>
+            </div>
+            
+            <div class="termo-item-mobile">
+                <div class="termo-icone">❓</div>
+                <div class="termo-texto">
+                    <strong style="color: #ffaa00;">Itens Sob Consulta:</strong> 
+                    Itens com este status no seu lote serão avaliados individualmente pela equipe técnica.
+                </div>
+            </div>
+            
+            <div class="termo-item-mobile" style="border-bottom: none;">
+                <div class="termo-icone">🔄</div>
+                <div class="termo-texto">
+                    <strong style="color: #ff4444;">Devolução e Divergências:</strong> 
+                    Se houver itens rejeitados ou com valores reduzidos da cotação original por falhas pela perícia técnica e você não concordar, os produtos poderão ser devolvidos ou descartados.<br><br>
+                    O envio é por nossa conta, porém o <strong>FRETE DE DEVOLUÇÃO</strong>, caso necessário, ocorre por sua conta.
+                </div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('aceitar_termos') }}" method="POST" id="form-termos">
+            
+            <label class="card-acionavel-mobile card-aceite" for="check-aceite">
+                <input type="checkbox" id="check-aceite" class="checkbox-nativo-mobile">
+                <div class="card-texto-mobile">
+                    Li e concordo com os Termos da Oferta e Política de Recompra
+                </div>
+            </label>
+
+            <div class="container-recusa-wrapper">
+                <label class="card-acionavel-mobile card-recusa" for="check-recusa">
+                    <input type="checkbox" id="check-recusa" class="checkbox-nativo-mobile recusa-check">
+                    <div class="card-texto-mobile">
+                        Não concordo com os Termos da Oferta
+                    </div>
+                </label>
+                
+                <div id="area-motivo-recusa" class="area-motivo-mobile" style="display: none;">
+                    <p style="color: var(--texto-dim); font-size: 13px; margin-top: 0; margin-bottom: 10px;">Para nos ajudar a melhorar, conte-nos o motivo (Opcional):</p>
+                    <textarea id="motivo_recusa_inline" rows="3" class="textarea-motivo-mobile" placeholder="Ex: Achei o prazo longo, política muito rígida..."></textarea>
+                </div>
+            </div>
+
+            <div class="acoes-finais-mobile">
+                <button type="submit" id="btn-continuar" class="btn-primary" disabled style="width: 100%; padding: 16px; opacity: 0.5;">
+                    CONTINUAR
+                </button>
+
+                <button type="button" id="btn-descartar" class="btn-secondary btn-descartar-mobile" style="display: none; width: 100%; padding: 16px;">
+                    DESCARTAR LOTE
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .titulo-pagina-mobile { color: var(--texto-br); font-size: 22px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; margin-top: 0; }
+    
+    /* Estilos da Lista de Termos (List-View) */
+    .termos-lista-mobile { background: rgba(0, 0, 0, 0.2); border: var(--borda-fina); border-radius: 12px; margin-bottom: 25px; padding: 0 15px; }
+    .termo-item-mobile { display: flex; gap: 12px; padding: 18px 0; border-bottom: 1px dashed rgba(255, 255, 255, 0.1); align-items: flex-start; }
+    .termo-icone { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .termo-texto { color: var(--texto-br); font-size: 13px; line-height: 1.5; }
+    .termo-texto strong { font-size: 14px; margin-bottom: 4px; display: block; }
+    
+    /* Cards Acionáveis (Checkboxes grandes) */
+    .card-acionavel-mobile { display: flex; align-items: center; gap: 15px; padding: 18px 15px; border-radius: 12px; margin-bottom: 15px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; -webkit-tap-highlight-color: transparent; }
+    
+    .card-aceite { background: rgba(0, 255, 0, 0.05); border-color: rgba(0, 255, 0, 0.2); }
+    .card-aceite:has(input:checked) { border-color: #28a745; background: rgba(40, 167, 69, 0.1); }
+    
+    .card-recusa { background: rgba(255, 0, 0, 0.05); border-color: rgba(255, 0, 0, 0.2); margin-bottom: 0; }
+    .card-recusa:has(input:checked) { border-color: #ff4444; background: rgba(255, 68, 68, 0.1); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    
+    .checkbox-nativo-mobile { width: 22px; height: 22px; flex-shrink: 0; margin: 0; cursor: pointer; accent-color: #28a745; }
+    .recusa-check { accent-color: #ff4444; }
+    
+    .card-texto-mobile { color: var(--texto-br); font-weight: bold; font-size: 14px; line-height: 1.3; }
+    
+    /* Container Recusa + Motivo */
+    .container-recusa-wrapper { margin-bottom: 25px; display: flex; flex-direction: column; }
+    .area-motivo-mobile { background: rgba(255, 0, 0, 0.05); border: 2px solid #ff4444; border-top: none; padding: 15px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+    .textarea-motivo-mobile { width: 100%; background: #111; border: 1px solid #444; color: var(--texto-br); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 14px; resize: none; box-sizing: border-box; }
+    .textarea-motivo-mobile:focus { outline: none; border-color: #ff4444; }
+
+    /* Botões Finais Empilhados */
+    .acoes-finais-mobile { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+    .btn-descartar-mobile { border-color: #ff4444 !important; color: #ff4444 !important; background: transparent; }
+</style>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const checkAceite = document.getElementById('check-aceite');
+        const checkRecusa = document.getElementById('check-recusa');
+        
+        const btnContinuar = document.getElementById('btn-continuar');
+        const btnDescartar = document.getElementById('btn-descartar');
+        
+        const areaMotivo = document.getElementById('area-motivo-recusa');
+        const inputMotivo = document.getElementById('motivo_recusa_inline');
+
+        // Lógica do Aceite
+        if (checkAceite) {
+            checkAceite.addEventListener('change', function() {
+                if (this.checked) {
+                    // Desmarca recusa e esconde a área de motivo
+                    if(checkRecusa) checkRecusa.checked = false;
+                    if(areaMotivo) areaMotivo.style.display = 'none';
+                    
+                    // Esconde botão descartar e exibe/ativa continuar
+                    btnDescartar.style.display = 'none';
+                    
+                    btnContinuar.style.display = 'block';
+                    btnContinuar.disabled = false;
+                    btnContinuar.style.opacity = '1';
+                } else {
+                    // Se desmarcar o aceite, apenas desativa o botão continuar
+                    btnContinuar.disabled = true;
+                    btnContinuar.style.opacity = '0.5';
+                }
+            });
+        }
+
+        // Lógica da Recusa
+        if (checkRecusa) {
+            checkRecusa.addEventListener('change', function() {
+                if (this.checked) {
+                    // Desmarca aceite
+                    if(checkAceite) checkAceite.checked = false;
+                    
+                    // Exibe a área de motivo
+                    if(areaMotivo) areaMotivo.style.display = 'block';
+                    
+                    // Esconde o botão continuar
+                    btnContinuar.style.display = 'none';
+
+                    // Exibe e ativa o botão descartar
+                    btnDescartar.style.display = 'block';
+                    btnDescartar.disabled = false;
+                    btnDescartar.style.opacity = '1';
+                } else {
+                    // Se desmarcar a recusa, esconde a área de motivo e botão descartar
+                    if(areaMotivo) areaMotivo.style.display = 'none';
+                    btnDescartar.style.display = 'none';
+                    
+                    // Retorna o botão continuar ao estado inicial
+                    btnContinuar.style.display = 'block';
+                    btnContinuar.disabled = true;
+                    btnContinuar.style.opacity = '0.5';
+                }
+            });
+        }
+
+        // Ação AJAX de Descarte
+        if (btnDescartar) {
+            btnDescartar.addEventListener('click', async () => {
+                btnDescartar.disabled = true;
+                btnDescartar.innerText = "PROCESSANDO...";
+                btnDescartar.style.opacity = "0.7";
+
+                const motivoTexto = inputMotivo ? inputMotivo.value : "";
+
+                try {
+                    const response = await fetch('/descartar-lote-final', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ motivo: motivoTexto })
+                    });
+
+                    if (response.ok) {
+                        window.location.href = '/';
+                    } else {
+                        alert("Ocorreu um erro ao processar o descarte. Tente novamente.");
+                        btnDescartar.disabled = false;
+                        btnDescartar.innerText = "DESCARTAR LOTE";
+                        btnDescartar.style.opacity = "1";
+                    }
+                } catch (error) {
+                    console.error("Erro de comunicação ao descartar:", error);
+                    alert("Falha de conexão. Verifique sua internet e tente novamente.");
+                    btnDescartar.disabled = false;
+                    btnDescartar.innerText = "DESCARTAR LOTE";
+                    btnDescartar.style.opacity = "1";
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

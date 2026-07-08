@@ -1,0 +1,248 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/base_mobile.html
+  DATA DE CRIAÇÃO: 20/06/2026
+  TÍTULO: Template Base e Design System (Mobile)
+  FUNÇÃO: Serve como o esqueleto principal para o fluxo de usuários em smartphones.
+  Contém meta tags exclusivas de viewport para bloquear zoom acidental, adapta o 
+  stepper de navegação e os touch-targets (botões/modais) para telas menores.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 20/06/2026: Criação e estruturação inicial do template mestre mobile otimizado.
+  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
+  - 08/07/2026: Reestruturação do cabeçalho. Logotipo e botão "VER LOTE" 
+    alinhados na mesma linha (flexbox space-between). Aumento do tamanho do logo 
+    (130px) e redução do espaço em branco inferior.
+  ==============================================================================
+#}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* SISTEMA DE DESIGN GLOBAL */
+        :root {
+            --bg-fundo: #1e1e1e;
+            --card-bg: #262626;
+            --cor-destaque: #00ff00;
+            --texto-br: #ffffff;
+            --texto-dim: #a0a0a0;
+            --borda-fina: 1px solid #333;
+        }
+
+        * { box-sizing: border-box; }
+        body { background-color: var(--bg-fundo); color: var(--texto-br); margin: 0; font-family: 'Roboto', sans-serif; }
+        
+        /* NOVO: CABEÇALHO GLOBAL ALINHADO - MOBILE */
+        .header-global-mobile {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px; /* Espaço morto reduzido */
+            padding: 0;
+        }
+
+        .logo-header { 
+            max-width: 130px; /* Aumentado de 100px para 130px */
+            display: block; 
+            border-radius: 8px; 
+            margin: 0; /* Margem interna zerada para o flexbox controlar */
+        }
+        
+        .header-carrinho-area {
+            display: flex;
+        }
+
+        /* COMPONENTES PADRÃO - MOBILE OPTIMIZED */
+        .card-padrao {
+            background: var(--card-bg);
+            border: 2px solid var(--cor-destaque);
+            border-radius: 16px;
+            padding: 20px 15px;
+            width: 100%;
+            margin: 0 auto;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.15);
+        }
+
+        /* TOUCH-TARGETS MAXIMIZADOS */
+        .btn-primary {
+            background: var(--cor-destaque);
+            color: #000;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px; 
+            transition: 0.3s;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: center;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .btn-secondary:active { background: rgba(0, 255, 0, 0.1); transform: scale(0.98); }
+
+        /* ESTRUTURA DE FASES (STEPPER) - MOBILE OPTIMIZED */
+        .fases-container { display: flex; justify-content: space-between; width: 100%; margin: 15px auto 20px auto; position: relative; padding: 0; }
+        .fases-container::before { content: ""; position: absolute; top: 12px; left: 15px; right: 15px; height: 2px; background: #333; z-index: 1; }
+        .fase-item { flex: 1; display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative; }
+        .circulo-externo { width: 24px; height: 24px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 5px; }
+        .circulo-interno { width: 8px; height: 8px; background: transparent; border-radius: 50%; }
+        .fase-nome { font-family: 'Rajdhani', sans-serif; font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; line-height: 1.1; }
+        
+        .fase-item.concluida .circulo-externo { border-color: var(--cor-destaque); }
+        .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
+        .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
+
+        /* BOTÃO DE ACESSO AO CARRINHO (LOTE) */
+        .btn-carrinho-mobile {
+            background: rgba(0, 255, 0, 0.08);
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 255, 0, 0.1);
+        }
+        .btn-carrinho-mobile:active {
+            background: rgba(0, 255, 0, 0.2);
+            transform: scale(0.95);
+        }
+
+        .container { width: 100%; margin: 0 auto; padding: 0 15px; }
+
+        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS - EMPILHAMENTO MOBILE */
+        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 25px 15px; width: 92%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-icone-global { font-size: 40px; margin-bottom: 10px; line-height: 1; }
+        .modal-titulo-global { color: #ff4444; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 25px; line-height: 1.4; }
+        
+        .modal-botoes-global { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+        .modal-botoes-global button { width: 100%; padding: 15px; font-size: 15px; cursor: pointer; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        {% if fase_atual|default(0) > 0 %}
+        <div class="fases-container">
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Cadastro</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
+        </div>
+        {% endif %}
+
+        <header class="header-global-mobile">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
+            </div>
+            
+            {# Exibe o botão do carrinho apenas nas fases de 1 a 4 #}
+            {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
+            <div class="header-carrinho-area">
+                <a href="{{ url_for('resumo') }}" class="btn-carrinho-mobile">
+                    <span style="font-size: 15px;">🛒</span> VER LOTE
+                </a>
+            </div>
+            {% endif %}
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <div id="modal-confirmacao-global" class="modal-overlay-global" style="display: none;">
+        <div class="modal-box-global">
+            <div class="modal-icone-global">⚠️</div>
+            <h3 id="modal-titulo-global" class="modal-titulo-global">Atenção</h3>
+            <p id="modal-texto-global" class="modal-texto-global">Deseja realmente continuar?</p>
+            
+            <div class="modal-botoes-global">
+                <button id="modal-btn-confirmar-global" onclick="executarAcaoModal()" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                    CONFIRMAR
+                </button>
+                <button onclick="fecharModalConfirmacao()" class="btn-primary" style="background: #333; border-color: #555; color: var(--texto-br);">
+                    CANCELAR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/ux-helper.js') }}"></script>
+    
+    <script>
+        let modalConfirmacaoAcao = null;
+
+        function abrirModalConfirmacao(titulo, mensagem, textoBotao, acao) {
+            document.getElementById('modal-titulo-global').innerText = titulo;
+            document.getElementById('modal-texto-global').innerText = mensagem;
+            document.getElementById('modal-btn-confirmar-global').innerText = textoBotao;
+            
+            modalConfirmacaoAcao = acao;
+            
+            const modal = document.getElementById('modal-confirmacao-global');
+            modal.style.display = 'flex';
+        }
+
+        function fecharModalConfirmacao() {
+            document.getElementById('modal-confirmacao-global').style.display = 'none';
+            modalConfirmacaoAcao = null;
+        }
+
+        function executarAcaoModal() {
+            if (typeof modalConfirmacaoAcao === 'function') {
+                modalConfirmacaoAcao();
+            } else if (typeof modalConfirmacaoAcao === 'string') {
+                const btn = document.getElementById('modal-btn-confirmar-global');
+                btn.innerText = "PROCESSANDO...";
+                btn.style.opacity = "0.7";
+                window.location.href = modalConfirmacaoAcao;
+            }
+            fecharModalConfirmacao();
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

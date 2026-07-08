@@ -1,145 +1,205 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: resultado.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Exibição de Oferta e Revisão de Perícia
+  FUNÇÃO: Apresenta o resultado da avaliação técnica de um produto individual. 
+  Exibe o valor da oferta gerada (ou o aviso de avaliação sob consulta para itens 
+  personalizados) e uma galeria de revisão com fotos e comentários enviados pelo usuário. 
+  Inclui funcionalidade para descartar a avaliação atual do item.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Integração com Modal Global e correção da navegação pós-descarte.
+  - 02/06/2026: Remoção do aviso de bônus regional e do valor riscado (Precificação oculta).
+  - 19/06/2026: Inclusão da mensagem de reavaliação dinâmica (com a categoria correspondente).
+  - 19/06/2026: Remoção da exibição do estado de conservação (badge) na tela de resultado a pedido do usuário.
+  - 19/06/2026: Atualização dos rótulos (labels) dos botões de ação final para maior clareza na UX.
+  - 19/06/2026: Inclusão de alerta sobre jogos digitais e cotação por média exclusivo para a categoria de Jogos.
+  - 19/06/2026: Ajuste de UX pós-descarte individual: Ocultação dos botões de fluxo e exibição de um botão único "VOLTAR" para a seleção de produtos.
+  - 22/06/2026: Ajuste de layout do cabeçalho (ícone alinhado à esquerda do título), formatação de moeda em BRL (vírgula) e destaque laranja no aviso de reavaliação.
+  - 22/06/2026: Ajuste na mensagem de reavaliação (destaque laranja e aumento de fonte aplicados a todo o texto) e aplicação do filtro moeda_real.
+  - 23/06/2026: Remoção do botão de "Inserir mais itens", readequação do texto do botão 
+    principal para "QUERO VENDER ESTE ITEM" e ocultação condicional da caixa de revisão 
+    (Paridade com versão Mobile).
+  - 23/06/2026: Inversão da posição dos botões de ação final (Avançar à direita).
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
-{% block title %}Sua Oferta - MyGames{% endblock %}
+{% block title %}Sua Oferta{% endblock %}
 
 {% block content %}
-<div class="container-resultado">
-    <div class="card-oferta">
-        <header class="oferta-header">
-            <span class="pix-badge">PAGAMENTO VIA PIX</span>
-            <div class="produto-nome-display">{{ cotacao.produto }}</div>
-        </header>
+<div class="container-resultado" style="display: flex; justify-content: center; align-items: center; padding: 20px; min-height: 70vh;">
+    
+    <div class="card-padrao" style="text-align: center;">
         
-        <div class="valor-container">
-            <span class="simbolo-monetario">R$</span>
-            <span class="valor-pix">{{ "%.2f"|format(cotacao.valor_final) }}</span>
-        </div>
-        
-        <div class="info-estado">
-            Estado avaliado: <strong>{{ cotacao.estado }}</strong>
-        </div>
+        <div id="dados-avaliacao-container">
+            <header class="oferta-header">
+                <div class="produto-thumb-wrapper">
+                    <img src="{{ cotacao.foto_url or 'https://via.placeholder.com/150' }}" alt="{{ cotacao.produto }}" class="produto-mini-foto">
+                </div>
+                <div class="produto-nome-display">{{ cotacao.produto }}</div>
+            </header>
 
-        <!-- PONTUAL: Inclusão de campos de Agendamento dentro do formulário -->
-        <div class="acoes-finais">
-            <form action="{{ url_for('finalizar') }}" method="POST" style="text-align: left;">
-                
-                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #333;">
-                    <label style="color: #bbb; font-size: 0.8rem; display: block; margin-bottom: 10px; text-transform: uppercase;">Agende sua entrega/coleta:</label>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <input type="date" name="data_entrega" required 
-                               style="flex: 2; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
-                        
-                        <select name="periodo_entrega" required 
-                                style="flex: 1; background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px;">
-                            <option value="Manhã">Manhã</option>
-                            <option value="Tarde">Tarde</option>
-                        </select>
+            {% if categoria_nome in ['Jogo', 'Jogos'] %}
+            <div class="alerta-jogos-digital" style="margin: 15px auto 5px auto; padding: 12px; background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.5); border-radius: 8px; max-width: 90%;">
+                <p style="color: #ffaa00; font-size: 13px; margin: 0; line-height: 1.4;">
+                    Não compramos jogos de mídia digital, estes jogos não foram considerados na cotação. Cotação de Jogos pela média, porém jogos especiais poderão melhorar a sua cotação na perícia técnica.
+                </p>
+            </div>
+            {% endif %}
+            
+            {% if session.get('is_outros') %}
+            <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin: 15px 0; text-align: left;">
+                <h3 style="color: var(--cor-destaque); margin-top: 0; font-size: 15px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">ℹ️ Avaliação Sob Consulta</h3>
+                <p style="color: var(--texto-br); font-size: 13px; margin-bottom: 5px;">Este item será avaliado manualmente por nossa equipe técnica.</p>
+                <p style="color: var(--texto-dim); font-size: 12px; margin: 0;">Entraremos em contato em até <strong>24 horas úteis</strong> através do WhatsApp ou E-mail informados no seu cadastro para concluir a oferta.</p>
+            </div>
+            {% else %}
+            
+            <div class="valor-container">
+                <span class="simbolo-monetario">R$</span>
+                <span class="valor-pix">{{ cotacao.valor_final | moeda_real }}</span>
+            </div>
+            
+            {% endif %}
+            
+            <div class="info-estado">
+                <p class="texto-enfase-discreta">
+                    O valor informado se refere para {{ categoria_nome }} em Perfeito Estado de Funcionamento e Sem Itens Faltantes. Seu item será reavaliado na perícia técnica.
+                </p>
+            </div>
+
+            {% if (session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]') or session['item_atual']['comentarios'] %}
+            <div class="revisao-pericia">
+                {% if session['item_atual']['fotos_json'] and session['item_atual']['fotos_json'] != '[]' %}
+                <div class="galeria-revisao">
+                    <p class="label-mini">Fotos enviadas:</p>
+                    <div class="fotos-grid">
+                        {% for foto in session['item_atual']['fotos_json']|from_json %}
+                        <img src="{{ url_for('static', filename='uploads/pericia/' + foto) }}" class="thumb-revisao">
+                        {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
-                <!-- Campos invisíveis mantidos -->
-                <input type="hidden" name="produto_nome" value="{{ cotacao.produto }}">
-                <input type="hidden" name="valor_final" value="{{ cotacao.valor_final }}">
-                
-                <button type="submit" class="btn-whatsapp-glow" style="width: 100%; border: none; cursor: pointer;">
-                    ACEITAR E AGENDAR ENTREGA
-                </button>
-            </form>
-            
-            <a href="/busca" class="btn-refazer">Avaliar outro produto</a>
+                {% if session['item_atual']['comentarios'] %}
+                <div class="obs-revisao">
+                    <p class="label-mini">Suas observações:</p>
+                    <p class="texto-comentario">"{{ session['item_atual']['comentarios'] }}"</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
 
-        <footer class="oferta-footer">
-            <p>* Valor sujeito a conferência física dos itens.</p>
-            <p>Pagamento realizado imediatamente após a perícia.</p>
-        </footer>
+        <div id="feedback-descarte" class="msg-feedback-descarte" style="display: none;">
+            <div class="icone-lixeira">🗑️</div>
+            <h3>Avaliação descartada com sucesso!</h3>
+            <p>Este item foi ejetado e não fará parte do lote.</p>
+        </div>
+
+        <div class="acoes-finais" style="margin-top: 15px;">
+            <div id="grupo-botoes-originais" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                
+                <button id="btn-descarte-acao" onclick="abrirModalConfirmacao('Descartar Avaliação', 'Deseja realmente descartar a avaliação deste produto?', 'SIM, DESCARTAR', executarDescarteIndividualAjax)" class="btn-secondary" style="border-color: #ff4444; color: #ff4444; padding: 12px 20px; font-size: 14px; min-width: 250px;">
+                    NÃO QUERO VENDER ESTE ITEM
+                </button>
+
+                <a href="{{ url_for('resumo') }}" class="btn-primary" style="padding: 12px 20px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; min-width: 250px;">
+                    QUERO VENDER ESTE ITEM
+                </a>
+
+            </div>
+
+            <div id="grupo-botao-voltar-descarte" style="display: none; justify-content: center; width: 100%;">
+                <a href="{{ url_for('produto') }}" class="btn-primary" style="padding: 15px 40px; font-size: 15px; text-align: center; width: 100%; max-width: 300px;">
+                    VOLTAR
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 
+<script>
+    function executarDescarteIndividualAjax() {
+        fetch('/descartar-atual')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'sucesso') {
+                    // Esconde os dados da avaliação e o grupo de botões
+                    document.getElementById('dados-avaliacao-container').style.display = 'none';
+                    document.getElementById('grupo-botoes-originais').style.display = 'none'; 
+                    
+                    // Exibe a mensagem de sucesso e o botão único de voltar
+                    document.getElementById('feedback-descarte').style.display = 'block';
+                    document.getElementById('grupo-botao-voltar-descarte').style.display = 'flex';
+                }
+            })
+            .catch(err => alert("Erro ao descartar avaliação. Tente novamente."));
+    }
+</script>
+
 <style>
-    /* Estilos originais mantidos integralmente */
-    .container-resultado { 
+    /* COMPACTAÇÃO DE MARGENS E ALINHAMENTO APLICADA */
+    .oferta-header {
         display: flex; 
-        justify-content: center; 
         align-items: center; 
-        padding: 20px; 
-        min-height: 70vh; 
+        justify-content: flex-start; /* Alinha à esquerda */
+        gap: 15px; 
+        margin-bottom: 20px; 
+        text-align: left;
     }
+
+    .produto-thumb-wrapper {
+        width: 80px; height: 80px; margin: 0; /* Removido margin auto para alinhar à esquerda */
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.2); border: var(--borda-fina);
+        border-radius: 12px; padding: 5px;
+        flex-shrink: 0;
+    }
+
+    .produto-mini-foto { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+    .produto-nome-display { color: var(--texto-br); text-transform: uppercase; font-size: 17px; font-weight: bold; text-align: left; }
     
-    .card-oferta { 
-        background: #1e1e1e; 
-        border: 2px solid #00ff00; 
-        border-radius: 24px; 
-        padding: 40px; 
-        text-align: center; 
-        max-width: 500px; 
-        width: 100%; 
-        box-shadow: 0 0 40px rgba(0, 255, 0, 0.15); 
+    .valor-container { margin: 5px 0; }
+    .simbolo-monetario { color: var(--cor-destaque); font-size: 16px; vertical-align: top; font-weight: bold; margin-top: 5px; display: inline-block; }
+    .valor-pix { color: var(--cor-destaque); font-size: 34px; font-weight: bold; line-height: 1; font-family: monospace; }
+
+    .info-estado { margin-bottom: 15px; }
+    
+    .texto-enfase-discreta {
+        color: #d48806; /* Laranja suave e elegante */
+        font-weight: 500;
+        font-size: 14px;
+        font-style: normal;
+        line-height: 1.4;
+        margin: 0 auto;
+        max-width: 80%;
     }
 
-    .pix-badge { 
-        background: #00ff00; 
-        color: #000; 
-        padding: 6px 16px; 
-        border-radius: 50px; 
-        font-weight: bold; 
-        font-size: 12px; 
-        letter-spacing: 1px;
+    .revisao-pericia { 
+        background: rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; 
+        margin-bottom: 15px; text-align: left; border: var(--borda-fina);
+    }
+    .label-mini { color: var(--texto-dim); font-size: 11px; text-transform: uppercase; margin-bottom: 6px; }
+    .fotos-grid { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+    .thumb-revisao { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: var(--borda-fina); }
+    
+    .texto-comentario { 
+        color: var(--texto-dim); font-size: 12px; font-style: italic; margin: 0;
+        word-wrap: break-word; white-space: pre-wrap; overflow-wrap: break-word;
     }
 
-    .produto-nome-display { 
-        margin-top: 20px; 
-        color: #bbb; 
-        text-transform: uppercase; 
-        font-size: 16px; 
-        letter-spacing: 1px; 
+    .msg-feedback-descarte {
+        padding: 20px 15px; margin-bottom: 15px;
+        border: 1px dashed #ff4444; border-radius: 12px;
+        background: rgba(255, 68, 68, 0.02);
     }
-
-    .valor-container { margin: 30px 0; }
-    .simbolo-monetario { color: #00ff00; font-size: 24px; vertical-align: top; margin-right: 5px; font-weight: bold; }
-    .valor-pix { color: #00ff00; font-size: 72px; font-weight: bold; line-height: 1; }
-
-    .info-estado { color: #fff; margin-bottom: 30px; font-size: 18px; }
-    .info-estado strong { color: #00ff00; }
-
-    .btn-whatsapp-glow { 
-        display: block; 
-        background: #ffffff; 
-        color: #000; 
-        text-decoration: none; 
-        padding: 20px; 
-        border-radius: 12px; 
-        font-weight: bold; 
-        font-size: 18px; 
-        transition: 0.3s; 
-        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
-        font-family: 'Rajdhani', sans-serif;
-    }
-
-    .btn-whatsapp-glow:hover { 
-        background: #00ff00; 
-        transform: translateY(-3px); 
-        box-shadow: 0 10px 20px rgba(0, 255, 0, 0.2);
-    }
-
-    .btn-refazer { 
-        display: block; 
-        margin-top: 25px; 
-        color: #555; 
-        text-decoration: none; 
-        font-size: 14px; 
-        transition: 0.2s;
-    }
-    .btn-refazer:hover { color: #888; }
-
-    .oferta-footer { 
-        border-top: 1px solid #333; 
-        margin-top: 40px; 
-        padding-top: 20px; 
-        color: #666; 
-        font-size: 13px; 
-        line-height: 1.6;
-    }
+    .icone-lixeira { font-size: 32px; margin-bottom: 8px; }
+    .msg-feedback-descarte h3 { color: #ff4444; margin: 0 0 6px 0; font-size: 15px; text-transform: uppercase; }
+    .msg-feedback-descarte p { color: var(--texto-dim); margin: 0; font-size: 12px; }
 </style>
 {% endblock %}

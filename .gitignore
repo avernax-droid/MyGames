@@ -2,13 +2,23 @@ __pycache__/
 env/
 venv/
 .env
+.env.*
 *.pyc
 .vscode/
+.idea/ # <- se um dia usar PyCharm
+
+# Pasta de utilitários e scripts (Não enviar para o GitHub)
+scripts/
+DOCS/
 
 # Arquivos de dados e scripts de carga
-Troca Game Avaliação - Geral.xlsx
-base
-popula_catalogo.py
+*.xlsx
+*.csv
+*.txt
+*.sql
 
-# Documentação de estrutura
-estrutura.txt
+# Arquivos temporários e uploads locais
+*:Zone.Identifier
+static/uploads/
+flask_session/
+instance/ # <- Flask cria essa pasta se usar sqlite em app.instance_path

@@ -1,117 +1,403 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: pericia.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Avaliação Técnica e Conservação do Produto
+  FUNÇÃO: Tela responsável por coletar informações detalhadas sobre o estado de 
+  conservação do item selecionado.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 02/06/2026: Ajuste de layout dos botões de ação e bloqueios de quantidade.
+  - 19/06/2026: Inclusão de validação no Front-end e condicionais Jinja2.
+  - 22/06/2026: Refatoração da UI de Upload (Desktop). Remoção de textos inúteis, 
+                botão PC abrindo o explorador diretamente e criação de galeria unificada.
+  - 22/06/2026: Correção de UX: Ocultar QR Code ao clicar em Upload do PC.
+  - 22/06/2026: Correção de roteamento de imagens no preview do handoff mobile para utilizar caminho com token antes da submissão.
+  - 22/06/2026: Melhoria de UX: Ocultar área do QR Code automaticamente após receber as fotos via celular.
+  - 04/07/2026: Implementação do objeto DataTransfer para acúmulo e retenção de múltiplos uploads sucessivos locais via Desktop.
+  - 04/07/2026: Inclusão da regra de exceção para consoles desbloqueados via flag 'permite_desbloqueio'.
+  ==============================================================================
+#}
 {% extends 'base.html' %}
 
 {% block title %}Avaliação Técnica - MyGames{% endblock %}
 
 {% block content %}
-<div class="container-pericia">
-    <header class="pericia-header">
-        <h2>Estado de Conservação</h2>
-        <p class="instrucao">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+<div class="card-padrao">
+    <header style="text-align: center; margin-bottom: 35px;">
+        <h2 style="color: var(--cor-destaque); font-size: 28px; margin-bottom: 10px;">Estado de Conservação</h2>
+        
+        <div class="produto-contexto-topo" style="margin-bottom: 15px; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <span class="badge-categoria" style="text-transform: uppercase; font-weight: bold; color: #fff; background-color: #333; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; border: 1px solid #555;">
+                {{ categoria_nome }}
+            </span>
+            <span class="nome-produto" style="color: var(--texto-br); font-weight: 500;">
+                {{ produto_nome }}
+            </span>
+        </div>
+        
+        {% if categoria_id|string == '4' %}
+            <p style="color: var(--texto-dim); font-size: 15px;">Você deve informar apenas a quantidade de jogos que possui em mídia física e mídia digital. Incluir fotos ou o nome dos jogos nos comentários é opcional, mas pode melhorar sua avaliação na perícia técnica.</p>
+        {% else %}
+            <p style="color: var(--texto-dim); font-size: 15px;">Seja sincero na avaliação para garantir o pagamento imediato na perícia física.</p>
+        {% endif %}
     </header>
 
-    <form action="/cotar" method="POST" class="form-pericia">
-        <!-- Listagem dinâmica das opções vindas do motor de cálculo (engine.py) -->
+    <form id="form-pericia" action="/cotar" method="POST" enctype="multipart/form-data">
+        
+        {% if session.get('is_outros') %}
+        <div style="border: 1px dashed var(--cor-destaque); background: rgba(0, 255, 0, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+            <p style="color: var(--cor-destaque); margin: 0; font-weight: bold; font-size: 14px;">ℹ️ AVALIAÇÃO PERSONALIZADA</p>
+            <p style="color: var(--texto-dim); font-size: 12px; margin: 5px 0 0 0;">
+                Preencha os dados abaixo com o máximo de detalhes possível para nossa equipe formular a sua oferta.
+            </p>
+        </div>
+        {% endif %}
+
         <div class="opcoes-wrapper">
-            {% for opcao in opcoes %}
-            <label class="radio-label">
-                <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
-                <div class="opcao-card">
-                    <div class="check-indicator"></div>
-                    <div class="opcao-info">
-                        <strong>{{ opcao.descricao }}</strong>
+            <p class="label-secao">Selecione o estado do item:</p>
+            {% if opcoes %}
+                {% for opcao in opcoes %}
+                <label class="radio-label">
+                    <input type="radio" name="estado_id" value="{{ opcao.id }}" required>
+                    <div class="opcao-card">
+                        <div class="check-indicator"></div>
+                        <div class="opcao-info">
+                            <strong>{{ opcao.descricao }}</strong>
+                        </div>
                     </div>
+                </label>
+                {% endfor %}
+            {% else %}
+                <div class="alert-error">
+                    <p>Nenhuma opção de estado encontrada no sistema.</p>
+                    <small>Verifique se as tabelas de categorias e opções estão populadas corretamente.</small>
                 </div>
-            </label>
-            {% endfor %}
+            {% endif %}
         </div>
 
-        <button type="submit" class="btn-cotar-glow">CALCULAR OFERTA FINAL</button>
-    </form>
+        {% if categoria_id %}
+        <div class="pergunta-extra-wrapper" style="margin-bottom: 30px;">
+            
+            {% if categoria_id|string == '1' %}
+                <p class="label-secao">Produto é original e bloqueado?</p>
+                <div class="radio-group-inline">
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Não, o produto foi desbloqueado." required> Não, o produto foi desbloqueado.</label>
+                </div>
+                
+            {% elif categoria_id|string == '2' %}
+                <p class="label-secao">O Controle é original?</p>
+                <div class="radio-group-inline">
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Não, é controle pirata." required> Não, é controle pirata.</label>
+                </div>
+                
+            {% elif categoria_id|string == '4' %}
+                <p class="label-secao">Os jogos são mídia física (CD) ou digital (na Net)?</p>
+                <div class="inputs-qtd-group">
+                    <label>
+                        <span>QTD Jogos Mídia Física:</span>
+                        <input type="number" name="qtd_fisica" min="1" value="0" class="input-qtd" required 
+                               oninvalid="this.setCustomValidity('Por favor, informe a quantidade de jogos físicos (mínimo 1).')" 
+                               oninput="this.setCustomValidity('')">
+                    </label>
+                    <label>
+                        <span>QTD Jogos Mídia Digital:</span>
+                        <input type="number" name="qtd_digital" min="0" value="0" class="input-qtd">
+                    </label>
+                </div>
+                
+            {% elif categoria_id|string == '3' %}
+                <p class="label-secao">O Acessório é original?</p>
+                <div class="radio-group-inline">
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Sim" required> Sim</label>
+                    <label class="radio-inline"><input type="radio" name="pergunta_extra" value="Não, o acessório é pirata." required> Não, o acessório é pirata.</label>
+                </div>
+            {% endif %}
+            
+        </div>
+        {% endif %}
 
-    <a href="/busca" class="btn-voltar">← Voltar para seleção de produto</a>
+        <div class="upload-section">
+            <p class="label-secao">Fotos do Produto (Opcional):</p>
+            
+            <div class="upload-actions">
+                <button type="button" class="btn-acao-upload" id="btn-upload-pc">💻 Upload do Computador</button>
+                <button type="button" class="btn-acao-upload" id="btn-qr-code">📸 Usar Câmera do Celular</button>
+            </div>
+
+            <input type="file" name="fotos" id="file-input" class="file-input" accept="image/*" multiple style="display: none;">
+
+            <div class="qr-code-area" id="area-upload-celular" style="display: none;">
+                <p class="qr-code-instrucao">Escaneie o código com seu celular para tirar as fotos. Elas aparecerão na galeria abaixo.</p>
+                <div id="qrcode" class="qrcode-display"></div>
+                <input type="hidden" name="token_sessao" id="token_sessao" value="{{ token_sessao }}">
+            </div>
+
+            <div class="galeria-preview" id="galeria-fotos">
+                <p class="galeria-vazia-msg" id="msg-vazia">Nenhuma foto adicionada ainda.</p>
+            </div>
+
+            <p class="file-hint">Envie fotos nítidas da frente, verso e selos de garantia.</p>
+        </div>
+
+        <div class="obs-section">
+            <p class="label-secao">Observações Adicionais:</p>
+            <textarea name="comentarios" id="campo-comentarios" class="text-obs" placeholder="Ex: Acompanha caixa original, detalhe no analógico, etc."></textarea>
+        </div>
+
+        <div class="botoes-acao" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+            <a href="/produto" class="btn-secondary">VOLTAR</a>
+            <button type="submit" class="btn-primary">AVALIAR</button>
+        </div>
+
+    </form>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const radiosOpcoes = document.querySelectorAll('input[name="estado_id"]');
+        const campoComentarios = document.getElementById('campo-comentarios');
+        const formPericia = document.getElementById('form-pericia');
+        const categoriaIdStr = "{{ categoria_id|string }}";
+        const permiteDesbloqueio = {{ 'true' if permite_desbloqueio else 'false' }};
+
+        // Lógica de obrigatoriedade de comentários
+
+        // Lógica de obrigatoriedade de comentários
+        radiosOpcoes.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const textoOpcao = this.nextElementSibling.innerText.toLowerCase();
+                
+                if (textoOpcao.includes('especifique nos comentários')) {
+                    campoComentarios.setAttribute('required', 'required');
+                    campoComentarios.placeholder = "OBRIGATÓRIO: Por favor, especifique os detalhes aqui...";
+                    campoComentarios.style.borderColor = "#ffaa00"; 
+                } else {
+                    campoComentarios.removeAttribute('required');
+                    campoComentarios.placeholder = "Ex: Acompanha caixa original, detalhe no analógico, etc.";
+                    campoComentarios.style.borderColor = "#333";
+                }
+            });
+        });
+
+        // VALIDAÇÃO DE REGRAS DE NEGÓCIO ANTES DO ENVIO
+        formPericia.addEventListener('submit', function(e) {
+            const estadoSelecionado = document.querySelector('input[name="estado_id"]:checked');
+            const perguntaExtraSelecionada = document.querySelector('input[name="pergunta_extra"]:checked');
+            
+            let textoEstado = estadoSelecionado ? estadoSelecionado.nextElementSibling.innerText.trim().toLowerCase() : "";
+            let textoExtra = perguntaExtraSelecionada ? perguntaExtraSelecionada.value.toLowerCase() : "";
+            let mensagemBloqueio = "";
+
+            if (categoriaIdStr === '1') { 
+                if (textoEstado.includes('não funciona')) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra de consoles que não funcionam.";
+                } else if (textoExtra.includes('desbloqueado') && !permiteDesbloqueio) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra deste modelo específico de console desbloqueado.";
+                }
+            } else if (categoriaIdStr === '2') {
+                if (textoExtra.includes('pirata')) {
+                    mensagemBloqueio = "Só realizamos a compra de controles originais.";
+                }
+            } else if (categoriaIdStr === '4') { 
+                if (textoEstado.includes('não funciona')) {
+                    mensagemBloqueio = "Infelizmente, não realizamos a compra de jogos que não funcionam.";
+                }
+            } else if (categoriaIdStr === '3') { 
+                if (textoExtra.includes('pirata')) {
+                    mensagemBloqueio = "Só realizamos a compra de acessórios originais.";
+                }
+            }
+
+            if (mensagemBloqueio !== "") {
+                e.preventDefault(); 
+                
+                if (typeof abrirModalConfirmacao === 'function') {
+                    abrirModalConfirmacao(
+                        "Avaliação Recusada", 
+                        mensagemBloqueio, 
+                        "ENTENDI", 
+                        function() { fecharModalConfirmacao(); }
+                    );
+                } else {
+                    alert(mensagemBloqueio); 
+                }
+            }
+        });
+
+        // -------------------------------------------------------------------------
+        // LÓGICA DE UPLOAD VISUAL E GALERIA
+        // -------------------------------------------------------------------------
+        const btnUploadPc = document.getElementById('btn-upload-pc');
+        const btnQrCode = document.getElementById('btn-qr-code');
+        const fileInput = document.getElementById('file-input');
+        const areaCelular = document.getElementById('area-upload-celular');
+        const galeriaFotos = document.getElementById('galeria-fotos');
+        const msgVazia = document.getElementById('msg-vazia');
+        const token = document.getElementById("token_sessao").value;
+        
+        let pollingInterval;
+
+        // NOVO: Objeto DataTransfer para acumular as fotos selecionadas sucessivamente
+        const acumuladorArquivos = new DataTransfer();
+
+        // Ação: Abrir Explorador de Arquivos (PC)
+        btnUploadPc.addEventListener('click', () => {
+            // Oculta a área do QR Code se estiver aberta e reseta o estilo do botão
+            areaCelular.style.display = 'none';
+            btnQrCode.style.borderColor = '#333';
+            btnQrCode.style.color = 'var(--texto-br)';
+            clearInterval(pollingInterval);
+
+            // Aciona o input de arquivo
+            fileInput.click();
+        });
+
+        // Renderização de miniaturas e ACÚMULO DE ARQUIVOS NO INPUT
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                msgVazia.style.display = 'none';
+                
+                // Itera sobre as NOVAS fotos selecionadas no explorador do Windows
+                Array.from(this.files).forEach(file => {
+                    // 1. Adiciona o arquivo no nosso acumulador contínuo
+                    acumuladorArquivos.items.add(file);
+                    
+                    // 2. Renderiza a miniatura na tela
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'thumb-galeria';
+                        galeriaFotos.appendChild(img);
+                    }
+                    reader.readAsDataURL(file);
+                });
+                
+                // 3. Substitui os arquivos do input original pela nossa lista acumulada
+                // Isso garante que no POST (submit), todas as fotos viajem para o servidor
+                this.files = acumuladorArquivos.files;
+            }
+        });
+
+        // Ação: Alternar visibilidade do QR Code
+        btnQrCode.addEventListener('click', () => {
+            if (areaCelular.style.display === 'none') {
+                areaCelular.style.display = 'block';
+                btnQrCode.style.borderColor = 'var(--cor-destaque)';
+                btnQrCode.style.color = 'var(--cor-destaque)';
+                
+                const qrContainer = document.getElementById("qrcode");
+                
+                if (qrContainer.innerHTML === "") {
+                    const urlBase = window.location.origin; 
+                    const urlMobile = `${urlBase}/upload-remoto/${token}`;
+                    
+                    new QRCode(qrContainer, {
+                        text: urlMobile,
+                        width: 160,
+                        height: 160,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff"
+                    });
+                }
+
+                clearInterval(pollingInterval);
+                
+                // Inicia o polling aguardando as fotos do celular
+                pollingInterval = setInterval(() => {
+                    fetch(`/api/status-upload/${token}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'concluido') {
+                                clearInterval(pollingInterval);
+                                
+                                // Oculta a área do QR Code inteira
+                                areaCelular.style.display = 'none';
+                                
+                                // Reseta o visual do botão "Usar Câmera do Celular"
+                                btnQrCode.style.borderColor = '#333';
+                                btnQrCode.style.color = 'var(--texto-br)';
+                                
+                                msgVazia.style.display = 'none';
+                                
+                                if (data.fotos && data.fotos.length > 0) {
+                                    data.fotos.forEach(fotoUrl => {
+                                        const img = document.createElement('img');
+                                        img.src = fotoUrl; 
+                                        img.className = 'thumb-galeria';
+                                        galeriaFotos.appendChild(img);
+                                    });
+                                } else {
+                                    const successText = document.createElement('p');
+                                    successText.style.color = 'var(--cor-destaque)';
+                                    successText.style.fontWeight = 'bold';
+                                    successText.innerText = "✅ Fotos recebidas via celular!";
+                                    galeriaFotos.appendChild(successText);
+                                }
+                            }
+                        })
+                        .catch(err => console.error("Erro na checagem:", err));
+                }, 3000);
+
+            } else {
+                areaCelular.style.display = 'none';
+                btnQrCode.style.borderColor = '#333';
+                btnQrCode.style.color = 'var(--texto-br)';
+                clearInterval(pollingInterval);
+            }
+        });
+    });
+</script>
+
 <style>
-    .container-pericia { max-width: 650px; margin: auto; padding: 20px; }
-    .pericia-header { text-align: center; margin-bottom: 35px; }
-    .pericia-header h2 { color: #00ff00; font-size: 28px; margin-bottom: 10px; }
-    .instrucao { color: #888; font-size: 15px; }
-
-    .opcoes-wrapper { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
-    
-    /* Esconde o rádio padrão */
+    .label-secao { color: var(--texto-dim); font-size: 14px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .opcoes-wrapper { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+    .alert-error { color: #ff4444; text-align: center; padding: 20px; border: 1px dashed #ff4444; border-radius: 12px; background: rgba(255, 68, 68, 0.05); }
     .radio-label input[type="radio"] { display: none; }
-
-    /* Card da opção */
-    .opcao-card {
-        display: flex;
-        align-items: center;
-        background: #1e1e1e;
-        border: 2px solid #333;
-        border-radius: 12px;
-        padding: 20px;
-        cursor: pointer;
-        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
+    .opcao-card { display: flex; align-items: center; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px 20px; cursor: pointer; transition: 0.3s; }
     .opcao-card:hover { border-color: #555; background: #252525; }
+    .check-indicator { width: 20px; height: 20px; border: 2px solid #555; border-radius: 50%; margin-right: 20px; position: relative; transition: 0.3s; }
+    .radio-label input[type="radio"]:checked + .opcao-card { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); }
+    .radio-label input[type="radio"]:checked + .opcao-card .check-indicator { border-color: var(--cor-destaque); background: var(--cor-destaque); box-shadow: 0 0 10px var(--cor-destaque); }
+    .pergunta-extra-wrapper { background: #151515; padding: 20px; border-radius: 12px; border: var(--borda-fina); }
+    .radio-group-inline { display: flex; flex-direction: column; gap: 15px; }
+    .radio-inline { display: flex; align-items: center; gap: 10px; color: var(--texto-br); cursor: pointer; font-size: 15px; }
+    .radio-inline input[type="radio"] { accent-color: var(--cor-destaque); width: 18px; height: 18px; cursor: pointer; }
+    .inputs-qtd-group { display: flex; flex-direction: column; gap: 15px; }
+    .inputs-qtd-group label { display: flex; justify-content: space-between; align-items: center; color: #ddd; font-size: 15px; }
+    .input-qtd { width: 80px; padding: 10px; background: var(--bg-fundo); border: 1px solid #555; border-radius: 8px; color: var(--texto-br); font-size: 16px; text-align: center; outline: none; transition: 0.3s; }
+    .input-qtd:focus { border-color: var(--cor-destaque); box-shadow: 0 0 10px rgba(0,255,0,0.1); }
+    
+    /* Upload Section - UI Refatorada */
+    .upload-section { margin-bottom: 30px; }
+    .upload-actions { display: flex; gap: 10px; margin-bottom: 15px; }
+    
+    .btn-acao-upload { flex: 1; padding: 14px; background: #252525; border: 2px solid #333; color: var(--texto-br); border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: bold; font-size: 14px; }
+    .btn-acao-upload:hover { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); }
+    
+    .qr-code-area { text-align: center; padding: 20px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; margin-bottom: 15px; }
+    .qr-code-instrucao { color: var(--texto-dim); margin-bottom: 15px; font-size: 14px; }
+    .qrcode-display { display: inline-block; padding: 15px; background: white; border-radius: 8px; }
+    
+    .galeria-preview { display: flex; flex-wrap: wrap; gap: 10px; min-height: 120px; padding: 15px; background: #1a1a1a; border: 2px dashed #444; border-radius: 12px; align-items: center; justify-content: center; }
+    .galeria-vazia-msg { color: #666; font-size: 14px; margin: 0; font-style: italic; }
+    .thumb-galeria { width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid var(--cor-destaque); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
-    /* Indicador circular de seleção */
-    .check-indicator {
-        width: 22px;
-        height: 22px;
-        border: 2px solid #555;
-        border-radius: 50%;
-        margin-right: 20px;
-        position: relative;
-        transition: 0.3s;
-    }
-
-    /* Estado selecionado */
-    .radio-label input[type="radio"]:checked + .opcao-card {
-        border-color: #00ff00;
-        background: rgba(0, 255, 0, 0.05);
-    }
-
-    .radio-label input[type="radio"]:checked + .opcao-card .check-indicator {
-        border-color: #00ff00;
-        background: #00ff00;
-        box-shadow: 0 0 10px #00ff00;
-    }
-
-    .opcao-info strong { font-size: 17px; color: #fff; }
-
-    /* Botão de ação */
-    .btn-cotar-glow {
-        width: 100%;
-        background: #00ff00;
-        color: #000;
-        border: none;
-        padding: 20px;
-        font-size: 18px;
-        font-weight: bold;
-        border-radius: 12px;
-        cursor: pointer;
-        transition: 0.3s;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    .btn-cotar-glow:hover {
-        background: #00cc00;
-        box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-        transform: translateY(-2px);
-    }
-
-    .btn-voltar {
-        display: block;
-        text-align: center;
-        margin-top: 25px;
-        color: #666;
-        text-decoration: none;
-        font-size: 14px;
-        transition: 0.2s;
-    }
-    .btn-voltar:hover { color: #888; }
+    .file-hint { color: #555; font-size: 12px; margin-top: 10px; text-align: center; }
+    
+    .obs-section { margin-bottom: 30px; }
+    .text-obs { width: 100%; height: 100px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 15px; color: var(--texto-br); font-family: inherit; resize: none; transition: 0.3s; }
+    .text-obs:focus { border-color: var(--cor-destaque); outline: none; background: #252525; }
+    
+    .btn-secondary { background: transparent; border: 2px solid #555; color: var(--texto-br); padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; text-align: center; cursor: pointer; transition: 0.3s; }
+    .btn-secondary:hover { border-color: #888; background: #252525; color: #fff; }
+    .btn-primary { padding: 12px 24px; cursor: pointer; border: none; font-weight: bold; border-radius: 8px; transition: 0.3s; }
 </style>
 {% endblock %}

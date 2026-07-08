@@ -1,0 +1,364 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/boas_vindas.html
+  DATA DE CRIAÇÃO: 20/06/2026
+  TÍTULO: Landing Page e Captura de Localização (Mobile)
+  FUNÇÃO: Ponto de entrada do sistema MyGames otimizado para smartphones. 
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 20/06/2026: Criação da versão mobile. 
+  - 20/06/2026: Ajuste final de layout - Centralização do título principal,
+    mantendo a responsividade e o alinhamento da lista de benefícios.
+  - 24/06/2026: Implementação do Modal de Vídeo In-Page (Iframe), adaptado 
+    para mobile. Inclusão de correção de copy (clientes satisfeitos) e 
+    tentativa de forçar modo horizontal via Screen Orientation API.
+  - 25/06/2026: Substituição da URL de incorporação do YouTube pela variável 
+    dinâmica url_video_como_funciona configurada via .env.
+  - 25/06/2026: Inserção do componente de Banner Dinâmico em vídeo (.mp4) 
+    abaixo da Hero Section, utilizando a tag nativa de HTML5 com fallback, 
+    otimizações para mobile (muted, playsinline) e roteamento para a pasta images.
+  - 25/06/2026: Reposicionamento do Banner Dinâmico para o topo (entre o logo 
+    e o título principal) e redução da margem do logo para otimização de espaço.
+  - 25/06/2026: Substituição do arquivo de vídeo do banner para tirinhas-desktop.mp4 
+    e aplicação de margem superior negativa no logo para subir todo o bloco.
+  - 26/06/2026: Ajuste na CTA do quadro de localização ("COMEÇAR -> Informe sua localização") 
+    com destaque visual e tipográfico na palavra COMEÇAR.
+  - 06/07/2026: Resolução de anomalia de intermitência mobile na busca de municípios: 
+    implementação de técnica de debounce, sanitização de entrada (.trim()) 
+    e tratamento de erros na requisição assíncrona.
+  - 06/07/2026: Correção de bug no scroll da lista de cidades em smartphones,
+    substituindo touchstart agressivo por click nativo e validação de container (.contains).
+  - 06/07/2026: Refatoração da UX inicial: Ocultação do formulário de localização e criação 
+    de botão de entrada "COMEÇAR!" com efeito luminoso, revelando o form via transição.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Bem-vindo ao MyGames{% endblock %}
+
+{% block content %}
+<style>
+    /* Otimização de espaço: Reduz as margens do logo que vem do base_mobile.html puxando para cima */
+    .logo-header { max-width: 150px !important; margin-top: -20px !important; margin-bottom: 5px !important; }
+
+    .como-funciona-section { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; margin-bottom: 25px; width: 100%; }
+    
+    .video-cta { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--texto-br); text-decoration: none; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: bold; text-transform: uppercase; padding: 14px 15px; border: 1px solid #333; border-radius: 8px; width: 100%; transition: 0.3s; }
+    .video-cta:active { border-color: var(--cor-destaque); background: rgba(0, 255, 0, 0.05); transform: scale(0.98); }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .form-group { margin-bottom: 15px; position: relative; width: 100%; }
+    input, select { width: 100%; padding: 16px 14px; background: #222; border: var(--borda-fina); color: #fff; border-radius: 8px; font-size: 16px; transition: border 0.3s; }
+    input:focus, select:focus { outline: none; border-color: var(--cor-destaque); }
+    
+    #lista-cidades { 
+        position: absolute; top: 100%; left: 0; right: 0; 
+        background: #222; border: 1px solid var(--cor-destaque); 
+        border-top: none; z-index: 1000; max-height: 250px; 
+        overflow-y: auto; display: none; border-radius: 0 0 8px 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    #lista-cidades div { padding: 16px 15px; cursor: pointer; color: #ddd; border-bottom: 1px solid #333; font-size: 16px; }
+    #lista-cidades div:active { background: var(--cor-destaque); color: #000; }
+    
+    #secao-canal-overlay { 
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+        background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; 
+    }
+    .modal-canal-box { 
+        background: var(--bg-fundo); border: 2px solid var(--cor-destaque); border-radius: 12px; 
+        padding: 25px 15px; width: 92%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    #btn-entrar { display: none; margin-top: 15px; animation: fadeIn 0.5s; width: 100%; }
+
+    /* ESTILO DO NOVO BOTÃO DE INÍCIO */
+    .btn-start-glow {
+        width: 100%;
+        background-color: #003300; /* Verde escuro para fundo */
+        color: #ffffff; /* Texto branco brilhante */
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 16px;
+        border: 2px solid #005500;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 15px rgba(0, 255, 0, 0.1);
+    }
+    .btn-start-glow:active {
+        transform: scale(0.96);
+        background-color: #004400;
+        box-shadow: 0 2px 8px rgba(0, 255, 0, 0.2);
+    }
+
+    /* MODAL DE VÍDEO IN-PAGE (MOBILE) */
+    .modal-video-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.95); display: none; justify-content: center; align-items: center; z-index: 10000;
+        animation: fadeIn 0.3s ease-out;
+    }
+    .modal-video-box {
+        position: relative; width: 95%; max-width: 500px; background: #000; 
+        border: 2px solid var(--cor-destaque); border-radius: 12px; padding: 3px;
+        box-shadow: 0 10px 40px rgba(0,255,0,0.3);
+    }
+    .btn-fechar-video {
+        position: absolute; top: -20px; right: -15px; background: var(--cor-destaque); color: #000; 
+        border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 18px; font-weight: bold; 
+        cursor: pointer; z-index: 2; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+    }
+    .btn-fechar-video:active { background: #00cc00; transform: scale(0.95); }
+    
+    .video-responsive {
+        position: relative; padding-bottom: 56.25%; /* Proporção 16:9 */ height: 0; overflow: hidden; border-radius: 8px;
+    }
+    .video-responsive iframe {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;
+    }
+</style>
+
+<div style="width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 2px solid var(--cor-destaque); box-shadow: 0 0 15px rgba(0, 255, 0, 0.2); animation: fadeIn 0.8s ease-in-out;">
+    <video autoplay loop muted playsinline style="width: 100%; display: block; object-fit: cover; pointer-events: none;">
+        <source src="{{ url_for('static', filename='img/mobile-tirinhas.mp4') }}" type="video/mp4">
+        Seu navegador não suporta a exibição de vídeos.
+    </video>
+</div>
+
+<div style="margin-top: -10px; padding-left: 0; animation: fadeIn 0.8s ease-in-out;">
+    
+    <h1 style="text-align: center; width: 100%; font-family: 'Roboto', sans-serif; font-size: clamp(14px, 4.2vw, 19px); letter-spacing: -0.5px; white-space: nowrap; font-weight: 700; color: #ffffff; margin-bottom: 25px; line-height: 1;">
+        Transforme seu game usado em <span style="color: #00ff00; text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);">DINHEIRO</span>
+    </h1>
+    
+    <div style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="font-size: 26px; color: #00ff00; width: 35px; text-align: center;">🏆</span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">30 anos de mercado</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="width: 35px; text-align: center; display: flex; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="26" height="26" fill="#00ff00">
+                    <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192 0s192 85.961 192 0s192 85.961 192 192c0 77.413-26.97 99.031-172.268 309.67-9.535 13.774-29.93 13.773-39.464 0zM192 272c44.183 0 80-35.817 80-80s-35.817-80-80-80-80 35.817-80 80 35.817 80 80 80z"/>
+                </svg>
+            </span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">5 lojas em SP e região</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+            <span style="font-size: 26px; color: #00ff00; width: 35px; text-align: center;">🤝</span>
+            <span style="color: #b3ffb3; font-size: 16px; font-weight: bold;">Milhares de clientes satisfeitos</span>
+        </div>
+
+    </div>
+</div>
+
+<div class="como-funciona-section">
+    <a href="#" onclick="abrirModalVideo(event)" class="video-cta">
+        <span style="font-size: 24px; color: #ff0000;">▶</span>
+        COMO FUNCIONA
+    </a>
+</div>
+
+<div class="card-padrao">
+    
+    <!-- BLOCO DO BOTÃO COMEÇAR (Visível inicialmente) -->
+    <div id="bloco-btn-comecar" style="text-align: center; padding: 10px 0;">
+        <button type="button" class="btn-start-glow" onclick="iniciarFluxoLocalizacao()">
+            COMEÇAR!
+        </button>
+    </div>
+
+    <!-- BLOCO DO FORMULÁRIO (Oculto inicialmente) -->
+    <div id="bloco-formulario" style="display: none; animation: fadeIn 0.4s ease-out;">
+        <p style="text-align: center; color: #ffffff; font-weight: bold; margin-bottom: 25px; font-size: 18px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px;">
+            Informe sua localização
+        </p>
+        
+        <form action="{{ url_for('definir_regiao') }}" method="POST">
+            <div class="form-group">
+                <input type="text" id="campo-cidade" name="cidade" placeholder="Digite sua cidade..." autocomplete="off" required>
+                <div id="lista-cidades"></div>
+            </div>
+            <div class="form-group">
+                <input type="text" id="campo-uf" name="estado_uf" placeholder="Estado (UF)" readonly required>
+            </div>
+
+            <div id="secao-canal-overlay">
+                <div class="modal-canal-box">
+                    <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 20px; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0;">
+                        Como você nos conheceu?
+                    </h3>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <select name="canal_aquisicao_id" id="canal_id_input" required onchange="selecionouCanal()">
+                            <option value="" disabled selected>Selecione uma opção...</option>
+                            {% for canal in canais %}
+                            <option value="{{ canal.id }}">{{ canal.nome_exibicao }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" id="btn-entrar" class="btn-primary">INICIAR COTAÇÃO</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-video-overlay" class="modal-video-overlay" onclick="fecharModalVideo(event)">
+    <div id="box-video-id" class="modal-video-box" onclick="event.stopPropagation()">
+        <button class="btn-fechar-video" onclick="fecharModalVideo(event)">✖</button>
+        <div class="video-responsive">
+            <iframe id="iframe-video" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const inputCidade = document.getElementById('campo-cidade');
+    const listaCidades = document.getElementById('lista-cidades');
+    const inputUf = document.getElementById('campo-uf');
+    const modalCanal = document.getElementById('secao-canal-overlay');
+    const btnEntrar = document.getElementById('btn-entrar');
+    const blocoBotaoComecar = document.getElementById('bloco-btn-comecar');
+    const blocoFormulario = document.getElementById('bloco-formulario');
+    
+    // Variável para controle do timer do Debounce
+    let debounceTimeout;
+
+    // Função para alternar entre o botão inicial e o formulário
+    function iniciarFluxoLocalizacao() {
+        blocoBotaoComecar.style.display = 'none';
+        blocoFormulario.style.display = 'block';
+        
+        // Foca suavemente no input da cidade após a transição
+        setTimeout(() => {
+            inputCidade.focus();
+        }, 100);
+    }
+
+    inputCidade.addEventListener('input', () => {
+        clearTimeout(debounceTimeout);
+        const termo = inputCidade.value.trim();
+        
+        if (termo.length < 3) { 
+            listaCidades.style.display = 'none'; 
+            return; 
+        }
+
+        debounceTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
+                if (!response.ok) throw new Error('Falha na resposta do servidor');
+                
+                const dados = await response.json();
+
+                listaCidades.innerHTML = '';
+                if (dados.length > 0) {
+                    dados.forEach(item => {
+                        const div = document.createElement('div');
+                        div.textContent = `${item.cidade} - ${item.uf}`;
+                        
+                        const selectCity = (e) => {
+                            e.preventDefault();
+                            inputCidade.value = item.cidade;
+                            inputUf.value = item.uf;
+                            listaCidades.style.display = 'none';
+                            modalCanal.style.display = 'flex';
+                        };
+                        
+                        // Utilizamos click nativo, permitindo que o navegador mobile diferencie scroll de tap
+                        div.addEventListener('click', selectCity);
+                        
+                        listaCidades.appendChild(div);
+                    });
+                    listaCidades.style.display = 'block';
+                } else {
+                    listaCidades.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Erro na busca de municípios:', error);
+                listaCidades.style.display = 'none';
+            }
+        }, 350);
+    });
+
+    // Só esconde a lista se o usuário clicar FORA do input e FORA da lista
+    document.addEventListener('click', (e) => {
+        if (e.target !== inputCidade && !listaCidades.contains(e.target)) {
+            listaCidades.style.display = 'none';
+        }
+    });
+    
+    document.addEventListener('touchstart', (e) => {
+        if (e.target !== inputCidade && !listaCidades.contains(e.target)) {
+            listaCidades.style.display = 'none';
+        }
+    }, {passive: true});
+
+    function selecionouCanal() {
+        const select = document.getElementById('canal_id_input');
+        if (select.value !== "") {
+            modalCanal.style.display = 'none';
+            btnEntrar.style.display = 'block';
+            
+            setTimeout(() => {
+                btnEntrar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    }
+
+    // LÓGICA DO MODAL DE VÍDEO COM ORIENTAÇÃO FORÇADA
+    function abrirModalVideo(e) {
+        if(e) e.preventDefault();
+        const modal = document.getElementById('modal-video-overlay');
+        const iframe = document.getElementById('iframe-video');
+        const overlay = document.getElementById('modal-video-overlay');
+        
+        iframe.src = "{{ url_video_como_funciona }}";
+        modal.style.display = 'flex';
+
+        if (overlay.requestFullscreen) {
+            overlay.requestFullscreen().then(() => {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(err => console.log('Orientação bloqueada pelo navegador.', err));
+                }
+            }).catch(err => console.log('Fullscreen bloqueado pelo navegador.', err));
+        } else if (overlay.webkitRequestFullscreen) {
+            overlay.webkitRequestFullscreen();
+        }
+    }
+
+    function fecharModalVideo(e) {
+        if(e) e.preventDefault();
+        const modal = document.getElementById('modal-video-overlay');
+        const iframe = document.getElementById('iframe-video');
+        
+        modal.style.display = 'none';
+        iframe.src = ""; 
+
+        if (document.fullscreenElement) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { 
+                document.webkitExitFullscreen();
+            }
+        }
+
+        if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+        }
+    }
+</script>
+{% endblock %}

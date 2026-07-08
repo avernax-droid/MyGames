@@ -1,0 +1,194 @@
+{# ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: templates/termos_oferta.html
+  DATA DE CRIAÇÃO: 02/06/2026
+  TÍTULO: Termos da Oferta e Política de Recompra
+  FUNÇÃO: Exibe as políticas da empresa após a cotação. Exige o aceite explícito 
+  (checkbox) para avançar à identificação, ou permite recusar exibindo uma área 
+  de feedback inline e descartando o lote.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 02/06/2026: Criação do arquivo conforme fluxo V2.9.
+  - 02/06/2026: Melhoria de UX com Checkboxes.
+  - 02/06/2026: Substituição do Modal de Recusa por Checkbox inline (Vermelho) com 
+                exibição condicional da caixa de texto e redirecionamento para Home.
+  - 19/06/2026: Atualização do texto da política de Devolução, Divergências e responsabilidade de frete, com quebra de linha para leitura.
+  - 22/06/2026: Destaque visual na instrução de leitura e ocultação do botão DESCARTAR até que a recusa seja explicitamente selecionada.
+  ============================================================================== #}
+
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-oferta fade-in" style="display: flex; justify-content: center; padding: 20px;">
+    <div class="card-padrao" style="max-width: 800px; width: 100%;">
+        <header style="text-align: center; margin-bottom: 25px;">
+            <h2 class="titulo-pagina">Termos da Oferta</h2>
+            <p style="color: #ffaa00; font-size: 16px; font-weight: 500;">Antes de prosseguirmos, por favor, leia nossa política de recompra.</p>
+        </header>
+
+        <div class="tabela-container" style="padding: 20px; margin-bottom: 25px; max-height: none; overflow: visible;">
+            <ul style="list-style: none; padding: 0; margin: 0; color: var(--texto-br); font-size: 14px; line-height: 1.6;">
+                <li style="margin-bottom: 15px; border-bottom: 1px solid #222; padding-bottom: 15px;">
+                    <strong style="color: var(--cor-destaque); display: block; margin-bottom: 5px;">🔍 Avaliação Física Obrigatória:</strong> 
+                    Os valores apresentados na etapa anterior são pré-avaliações. A oferta final está estritamente sujeita à aprovação em nossa avaliação técnica presencial.
+                </li>
+                <li style="margin-bottom: 15px; border-bottom: 1px solid #222; padding-bottom: 15px;">
+                    <strong style="color: #00d2ff; display: block; margin-bottom: 5px;">⏱️ Prazo de Pagamento:</strong> 
+                    Após o recebimento e aprovação técnica dos itens, o pagamento será realizado via PIX em até 48 horas úteis.
+                </li>
+                <li style="margin-bottom: 15px; border-bottom: 1px solid #222; padding-bottom: 15px;">
+                    <strong style="color: #ffaa00; display: block; margin-bottom: 5px;">❓ Itens Sob Consulta:</strong> 
+                    Caso existam itens marcados como "Sob Consulta" no seu lote, eles serão avaliados individualmente pela nossa equipe técnica.
+                </li>
+                <li>
+                    <strong style="color: #ff4444; display: block; margin-bottom: 5px;">🔄 Devolução e Divergências:</strong> 
+                    Se houver itens rejeitados ou com valores reduzidos da cotação original por falhas pela perícia técnica e você não concordar, os produtos poderão ser devolvidos ou descartados.<br><br>
+                    O envio é por nossa conta, porém o <strong>FRETE DE DEVOLUÇÃO</strong>, caso necessário, ocorre por sua conta.
+                </li>
+            </ul>
+        </div>
+
+        <form action="{{ url_for('aceitar_termos') }}" method="POST" id="form-termos">
+            
+            <div class="area-aceite" style="background: rgba(0, 255, 0, 0.05); border: 1px dashed var(--cor-destaque); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px;">
+                <input type="checkbox" id="check-aceite" style="width: 20px; height: 20px; cursor: pointer; accent-color: #28a745;">
+                <label for="check-aceite" style="color: var(--texto-br); font-weight: bold; cursor: pointer; user-select: none; flex-grow: 1;">
+                    Li e concordo com os Termos da Oferta e Política de Recompra
+                </label>
+            </div>
+
+            <div class="area-recusa" style="background: rgba(255, 0, 0, 0.05); border: 1px dashed #ff4444; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <input type="checkbox" id="check-recusa" style="width: 20px; height: 20px; cursor: pointer; accent-color: #ff4444;">
+                    <label for="check-recusa" style="color: #ff4444; font-weight: bold; cursor: pointer; user-select: none; flex-grow: 1;">
+                        Não concordo com os Termos da Oferta
+                    </label>
+                </div>
+                
+                <div id="area-motivo-recusa" style="display: none; margin-top: 10px; border-top: 1px solid #333; padding-top: 15px;">
+                    <p style="color: var(--texto-dim); font-size: 13px; margin-top: 0; margin-bottom: 10px;">Para nos ajudar a melhorar, conte-nos o motivo (Opcional):</p>
+                    <textarea id="motivo_recusa_inline" rows="3" style="width: 100%; background: #000; border: 1px solid #333; color: var(--texto-br); border-radius: 6px; padding: 10px; resize: none;" placeholder="Ex: Achei o prazo longo, política muito rígida..."></textarea>
+                </div>
+            </div>
+
+            <div class="acoes-finais">
+                <div class="botoes-nav" style="display: flex; justify-content: center; align-items: center; width: 100%;">
+                    
+                    <button type="button" id="btn-descartar" class="btn-secondary btn-descartar" style="width: 100%; color: #ff4444; border-color: #ff4444; display: none;">
+                        DESCARTAR LOTE
+                    </button>
+
+                    <button type="submit" id="btn-continuar" class="btn-primary" disabled style="width: 100%; opacity: 0.5; cursor: not-allowed;">
+                        CONTINUAR
+                    </button>
+
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const checkAceite = document.getElementById('check-aceite');
+        const checkRecusa = document.getElementById('check-recusa');
+        
+        const btnContinuar = document.getElementById('btn-continuar');
+        const btnDescartar = document.getElementById('btn-descartar');
+        
+        const areaMotivo = document.getElementById('area-motivo-recusa');
+        const inputMotivo = document.getElementById('motivo_recusa_inline');
+
+        // Lógica ao clicar no botão VERDE (Aceite)
+        if (checkAceite) {
+            checkAceite.addEventListener('change', function() {
+                if (this.checked) {
+                    // Desmarca o vermelho e esconde a área de motivo
+                    if(checkRecusa) checkRecusa.checked = false;
+                    if(areaMotivo) areaMotivo.style.display = 'none';
+                    
+                    // Oculta botão descartar
+                    btnDescartar.style.display = 'none';
+
+                    // Exibe e ativa botão continuar
+                    btnContinuar.style.display = 'block';
+                    btnContinuar.disabled = false;
+                    btnContinuar.style.opacity = '1';
+                    btnContinuar.style.cursor = 'pointer';
+                } else {
+                    // Bloqueia botão continuar se desmarcar
+                    btnContinuar.disabled = true;
+                    btnContinuar.style.opacity = '0.5';
+                    btnContinuar.style.cursor = 'not-allowed';
+                }
+            });
+        }
+
+        // Lógica ao clicar no botão VERMELHO (Recusa)
+        if (checkRecusa) {
+            checkRecusa.addEventListener('change', function() {
+                if (this.checked) {
+                    // Desmarca o verde
+                    if(checkAceite) checkAceite.checked = false;
+                    
+                    // Exibe a área de motivo
+                    if(areaMotivo) areaMotivo.style.display = 'block';
+                    
+                    // Oculta botão continuar
+                    btnContinuar.style.display = 'none';
+
+                    // Exibe e ativa botão descartar
+                    btnDescartar.style.display = 'block';
+                    btnDescartar.disabled = false;
+                    btnDescartar.style.opacity = '1';
+                    btnDescartar.style.cursor = 'pointer';
+                } else {
+                    // Restaura estado inicial se desmarcar
+                    if(areaMotivo) areaMotivo.style.display = 'none';
+                    btnDescartar.style.display = 'none';
+                    
+                    btnContinuar.style.display = 'block';
+                    btnContinuar.disabled = true;
+                    btnContinuar.style.opacity = '0.5';
+                    btnContinuar.style.cursor = 'not-allowed';
+                }
+            });
+        }
+
+        // Ação de disparo do botão Descartar (AJAX e Redirecionamento)
+        if (btnDescartar) {
+            btnDescartar.addEventListener('click', async () => {
+                btnDescartar.disabled = true;
+                btnDescartar.innerText = "Descartando...";
+
+                const motivoTexto = inputMotivo ? inputMotivo.value : "";
+
+                try {
+                    const response = await fetch('/descartar-lote-final', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ motivo: motivoTexto })
+                    });
+
+                    if (response.ok) {
+                        window.location.href = '/';
+                    } else {
+                        alert("Ocorreu um erro ao processar o descarte. Tente novamente.");
+                        btnDescartar.disabled = false;
+                        btnDescartar.innerText = "DESCARTAR LOTE";
+                    }
+                } catch (error) {
+                    console.error("Erro de comunicação ao descartar:", error);
+                    alert("Falha de conexão. Verifique sua internet e tente novamente.");
+                    btnDescartar.disabled = false;
+                    btnDescartar.innerText = "DESCARTAR LOTE";
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

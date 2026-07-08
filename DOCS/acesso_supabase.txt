@@ -1,0 +1,85 @@
+Guia de Integração Arquitetural: MyGames x Supabase (Catálogo Centralizado)
+Este documento descreve o modelo de arquitetura onde o aplicativo local (MyGames - Site e Admin) deixa de ser o gestor do catálogo de produtos e passa a atuar como consumidor (Read-Only) de uma base de dados centralizada (Supabase) pertencente a outro aplicativo da mesma empresa.
+
+1. O Problema vs. A Solução
+O Problema: Manter a opção "Catálogo" no aplicativo Backoffice/Admin geraria retrabalho, exigindo que operadores digitassem os mesmos dados que já existem na base central da empresa, com alto risco de divergência de preços e informações.
+
+A Solução: Eliminar o CRUD (Create, Read, Update, Delete) de produtos no MyGames. O sistema passará a consultar o catálogo oficial em tempo real na plataforma Supabase da empresa via API.
+
+2. Como a Empresa Concede o Acesso
+A equipe responsável pelo banco centralizado não precisará abrir portas de firewall ou criar conexões diretas complexas com o banco de dados. 
+A liberação ocorre via API REST nativa do Supabase.
+
+Para que a integração aconteça, a empresa deve fornecer:
+
+URL do Projeto: O endereço web do Supabase deles (ex: https://[ID-DO-PROJETO].supabase.co).
+
+Anon Key (Chave Pública): A chave de API padrão gerada pelo Supabase.
+
+Segurança Garantida (RLS):
+A equipe da empresa ativará o Row Level Security (RLS) na tabela de produtos deles. Eles criarão uma regra informando que chaves anônimas 
+(Anon Key) possuem apenas permissão de leitura (SELECT). O banco de dados do Supabase bloqueará automaticamente qualquer tentativa de 
+inserção, edição ou exclusão vinda do nosso aplicativo.
+
+3. Implementação Prática no Ambiente MyGames
+A integração mantém a organização atual do código. As configurações sensíveis ficam isoladas e a lógica de comunicação externa fica 
+centralizada no módulo principal de negócios, o engine.py.
+
+Passo A: Configuração de Variáveis de Ambiente (.env)
+No servidor, adicionamos as credenciais fornecidas pela empresa:
+SUPABASE_URL=https://[ID-DO-PROJETO].supabase.co
+SUPABASE_KEY=ey...[CHAVE-FORNECIDA-PELA-EMPRESA]...
+
+Passo B: Instalação do SDK Oficial
+No terminal do seu ambiente de desenvolvimento, basta instalar a biblioteca do Supabase para Python:
+pip install supabase
+
+Passo C: Lógica de Negócios (engine.py)
+No módulo central, importamos a biblioteca e criamos as funções que conectam o nosso aplicativo à base deles.
+import os
+from supabase import create_client, Client
+
+# 1. Inicializa o cliente apontando para a base da empresa
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+supabase_empresa: Client = create_client(url, key)
+
+# 2. Função para buscar um produto específico
+def obter_produto_oficial(produto_id):
+    try:
+        # Executa um SELECT na tabela externa via API
+        resposta = supabase_empresa.table("produtos").select("*").eq("id", produto_id).execute()
+        
+        # Retorna o dicionário com os dados caso o produto exista
+        if resposta.data and len(resposta.data) > 0:
+            return resposta.data[0]
+        return None
+        
+    except Exception as e:
+        print(f"Erro de comunicação com o Supabase Central: {e}")
+        return None
+
+# 3. Função para listar catálogo (Ex: auto-completar no site-cliente)
+def buscar_catalogo_por_nome(termo):
+    try:
+        # Usa ilike para busca parcial (semelhante ao LIKE '%termo%' do MySQL)
+        resposta = supabase_empresa.table("produtos").select("id, nome, valor").ilike("nome", f"%{termo}%").execute()
+        return resposta.data
+    except Exception as e:
+        print(f"Erro na busca: {e}")
+        return []
+
+4. Impacto no Banco de Dados Local (MySQL)
+Com essa nova arquitetura em vigor, a estrutura do seu banco de dados MySQL local passará por uma otimização importante:
+
+Tabela Excluída: A tabela catalogo_mestre não será mais necessária no seu MySQL, reduzindo o tamanho e a complexidade 
+do seu banco local.
+
+Modelo de Relacionamento (Chave Estrangeira Virtual): As suas tabelas transacionais (como a tabela que guarda os itens 
+de um protocolo de recompra) passarão a salvar apenas o ID do Produto gerado lá no Supabase.
+
+Composição de Tela: Quando o Backoffice precisar exibir a tela de "Detalhes do Protocolo", o engine.py fará um SELECT 
+no MySQL para pegar os IDs dos itens salvos e, imediatamente, disparará requisições rápidas para o Supabase para 
+resgatar os nomes reais e as URLs das fotos oficiais, juntando tudo na memória antes de mandar para o 
+HTML (renderização).
+

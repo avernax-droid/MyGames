@@ -1,0 +1,43 @@
+Documentação de Migração: Banco de Dados MySQL para Docker (Homologação)
+1. Objetivo da Migração
+Isolar o banco de dados MyGames_Homo do ambiente hospedeiro local (desktop) para dentro do ecossistema Docker. Esta mudança visa garantir a portabilidade da aplicação, facilitar futuros deploys em produção e aumentar a segurança através do encapsulamento da rede do banco de dados, permitindo comunicação interna com as aplicações Flask (Site e Admin) sem expor a porta para a internet.
+
+2. Configuração da Infraestrutura (docker-compose.yml)
+O arquivo de orquestração foi atualizado para incluir o contêiner nativo do MySQL 8.0, configurado com os seguintes parâmetros de segurança e persistência:
+
+Serviço Adicionado: Criação do bloco db_homo utilizando a imagem mysql:8.0.
+
+Inicialização Segura: Passagem de credenciais via variáveis de ambiente (MYSQL_ROOT_PASSWORD e MYSQL_DATABASE) para a primeira subida do banco.
+
+Blindagem de Porta (Anti-Conflito): A porta externa foi mapeada exclusivamente para o localhost na porta 3308 (127.0.0.1:3308:3306). Isso evitou conflitos com o banco MySQL hospedeiro (que já rodava na porta 3307) e garantiu que acessos externos fossem bloqueados, permitindo conexão via DBeaver/Workbench apenas pela própria máquina.
+
+Persistência de Dados: Implementação do volume nomeado mysql_homo_data:/var/lib/mysql, garantindo que o ciclo de docker compose down/up (reinicialização durante deploys) não apague os dados registrados.
+
+Dependência de Inicialização: Adicionada a instrução depends_on: - db_homo nos serviços do Site e do Admin, garantindo que o Flask só inicie após o banco de dados estar pronto.
+
+3. Ajustes de Roteamento Interno (Variáveis de Ambiente)
+A comunicação entre os aplicativos (Site/Admin) e o Banco de Dados foi reconfigurada para utilizar a rede interna do Docker (bridge):
+
+Host Interno: A variável DB_HOST nos blocos de environment do docker-compose.yml foi alterada de host.docker.internal para db_homo (nome do serviço do banco).
+
+Porta Interna: As aplicações passaram a buscar o banco na porta nativa 3306 (configurado nos arquivos .env), pois dentro da rede Docker a porta de escuta do MySQL é a original, ignorando o mapeamento externo.
+
+4. Migração de Dados (Dump & Restore)
+Para migrar o schema, catálogo e dados estruturais sem gerar arquivos temporários no disco, foi utilizado o método de injeção direta via "Pipe" (|) no terminal, conectando o banco hospedeiro (origem) diretamente ao novo contêiner na porta isolada 3308:
+mysqldump -u root -p'[SENHA]' mygames_dev | mysql -h 127.0.0.1 -P 3308 -u root -p'[SENHA]' MyGames_Homo
+
+5. Migração de Arquivos Físicos (Uploads/Perícia)
+Como o dump de banco não trafega arquivos físicos (fotos de produtos), foi realizada a cópia manual das imagens da pasta de desenvolvimento para o diretório de homologação:
+
+Cópia de Arquivos: Utilizado o comando cp -R para espelhar a pasta static/uploads/pericia/.
+
+Ajuste de Propriedade (Chown): Como os contêineres e a execução manual geraram conflitos de posse (usuário root vs usuário userverna), foi aplicado o comando sudo chown -R userverna:userverna para devolver a posse dos arquivos ao usuário do sistema.
+
+Ajuste de Permissão (Chmod): Aplicado sudo chmod -R 755 na pasta de uploads para garantir que a aplicação Flask (usuário do Docker) tivesse a permissão de leitura (read) necessária para exibir as imagens no navegador do Admin.
+
+6. Auditoria de Segurança nos Motores de Dados (engine.py e admin_engine.py)
+Após a migração, o código dos motores de persistência foi validado para o ecossistema Docker:
+
+Zero Hardcodes: Confirmado que as funções de conexão (conectar_bd()) utilizam estritamente o os.getenv() para Host e Porta, não existindo rotinas de fallback para IP local (127.0.0.1) que quebrariam o roteamento do contêiner.
+
+Prevenção de Timeout: O ciclo de vida das conexões no Python foi validado. O uso rigoroso do bloco finally: if db.is_connected(): cursor.close(); db.close() após cada query garante que nenhuma conexão ociosa fique pendente, imunizando as aplicações contra o erro clássico "MySQL server has gone away" típico de contêineres Docker.

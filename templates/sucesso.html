@@ -1,47 +1,140 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: sucesso.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Tela de Conclusão e Protocolo
+  FUNÇÃO: Exibe o número do protocolo gerado, confirma o envio do e-mail de 
+  resumo e apresenta os dados de contato da empresa dinamicamente.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 10/06/2026: Adição do painel de exibição de Logística Reversa.
+  - 15/06/2026: Injeção dinâmica dos dados da empresa (e-mail/telefone) via banco de dados.
+  - 16/06/2026: Atualização da variável de nome da empresa (nome_fantasia).
+  - 20/06/2026: Substituição de "Protocolo Gerado!" por "VENDA FINALIZADA!", remoção do E-Ticket e inclusão da seção Próximos Passos.
+  - 20/06/2026: Integração do botão de suporte via WhatsApp com ícone SVG nativo.
+  - 20/06/2026: Alteração para Deep Link Nativo (whatsapp://).
+  - 20/06/2026: Refatoração da UI de Contato: Uso de Flexbox para alinhar ícone circular gigante do WhatsApp à direita na mesma linha dos textos.
+  - 22/06/2026: Aplicação do filtro Jinja2 'mascara_telefone' na exibição do telefone de contato.
+  - 23/06/2026: Aplicação do filtro moeda_real, inclusão de quebra segura de strings (word-break) 
+    nos códigos e estilização das instruções de envio para a cor branca (Paridade Mobile).
+  - 23/06/2026: Ajuste no alinhamento do botão do WhatsApp para ficar mais próximo ao número de telefone.
+  ==============================================================================
+#}
 {% extends "base.html" %}
 
-{% block title %}Agendamento Concluído{% endblock %}
+{% block title %}Venda Finalizada - MyGames{% endblock %}
 
 {% block content %}
-<div class="card-lead" style="text-align: center;">
-    <div class="xp-bar-container">
-        <!-- Barra 100% Completa -->
-        <div class="xp-bar-fill" style="width: 100%;"></div>
-        <span class="xp-text">MISSION ACCOMPLISHED</span>
-    </div>
+{% set tem_pendentes = false %}
+{% for item in session.get('itens_avaliados', []) %}
+    {% if item.is_outros %}
+        {% set tem_pendentes = true %}
+    {% endif %}
+{% endfor %}
 
-    <header style="margin-bottom: 30px;">
-        <div style="font-size: 60px; color: #00ff00; margin-bottom: 10px;">✓</div>
-        <h2 style="font-family: 'Rajdhani', sans-serif; color: var(--neon-orange); text-transform: uppercase; margin: 0;">
-            Protocolo Gerado!
+<div class="card-padrao" style="text-align: center; padding-top: 20px;">
+    
+    <header style="margin-bottom: 20px;">
+        <h2 style="font-family: 'Rajdhani', sans-serif; color: var(--texto-br); text-transform: uppercase; margin: 0; font-size: 32px;">
+            VENDA FINALIZADA! <span style="color: var(--cor-destaque); font-size: 36px; vertical-align: middle; margin-left: 5px;">✓</span>
         </h2>
-        <p style="color: var(--text-dim); margin-top: 5px;">
-            Um resumo foi enviado para <strong>{{ session.get('player_email') }}</strong>.
+        <p style="color: var(--texto-dim); margin-top: 10px;">
+            Um resumo detalhado foi enviado para <strong>{{ session.get('player_email', 'seu e-mail cadastrado') }}</strong>.
         </p>
     </header>
 
-    <!-- BOX DE PROTOCOLO DINÂMICO -->
-    <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px dashed var(--neon-blue); margin-bottom: 25px;">
-        <span style="display: block; font-size: 0.75rem; color: var(--neon-blue); margin-bottom: 5px; text-transform: uppercase;">Código de Rastreio</span>
-        <strong style="font-size: 1.3rem; letter-spacing: 1px; color: #fff;">
-            {{ session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
+    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid #333; margin-bottom: 25px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+        <span style="font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase;">Código de Protocolo:</span>
+        <strong style="font-size: 1.1rem; letter-spacing: 1px; color: var(--texto-br); font-family: 'Courier New', monospace; word-break: break-all; overflow-wrap: break-word;">
+            {{ protocolo if protocolo else session.get('ultimo_protocolo', 'MG-PROCESSANDO') }}
         </strong>
     </div>
 
-    <!-- RESUMO VISUAL NO CARD -->
-    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; margin-bottom: 30px; font-size: 0.9rem; border-left: 3px solid var(--neon-blue);">
-        <p style="margin: 5px 0; color: var(--text-dim);"><strong>Item:</strong> <span style="color: #fff;">{{ session.get('produto_nome', 'Produto') }}</span></p>
-        <p style="margin: 5px 0; color: var(--text-dim);"><strong>Valor:</strong> <span style="color: #00ff00;">R$ {{ "%.2f"|format(session.get('valor_final', 0)) }}</span></p>
+    {% if codigo_rastreio %}
+    <div style="background: rgba(0, 255, 0, 0.05); padding: 25px 20px; border-radius: 12px; border: 2px solid var(--cor-destaque); margin-bottom: 25px; text-align: center; box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);">
+        <h3 style="font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0; font-size: 1.2rem; letter-spacing: 1px;">
+            📦 Logística Reversa (Envio Correios)
+        </h3>
+        
+        <div style="margin-bottom: 25px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; display: inline-block; min-width: 80%;">
+            <span style="display: block; font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 8px;">Código de Rastreio</span>
+            <strong style="font-size: 2rem; color: var(--cor-destaque); font-family: 'Courier New', monospace; letter-spacing: 2px; word-break: break-all; overflow-wrap: break-word;">{{ codigo_rastreio }}</strong>
+        </div>
+        
+        <div style="border-top: 1px solid rgba(0, 255, 0, 0.2); padding-top: 15px; text-align: left;">
+            <h4 style="color: #ff4444; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; margin: 0 0 10px 0; font-size: 16px;">
+                PRÓXIMOS PASSOS
+            </h4>
+            <div style="font-size: 0.9rem; color: var(--texto-dim); line-height: 1.5;">
+                <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;">Embale os itens com segurança dentro de uma caixa, dirija-se a qualquer agência dos Correios e informe o <b><i>código de rastreio</i></b>. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if tem_pendentes %}
+    <div style="background: rgba(255, 170, 0, 0.1); border: 1px dashed #ffaa00; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: left;">
+        <p style="color: #ffaa00; margin: 0 0 5px 0; font-weight: bold; font-size: 14px;">⚠️ ANÁLISE PENDENTE</p>
+        <p style="color: var(--texto-br); font-size: 13px; margin: 0;">Itens sob análise manual. Nossa equipe enviará a oferta final atualizada em até 24 horas úteis.</p>
+    </div>
+    {% endif %}
+
+    <div style="text-align: left; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border-left: 4px solid var(--cor-destaque);">
+        <p style="margin: 8px 0; color: var(--texto-dim);"><strong>Total de Itens:</strong> <span style="color: var(--texto-br);">{{ session.get('itens_avaliados', [])|length }}</span></p>
+        <p style="margin: 8px 0; color: var(--texto-dim);">
+            <strong>{{ 'Valor Parcial da Proposta:' if tem_pendentes else 'Valor Total da Proposta:' }}</strong> 
+            <span style="color: var(--cor-destaque); font-weight: bold; font-size: 1.2rem;">R$ {{ total_lote | moeda_real }}</span>
+        </p>
     </div>
 
-    <!-- Botão para Novo Agendamento (Mantém o login, limpa apenas o produto) -->
-    <a href="{{ url_for('novo_agendamento') }}" 
-       class="btn-glow" 
-       style="text-decoration: none; display: block; padding: 20px; text-transform: uppercase;">
-        AVALIAR OUTRO ITEM
-    </a>
+    <div style="margin-bottom: 25px; padding: 15px; border-top: 1px solid #333; font-size: 0.85rem; color: var(--texto-dim); text-align: left;">
+        <p style="margin: 0 0 8px 0;">Em caso de dúvidas, contate nossa equipe:</p>
+        <p style="margin: 5px 0; color: var(--texto-br);"><strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong></p>
+        
+        {% set v_email = email_contato if email_contato else (dados_empresa.get('email_contato') if dados_empresa else (empresa.get('email_contato') if empresa else 'suporte@trocagame.com')) %}
+        {% set v_tel = telefone_contato if telefone_contato else (dados_empresa.get('telefone_contato') if dados_empresa else (empresa.get('telefone_contato') if empresa else '')) %}
+        
+        <div style="display: flex; justify-content: flex-start; align-items: center; margin-top: 10px; gap: 20px;">
+            
+            <div>
+                <p style="margin: 3px 0;"><i class="fas fa-envelope"></i> {{ v_email }}</p>
+                {% if v_tel %}
+                    <p style="margin: 3px 0;"><i class="fas fa-phone"></i> {{ v_tel | mascara_telefone }}</p>
+                {% else %}
+                    <p style="margin: 3px 0;"><i class="fas fa-phone"></i> (00) 00000-0000</p>
+                {% endif %}
+            </div>
 
-    <!-- PONTUAL: Link alterado para a rota /sair, garantindo a limpeza total da sessão -->
-    <a href="{{ url_for('sair') }}" class="btn-refazer" style="display: inline-block; margin-top: 25px;">Sair e encerrar</a>
+            {% if v_tel %}
+                {# Limpeza preventiva de caracteres de máscara para montar a URL estável do WhatsApp #}
+                {% set v_tel_limpo = v_tel|replace('(', '')|replace(')', '')|replace('-', '')|replace(' ', '') %}
+                {# Garante o prefixo do país caso não esteja presente no banco #}
+                {% if v_tel_limpo|length == 10 or v_tel_limpo|length == 11 %}
+                    {% set v_tel_whatsapp = '55' ~ v_tel_limpo %}
+                {% else %}
+                    {% set v_tel_whatsapp = v_tel_limpo %}
+                {% endif %}
+                
+                <a href="whatsapp://send?phone={{ v_tel_whatsapp }}&text=Olá!%20Finalizei%20meu%20processo%20de%20venda%20e%20gostaria%20de%20falar%20sobre%20o%20meu%20protocolo." 
+                    style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background-color: #25D366; color: #fff; border-radius: 50%; text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2);"
+                    onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 16px rgba(37, 211, 102, 0.4)';"
+                    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(37, 211, 102, 0.2)';"
+                    onmousedown="this.style.transform='scale(0.95)';"
+                    title="Falar com Suporte">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" style="width: 26px; height: 26px; fill: currentColor;">
+                        <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
+                    </svg>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        <a href="{{ url_for('sair') }}" class="btn-primary" style="width: 100%; box-sizing: border-box;">
+            Encerrar Sessão
+        </a>
+    </div>
 </div>
 {% endblock %}

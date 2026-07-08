@@ -1,132 +1,190 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: base.html
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Template Base e Design System Globais
+  FUNÇÃO: Serve como o esqueleto principal (layout mestre) para todas as outras 
+  telas do sistema. Define a estrutura HTML global, importa fontes, estabelece as 
+  variáveis CSS globais do Design System (cores, botões, cards) e renderiza a barra 
+  de progresso (stepper) de fases de navegação do usuário.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
+  - 29/05/2026: Inclusão de Modal Global de Confirmação para reuso em todas as telas.
+  - 19/06/2026: Ocultação condicional do stepper para não exibição na tela inicial de boas-vindas.
+  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
+  - 08/07/2026: Reestruturação do cabeçalho (logo + botão VER LOTE alinhados).
+  - 08/07/2026 (Atualização): Redução da margem inferior do header para aproximar o conteúdo principal.
+  ==============================================================================
+#}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyGames - {% block title %}{% endblock %}</title>
+    <title>{% block title %}{% endblock %}</title>
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- ESTRUTURA DE FASES CENTRALIZADA (STEPPER) --- */
-        .fases-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            max-width: 800px;
-            margin: 30px auto 50px;
-            position: relative;
-            padding: 0 10px;
+        /* SISTEMA DE DESIGN GLOBAL */
+        :root {
+            --bg-fundo: #1e1e1e;
+            --card-bg: #262626;
+            --cor-destaque: #00ff00;
+            --texto-br: #ffffff;
+            --texto-dim: #a0a0a0;
+            --borda-fina: 1px solid #333;
         }
 
-        /* A Linha que liga os círculos */
-        .fases-container::before {
-            content: "";
-            position: absolute;
-            top: 15px; 
-            left: 50px;
-            right: 50px;
-            height: 2px;
-            background: #333;
-            z-index: 1;
-        }
-
-        .fase-item {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            z-index: 2;
-            position: relative;
-        }
-
-        /* Círculo Externo */
-        .circulo-externo {
-            width: 30px;
-            height: 30px;
-            background: #121212;
-            border: 2px solid #333;
-            border-radius: 50%;
+        * { box-sizing: border-box; }
+        body { background-color: var(--bg-fundo); color: var(--texto-br); margin: 0; font-family: 'Roboto', sans-serif; }
+        
+        /* CABEÇALHO GLOBAL ALINHADO */
+        .header-global {
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 10px;
-            transition: 0.3s;
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 10px auto; /* Reduzido de 25px para 10px para puxar o conteúdo para cima */
+            padding: 0 10px;
         }
 
-        /* Círculo Interno (O "Ponto" Verde) */
-        .circulo-interno {
-            width: 14px;
-            height: 14px;
-            background: transparent; 
-            border-radius: 50%;
-            transition: 0.3s;
+        .logo-header { 
+            max-width: 160px; 
+            display: block; 
+            border-radius: 8px; 
         }
 
-        .fase-nome {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            color: #555;
+        .header-carrinho-area {
+            position: absolute;
+            right: 10px; 
+        }
+
+        /* COMPONENTES PADRÃO */
+        .card-padrao {
+            background: var(--card-bg);
+            border: 2px solid var(--cor-destaque);
+            border-radius: 24px;
+            padding: 30px;
+            width: 100%;
+            max-width: 650px;
+            margin: 0 auto;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: var(--cor-destaque);
+            color: #000;
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+            border: none;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px; 
+            transition: 0.3s;
+        }
+        .btn-primary:hover { background: #00cc00; transform: translateY(-2px); }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+            padding: 18px 40px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .btn-secondary:hover { background: rgba(0, 255, 0, 0.1); transform: translateY(-2px); }
+
+        /* ESTRUTURA DE FASES (STEPPER) */
+        .fases-container { display: flex; justify-content: space-between; max-width: 800px; margin: 20px auto 25px auto; position: relative; padding: 0 10px; }
+        .fases-container::before { content: ""; position: absolute; top: 12px; left: 40px; right: 40px; height: 2px; background: #333; z-index: 1; }
+        .fase-item { flex: 1; display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative; }
+        .circulo-externo { width: 26px; height: 26px; background: var(--bg-fundo); border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 5px; }
+        .circulo-interno { width: 10px; height: 10px; background: transparent; border-radius: 50%; }
+        .fase-nome { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .fase-item.concluida .circulo-externo { border-color: var(--cor-destaque); }
+        .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
+        .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
+
+        /* BOTÃO DE ACESSO AO CARRINHO (LOTE) - DESKTOP */
+        .btn-carrinho-desktop {
+            background: rgba(0, 255, 0, 0.08);
+            border: 1px solid var(--cor-destaque);
+            color: var(--cor-destaque);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 255, 0, 0.1);
+        }
+        .btn-carrinho-desktop:hover {
+            background: rgba(0, 255, 0, 0.2);
+            transform: translateY(-2px);
         }
 
-        /* Lógica de Ativação: Ativa se a fase atual for maior ou igual ao passo */
-        .fase-item.concluida .circulo-externo {
-            border-color: #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
-        }
+        .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 
-        .fase-item.concluida .circulo-interno {
-            background: #00ff00;
-            box-shadow: 0 0 8px #00ff00;
-        }
-
-        .fase-item.concluida .fase-nome {
-            color: #00ff00;
-        }
-
-        .client-logo[src*="404"] { display: none; }
+        /* ============================================================================== */
+        /* MODAL GLOBAL DE CONFIRMAÇÃO CSS */
+        /* ============================================================================== */
+        .modal-overlay-global { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box-global { background: var(--bg-fundo); border: 2px solid #333; border-radius: 12px; padding: 30px 20px; max-width: 350px; width: 90%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-icone-global { font-size: 45px; margin-bottom: 15px; line-height: 1; }
+        .modal-titulo-global { color: #ff4444; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+        .modal-texto-global { color: var(--texto-dim); font-size: 14px; margin-bottom: 25px; line-height: 1.4; }
+        .modal-botoes-global { display: flex; gap: 10px; justify-content: center; }
+        .modal-botoes-global button { flex: 1; padding: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; }
     </style>
 </head>
 <body>
     <div class="container">
         
-        <!-- BARRA AUTOMÁTICA: Controlada pelo server.py através da variável fase_atual -->
+        {% if fase_atual|default(0) > 0 %}
         <div class="fases-container">
-            <!-- Fase 1 -->
-            <div class="fase-item {{ 'concluida' if fase_atual >= 1 }}">
-                <div class="circulo-externo"><div class="circulo-interno"></div></div>
-                <span class="fase-nome">Identificação</span>
-            </div>
-
-            <!-- Fase 2 -->
-            <div class="fase-item {{ 'concluida' if fase_atual >= 2 }}">
-                <div class="circulo-externo"><div class="circulo-interno"></div></div>
-                <span class="fase-nome">Produto</span>
-            </div>
-
-            <!-- Fase 3 -->
-            <div class="fase-item {{ 'concluida' if fase_atual >= 3 }}">
-                <div class="circulo-externo"><div class="circulo-interno"></div></div>
-                <span class="fase-nome">Avaliação</span>
-            </div>
-
-            <!-- Fase 4 -->
-            <div class="fase-item {{ 'concluida' if fase_atual >= 4 }}">
-                <div class="circulo-externo"><div class="circulo-interno"></div></div>
-                <span class="fase-nome">Oferta</span>
-            </div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 1 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Produto</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 2 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Avaliação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 4 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Oferta</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 5 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Identificação</span></div>
+            <div class="fase-item {{ 'concluida' if (fase_atual|default(0)) >= 6 }}"><div class="circulo-externo"><div class="circulo-interno"></div></div><span class="fase-nome">Protocolo</span></div>
         </div>
+        {% endif %}
 
-        <header>
+        <header class="header-global">
             <div class="logo-container">
-                <img src="{{ url_for('static', filename='images/logo-cliente.png') }}" alt="Logo Cliente" class="client-logo" onerror="this.style.display='none'">
-                <h1>MY<span>GAMES</span></h1>
+                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
             </div>
+            
+            {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
+            <div class="header-carrinho-area">
+                <a href="{{ url_for('resumo') }}" class="btn-carrinho-desktop">
+                    <span style="font-size: 16px;">🛒</span> VER LOTE
+                </a>
+            </div>
+            {% endif %}
         </header>
 
         <main>
@@ -134,7 +192,57 @@
         </main>
     </div>
 
+    <div id="modal-confirmacao-global" class="modal-overlay-global" style="display: none;">
+        <div class="modal-box-global">
+            <div class="modal-icone-global">⚠️</div>
+            <h3 id="modal-titulo-global" class="modal-titulo-global">Atenção</h3>
+            <p id="modal-texto-global" class="modal-texto-global">Deseja realmente continuar?</p>
+            
+            <div class="modal-botoes-global">
+                <button onclick="fecharModalConfirmacao()" class="btn-primary" style="background: #333; border-color: #555; color: var(--texto-br);">
+                    CANCELAR
+                </button>
+                <button id="modal-btn-confirmar-global" onclick="executarAcaoModal()" class="btn-secondary" style="border-color: #ff4444; color: #ff4444;">
+                    CONFIRMAR
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/ux-helper.js') }}"></script>
+    
+    <script>
+        let modalConfirmacaoAcao = null;
+
+        function abrirModalConfirmacao(titulo, mensagem, textoBotao, acao) {
+            document.getElementById('modal-titulo-global').innerText = titulo;
+            document.getElementById('modal-texto-global').innerText = mensagem;
+            document.getElementById('modal-btn-confirmar-global').innerText = textoBotao;
+            
+            modalConfirmacaoAcao = acao;
+            
+            const modal = document.getElementById('modal-confirmacao-global');
+            modal.style.display = 'flex';
+        }
+
+        function fecharModalConfirmacao() {
+            document.getElementById('modal-confirmacao-global').style.display = 'none';
+            modalConfirmacaoAcao = null;
+        }
+
+        function executarAcaoModal() {
+            if (typeof modalConfirmacaoAcao === 'function') {
+                modalConfirmacaoAcao();
+            } else if (typeof modalConfirmacaoAcao === 'string') {
+                const btn = document.getElementById('modal-btn-confirmar-global');
+                btn.innerText = "PROCESSANDO...";
+                btn.style.opacity = "0.7";
+                window.location.href = modalConfirmacaoAcao;
+            }
+            fecharModalConfirmacao();
+        }
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>

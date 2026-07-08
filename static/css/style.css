@@ -1,11 +1,30 @@
-/* Variáveis de Identidade Visual Gamer */
+/* ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: static/css/style.css
+  DATA DE CRIAÇÃO: 28/05/2026
+  TÍTULO: Design System e Identidade Visual (v1.8 Consolidada)
+  FUNÇÃO: Arquivo central de estilos responsável por toda a identidade visual 
+  da aplicação. Define variáveis de cores (Tokens), tipografia, estilização de 
+  componentes, layout responsivo e elementos de gamificação.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 28/05/2026: Inclusão do cabeçalho padrão e consolidação da Identidade Visual.
+  ==============================================================================
+*/
+
 :root {
     --bg-dark: #0f172a;
     --card-bg: #1e293b;
     --neon-orange: #fb923c;
     --neon-blue: #38bdf8;
+    --neon-green: #00ff00;
     --text-main: #f8fafc;
     --text-dim: #94a3b8;
+    --border-std: #334155;
+}
+
+* {
+    box-sizing: border-box; /* Regra de Ouro: impede que padding quebre o layout */
 }
 
 body {
@@ -15,42 +34,47 @@ body {
     margin: 0;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start; /* Alterado de center para start para telas longas */
+    padding-top: 50px;
     min-height: 100vh;
 }
 
 .container {
     width: 100%;
-    max-width: 600px;
+    max-width: 650px; /* Levemente ampliado para acomodar perícia */
     padding: 20px;
+    margin-bottom: 50px;
 }
 
 /* --- BARRA DE PROGRESSO (XP BAR) --- */
 .xp-bar-container {
     background: #334155;
-    height: 12px;
-    border-radius: 6px;
+    height: 14px;
+    border-radius: 50px;
     margin-bottom: 30px;
     position: relative;
     overflow: hidden;
-    border: 1px solid #475569;
+    border: 1px solid var(--border-std);
 }
 
 .xp-bar-fill {
-    background: linear-gradient(90deg, #fb923c, #f97316);
+    background: linear-gradient(90deg, var(--neon-orange), #f97316);
     height: 100%;
     box-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
-    transition: width 0.5s ease-in-out;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .xp-text {
     font-family: 'Rajdhani', sans-serif;
     font-size: 10px;
     position: absolute;
-    right: 10px;
-    top: -1px;
+    width: 100%;
+    text-align: center;
+    top: 0;
     color: #fff;
     text-transform: uppercase;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px #000;
 }
 
 /* --- HEADER E LOGO --- */
@@ -59,144 +83,170 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
 }
 
 .client-logo {
-    max-width: 150px;
-    height: auto;
+    max-height: 80px;
+    width: auto;
     filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
 }
 
 header h1 {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     margin: 0;
     text-align: center;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
+    font-weight: 700;
 }
 
 header h1 span { color: var(--neon-orange); }
 
-header p {
-    text-align: center;
-    color: var(--text-dim);
-    margin-bottom: 40px;
-}
-
-/* --- FORMULÁRIO E CARDS --- */
-.card-lead {
+/* --- CARDS E FORMULÁRIOS --- */
+.card-lead, .container-pericia, .card-oferta {
     background: var(--card-bg);
     padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-    border: 1px solid #334155;
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-std);
 }
 
-.input-group {
-    margin-bottom: 20px;
-    flex: 1;
-}
+.input-group { margin-bottom: 20px; position: relative; }
+.row { display: flex; gap: 15px; }
 
-.row {
-    display: flex;
-    gap: 20px;
-}
-
-label {
+label, .label-secao {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--neon-blue);
     margin-bottom: 8px;
     text-transform: uppercase;
     font-weight: bold;
+    letter-spacing: 1px;
 }
 
-input {
+input, select, textarea {
     width: 100%;
     padding: 12px;
     background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 6px;
+    border: 1px solid var(--border-std);
+    border-radius: 8px;
     color: white;
-    box-sizing: border-box;
-    caret-color: var(--neon-orange); /* Cursor Neon para facilitar edição */
+    font-family: inherit;
 }
 
-input:focus {
+input:focus, textarea:focus {
     outline: none;
     border-color: var(--neon-orange);
-    box-shadow: 0 0 5px rgba(251, 146, 60, 0.3);
+    box-shadow: 0 0 8px rgba(251, 146, 60, 0.2);
 }
 
-input[readonly] {
-    background: #1e293b;
-    color: var(--text-dim);
-    cursor: not-allowed;
-    border-style: dashed;
-}
+/* --- SEÇÃO DE UPLOAD (v1.8) --- */
+.upload-section { margin: 25px 0; }
 
-/* --- DROPDOWN DE CIDADES (AUTOCOMPLETE) --- */
-.dropdown-sugestoes {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background-color: var(--card-bg);
-    border: 1px solid var(--neon-blue);
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    z-index: 1000;
-    max-height: 200px;
-    overflow-y: auto;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-}
-
-.sugestao-item {
-    padding: 12px;
+.file-drop-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    background: rgba(0,0,0,0.2);
+    border: 2px dashed #475569;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 0.9rem;
-    color: var(--text-main);
-    border-bottom: 1px solid #334155;
-    transition: all 0.2s;
+    transition: 0.3s;
 }
 
-.sugestao-item:hover {
-    background-color: #334155;
-    color: var(--neon-orange);
-    padding-left: 18px; /* Efeito visual de seleção */
+.file-drop-area:hover { border-color: var(--neon-green); background: rgba(0,255,0,0.02); }
+
+.file-input {
+    position: absolute;
+    left: 0; top: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer;
 }
+
+.file-msg { color: var(--text-dim); font-size: 0.9rem; }
+
+/* --- REVISÃO DE FOTOS (GALERIA) --- */
+.revisao-pericia {
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 12px;
+    margin: 20px 0;
+    border: 1px solid var(--border-std);
+}
+
+.fotos-grid {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 5px 0;
+}
+
+.thumb-revisao {
+    width: 65px;
+    height: 65px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 2px solid #333;
+    transition: 0.2s;
+}
+
+.thumb-revisao:hover { border-color: var(--neon-green); transform: scale(1.1); }
 
 /* --- BOTÕES --- */
-.btn-glow {
+.btn-glow, .btn-cotar-glow, .btn-whatsapp-glow {
     width: 100%;
-    padding: 15px;
+    padding: 18px;
     background: var(--neon-orange);
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     color: white;
     font-family: 'Rajdhani', sans-serif;
     font-size: 1.2rem;
     font-weight: bold;
     cursor: pointer;
-    transition: all 0.3s ease;
-    margin-top: 10px;
+    transition: 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.btn-glow:hover {
-    background: #f97316;
-    box-shadow: 0 0 20px rgba(251, 146, 60, 0.6);
+.btn-glow:hover, .btn-cotar-glow:hover {
+    box-shadow: 0 0 20px rgba(251, 146, 60, 0.4);
     transform: translateY(-2px);
 }
 
-/* Custom Scrollbar para o Dropdown */
-.dropdown-sugestoes::-webkit-scrollbar {
-    width: 6px;
+/* Botão específico para Aceite Final */
+.btn-whatsapp-glow {
+    background: #fff;
+    color: #000;
 }
-.dropdown-sugestoes::-webkit-scrollbar-track {
-    background: var(--bg-dark);
+
+.btn-whatsapp-glow:hover {
+    background: var(--neon-green);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
 }
-.dropdown-sugestoes::-webkit-scrollbar-thumb {
-    background: var(--neon-blue);
-    border-radius: 3px;
+
+.btn-voltar, .btn-refazer {
+    display: block;
+    text-align: center;
+    margin-top: 20px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.85rem;
 }
+
+/* --- STATUS DA OFERTA --- */
+.valor-pix {
+    color: var(--neon-green);
+    font-size: 4rem;
+    font-weight: bold;
+    font-family: 'Rajdhani', sans-serif;
+    text-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border-std); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neon-blue); }

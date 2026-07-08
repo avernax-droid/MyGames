@@ -1,0 +1,273 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/produto.html
+  DATA DE CRIAÇÃO: 20/06/2026
+  TÍTULO: Seleção de Categoria e Busca de Produtos (Mobile)
+  FUNÇÃO: Tela otimizada para smartphones responsável por permitir a escolha 
+  de categoria e busca no catálogo. 
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 20/06/2026: Criação da versão mobile. Transformação das grades (Grid-View) 
+    em listas verticais fluidas (List-View).
+  - 23/06/2026: Ajuste na renderização de itens "Outros".
+  - 08/07/2026: Implementação de seleção via Radio Button ("bolinha") na lista 
+    de produtos e adição do botão "Continuar" com rolagem suave (Smooth Scroll).
+  - 08/07/2026 (Atualização): Remoção de espaço superior (padding-top) para alinhar 
+    ao novo logotipo, compactação do título e inclusão da instrução dinâmica em verde discreto.
+  ==============================================================================
+#}
+{% extends 'mobile/base_mobile.html' %}
+
+{% block title %}Seleção de Produto{% endblock %}
+
+{% block content %}
+<div class="container-busca-mobile">
+    <header class="busca-header">
+        <h2 id="tituloEtapa">Selecione a categoria</h2>
+        <p id="subTituloEtapa" class="busca-subtitulo">Inserir cada item do seu game separadamente: Console c/ 1 Controle, Controle Adicional, Quantidade de Jogos e Acessórios</p>
+    </header>
+
+    <div id="stepCategorias" class="lista-categorias-mobile">
+        <div class="card-categoria-mobile" onclick="selecionarCategoria(1, 'Console')">
+            <span class="icone-cat">🎮</span>
+            <h3>Console</h3>
+        </div>
+        <div class="card-categoria-mobile" onclick="selecionarCategoria(2, 'Controle')">
+            <span class="icone-cat">🕹️</span>
+            <h3>Controle</h3>
+        </div>
+        <div class="card-categoria-mobile" onclick="selecionarCategoria(4, 'Jogo')">
+            <span class="icone-cat">💿</span>
+            <h3>Jogo</h3>
+        </div>
+        <div class="card-categoria-mobile" onclick="selecionarCategoria(3, 'Acessório')">
+            <span class="icone-cat">🎧</span>
+            <h3>Acessório</h3>
+        </div>
+    </div>
+
+    <div id="stepProdutos" style="display: none;">
+        <div class="container-botao-voltar">
+            <button class="btn-secondary" style="width: 100%; padding: 12px; margin-bottom: 15px;" onclick="voltarCategorias()">
+                ← VOLTAR
+            </button>
+        </div>
+        
+        <input type="text" id="inputBusca" class="input-busca" placeholder="Digite o nome do produto..." oninput="filtrarProdutos()">
+
+        <div id="listaProdutos" class="lista-produtos-mobile" style="margin-top: 15px; margin-bottom: 20px;">
+            </div>
+
+        <div id="containerContinuar" style="display: none; padding-bottom: 30px;">
+            <button class="btn-primary" style="width: 100%; padding: 15px; font-size: 16px; font-weight: bold;" onclick="avancarParaPericia()">
+                Continuar →
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let produtosDaCategoria = [];
+    let categoriaAtualId = null;
+
+    async function selecionarCategoria(catId, catNome) {
+        document.getElementById('stepCategorias').style.display = 'none';
+        document.getElementById('stepProdutos').style.display = 'block';
+        
+        // Ajustes dinâmicos de texto e instrução visual
+        document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;
+        const subTitulo = document.getElementById('subTituloEtapa');
+        subTitulo.innerText = 'Digite o nome do produto para buscar ou escolha diretamente na lista abaixo.';
+        subTitulo.className = 'instrucao-pesquisa-mobile';
+        
+        document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
+        document.getElementById('containerContinuar').style.display = 'none';
+        
+        carregarProdutos(catId);
+    }
+
+    function voltarCategorias() {
+        document.getElementById('stepProdutos').style.display = 'none';
+        document.getElementById('stepCategorias').style.display = 'flex'; 
+        
+        // Restaura Título e Subtítulo originais
+        document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
+        const subTitulo = document.getElementById('subTituloEtapa');
+        subTitulo.innerText = 'Inserir cada item do seu game separadamente: Console c/ 1 Controle, Controle Adicional, Quantidade de Jogos e Acessórios';
+        subTitulo.className = 'busca-subtitulo';
+        
+        document.getElementById('inputBusca').value = '';
+        document.getElementById('listaProdutos').innerHTML = '';
+        document.getElementById('containerContinuar').style.display = 'none';
+    }
+
+    async function carregarProdutos(catId) {
+        categoriaAtualId = catId;
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = '<p style="text-align: center; color: var(--texto-dim);">Carregando catálogo...</p>'; 
+        document.getElementById('inputBusca').value = ''; 
+
+        try {
+            const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
+            produtosDaCategoria = await response.json();
+            filtrarProdutos(); 
+        } catch (error) {
+            console.error("Erro na busca:", error);
+            container.innerHTML = '<p style="color: #ff4444; text-align: center;">Erro ao carregar o catálogo.</p>';
+        }
+    }
+
+    function filtrarProdutos() {
+        const termo = document.getElementById('inputBusca').value.toLowerCase().trim();
+        const container = document.getElementById('listaProdutos');
+        container.innerHTML = ''; 
+        document.getElementById('containerContinuar').style.display = 'none';
+
+        let produtosFiltrados = produtosDaCategoria;
+
+        if (termo !== '') {
+            produtosFiltrados = produtosDaCategoria.filter(p => 
+                p.nome_produto.toLowerCase().includes(termo)
+            );
+
+            produtosFiltrados.sort((a, b) => {
+                const nomeA = a.nome_produto.toLowerCase();
+                const nomeB = b.nome_produto.toLowerCase();
+                const aComecaComTermo = nomeA.startsWith(termo);
+                const bComecaComTermo = nomeB.startsWith(termo);
+
+                if (aComecaComTermo && !bComecaComTermo) return -1;
+                if (!aComecaComTermo && bComecaComTermo) return 1;
+                return nomeA.localeCompare(nomeB);
+            });
+        }
+
+        let possuiOutrosNaTela = false;
+
+        produtosFiltrados.forEach(p => {
+            const isOutros = p.nome_produto.toLowerCase().includes('outro');
+            if (isOutros) possuiOutrosNaTela = true;
+
+            const label = document.createElement('label');
+            label.className = 'card-produto-list-view';
+            
+            const valorId = isOutros ? `outro_cat_${categoriaAtualId}` : p.id;
+            
+            label.innerHTML = `
+                <div class="radio-wrapper">
+                    <input type="radio" name="produto_selecionado" value="${valorId}" onchange="liberarBotao()">
+                </div>
+                <div class="list-img-wrapper">
+                    <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
+                </div>
+                <div class="list-data-wrapper">
+                    <h4>${p.nome_produto}</h4>
+                    ${isOutros 
+                        ? `<span style="font-size: 11px; color: var(--texto-dim);">Clique aqui para avaliar manualmente</span>`
+                        : `<span class="plataforma-badge">${p.plataforma || 'N/A'}</span>`
+                    }
+                </div>
+            `;
+            container.appendChild(label);
+        });
+
+        if (!possuiOutrosNaTela) {
+            const labelOutro = document.createElement('label');
+            labelOutro.className = 'card-produto-list-view card-outro-mobile';
+            labelOutro.innerHTML = `
+                <div class="radio-wrapper">
+                    <input type="radio" name="produto_selecionado" value="outro_cat_${categoriaAtualId}" onchange="liberarBotao()">
+                </div>
+                <div class="list-img-wrapper" style="font-size: 30px; color: var(--cor-destaque); text-align: center; background: transparent;">
+                    ➕
+                </div>
+                <div class="list-data-wrapper">
+                    <h4>Outro produto não listado</h4>
+                    <span style="font-size: 11px; color: var(--texto-dim);">Clique aqui para avaliar manualmente</span>
+                </div>
+            `;
+            container.appendChild(labelOutro);
+        }
+    }
+
+    function liberarBotao() {
+        const containerBtn = document.getElementById('containerContinuar');
+        containerBtn.style.display = 'block';
+        
+        setTimeout(() => {
+            containerBtn.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+        }, 100);
+    }
+
+    function avancarParaPericia() {
+        const selecionado = document.querySelector('input[name="produto_selecionado"]:checked');
+        if (selecionado) {
+            window.location.href = `/pericia/${selecionado.value}`;
+        }
+    }
+</script>
+
+<style>
+    /* PADDING-TOP ZERADO PARA APROXIMAR DO NOVO CABEÇALHO */
+    .container-busca-mobile { width: 100%; margin: auto; padding: 0 10px 10px 10px; }
+    
+    .busca-header { margin-bottom: 20px; text-align: center; }
+    .busca-header h2 { color: var(--texto-br); font-family: 'Rajdhani', sans-serif; text-transform: uppercase; font-size: 20px; margin-bottom: 2px; }
+    
+    .busca-subtitulo { color: #00cc00; font-size: 13px; margin: 5px auto 0 auto; line-height: 1.4; font-weight: 500; padding: 0 10px; }
+    
+    /* Nova classe da instrução discreta para o Mobile */
+    .instrucao-pesquisa-mobile {
+        color: rgba(0, 204, 0, 0.8);
+        font-size: 14px;
+        margin: 5px auto 10px auto;
+        line-height: 1.4;
+        font-weight: 500;
+        padding: 0 10px;
+    }
+
+    .lista-categorias-mobile { display: flex; flex-direction: column; gap: 12px; }
+    .card-categoria-mobile { background: #222; border: 2px solid #333; border-radius: 12px; padding: 20px; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 15px; }
+    .card-categoria-mobile:active { border-color: var(--cor-destaque); background: #2a2a2a; transform: scale(0.98); }
+    .icone-cat { font-size: 28px; width: 40px; text-align: center; }
+    .card-categoria-mobile h3 { color: var(--texto-br); margin: 0; font-size: 18px; text-transform: uppercase; }
+
+    .lista-produtos-mobile { display: flex; flex-direction: column; gap: 10px; }
+    
+    .card-produto-list-view { 
+        background: #222; border: var(--borda-fina); border-radius: 10px; padding: 12px; 
+        cursor: pointer; display: flex; flex-direction: row; align-items: center; gap: 15px;
+        -webkit-tap-highlight-color: transparent; 
+    }
+    
+    .card-produto-list-view:has(input[type="radio"]:checked) {
+        border-color: var(--cor-destaque);
+        background: #2a2a2a;
+    }
+
+    .radio-wrapper { display: flex; align-items: center; justify-content: center; padding-left: 5px; }
+    input[type="radio"] { width: 22px; height: 22px; accent-color: var(--cor-destaque); cursor: pointer; }
+
+    .list-img-wrapper { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(0,0,0,0.2); border-radius: 8px; }
+    .list-img-wrapper img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+    
+    .list-data-wrapper { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; overflow: hidden; width: 100%; }
+    .list-data-wrapper h4 { font-size: 14px; margin: 0 0 6px 0; line-height: 1.2; color: var(--texto-br); width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    
+    .plataforma-badge { background: #333; color: var(--cor-destaque); padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    
+    .card-outro-mobile { border: 2px dashed #666; }
+
+    .input-busca {
+        width: 100%; padding: 16px; margin-bottom: 10px;
+        background: #222; border: 2px solid #333; border-radius: 10px;
+        color: var(--texto-br); font-size: 16px; outline: none; box-sizing: border-box;
+    }
+    .input-busca:focus { border-color: var(--cor-destaque); }
+    .input-busca::placeholder { color: var(--texto-dim); }
+</style>
+{% endblock %}
