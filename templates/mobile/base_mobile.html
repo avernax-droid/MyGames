@@ -12,8 +12,7 @@
   - 20/06/2026: Criação e estruturação inicial do template mestre mobile otimizado.
   - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
   - 08/07/2026: Reestruturação do cabeçalho. Logotipo e botão "VER LOTE" 
-    alinhados na mesma linha (flexbox space-between). Aumento do tamanho do logo 
-    (130px) e redução do espaço em branco inferior.
+    alinhados pela borda superior (flex-start). Margem inferior reduzida.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -43,18 +42,18 @@
         /* NOVO: CABEÇALHO GLOBAL ALINHADO - MOBILE */
         .header-global-mobile {
             display: flex;
-            align-items: center;
+            align-items: flex-start; /* Ajustado para alinhar pelo topo */
             justify-content: space-between;
             width: 100%;
-            margin-bottom: 15px; /* Espaço morto reduzido */
+            margin-bottom: 5px; /* Espaçamento reduzido */
             padding: 0;
         }
 
         .logo-header { 
-            max-width: 130px; /* Aumentado de 100px para 130px */
+            max-width: 130px; 
             display: block; 
             border-radius: 8px; 
-            margin: 0; /* Margem interna zerada para o flexbox controlar */
+            margin: 0; 
         }
         
         .header-carrinho-area {

@@ -1086,3 +1086,19 @@ Adicionar limpeza de string (.trim()) antes de enviar o termo de busca.
 Substituir o encerramento no blur por lógicas de atraso (setTimeout) ou trocar o evento de seleção para mousedown/touchstart.
 
 Aplicar uma função de debounce na chamada de busca para poupar processamento e ordenar as requisições.
+
+========================
+08/07
+
+Registro de Atividades: Estruturação e Organização de Projetos
+Separação de Repositórios: Realizamos a migração e separação definitiva das aplicações em dois repositórios independentes no GitHub para melhor organização e segurança: MyGames (Site/Cliente) e MyGames_Admin (Backoffice).
+
+Implementação de .gitignore: Configuramos arquivos .gitignore em ambos os repositórios para garantir que pastas sensíveis ou desnecessárias, como venv/, __pycache__/ e arquivos .env, não sejam enviadas para o controle de versão.
+
+Padronização de Documentação: Criamos e implementamos arquivos README.md em ambos os repositórios, fornecendo um guia claro para a equipe de instalação remota, incluindo pré-requisitos, instruções de clonagem, configuração de ambiente virtual e execução.
+
+Definição de Fluxo de Trabalho (Git Workflow): Estabelecemos o padrão profissional de desenvolvimento utilizando branches e Pull Requests. Consolidamos a regra de que alterações nunca devem ser feitas diretamente na main, protegendo a estabilidade do código em produção.
+
+Alinhamento para Implantação: Revisamos o guia de implantação em produção (baseado em Gunicorn, Nginx e MySQL) e confirmamos a estratégia de entrega, que incluirá os repositórios, o manual de configuração (anexo) e a transferência segura dos arquivos .env para a equipe técnica responsável.
+
+Manutenção Histórica: Confirmamos que o repositório original https://github.com/avernax-droid/MyGames permanece disponível como referência histórica, garantindo que nenhum dado ou histórico anterior seja perdido durante esta transição para a nova estrutura de repositórios.
