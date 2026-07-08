@@ -13,8 +13,9 @@
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
   - 29/05/2026: Inclusão de Modal Global de Confirmação para reuso em todas as telas.
   - 19/06/2026: Ocultação condicional do stepper para não exibição na tela inicial de boas-vindas.
-  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote) 
-    abaixo do stepper (visível das fases 1 a 4).
+  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
+  - 08/07/2026: Reestruturação do cabeçalho (logo + botão VER LOTE alinhados).
+  - 08/07/2026 (Atualização): Redução da margem inferior do header para aproximar o conteúdo principal.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -41,7 +42,28 @@
         * { box-sizing: border-box; }
         body { background-color: var(--bg-fundo); color: var(--texto-br); margin: 0; font-family: 'Roboto', sans-serif; }
         
-        .logo-header { max-width: 120px; display: block; margin: 0 auto 15px auto; border-radius: 8px; }
+        /* CABEÇALHO GLOBAL ALINHADO */
+        .header-global {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 10px auto; /* Reduzido de 25px para 10px para puxar o conteúdo para cima */
+            padding: 0 10px;
+        }
+
+        .logo-header { 
+            max-width: 160px; 
+            display: block; 
+            border-radius: 8px; 
+        }
+
+        .header-carrinho-area {
+            position: absolute;
+            right: 10px; 
+        }
 
         /* COMPONENTES PADRÃO */
         .card-padrao {
@@ -101,15 +123,7 @@
         .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
         .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
 
-        /* NOVO: COMPONENTE DE ACESSO AO CARRINHO (LOTE) - DESKTOP */
-        .carrinho-container {
-            display: flex;
-            justify-content: flex-end;
-            width: 100%;
-            max-width: 800px;
-            margin: 0 auto 15px auto;
-            padding: 0 10px;
-        }
+        /* BOTÃO DE ACESSO AO CARRINHO (LOTE) - DESKTOP */
         .btn-carrinho-desktop {
             background: rgba(0, 255, 0, 0.08);
             border: 1px solid var(--cor-destaque);
@@ -159,19 +173,18 @@
         </div>
         {% endif %}
 
-        {# Exibe o botão do carrinho apenas nas fases de 1 a 4 #}
-        {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
-        <div class="carrinho-container">
-            <a href="{{ url_for('resumo') }}" class="btn-carrinho-desktop">
-                <span style="font-size: 16px;">🛒</span> VER LOTE
-            </a>
-        </div>
-        {% endif %}
-
-        <header>
-            <div style="text-align: center; margin-bottom: 20px;">
+        <header class="header-global">
+            <div class="logo-container">
                 <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
             </div>
+            
+            {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
+            <div class="header-carrinho-area">
+                <a href="{{ url_for('resumo') }}" class="btn-carrinho-desktop">
+                    <span style="font-size: 16px;">🛒</span> VER LOTE
+                </a>
+            </div>
+            {% endif %}
         </header>
 
         <main>

@@ -6,19 +6,16 @@
   TÍTULO: Seleção de Categoria e Busca de Produtos
   FUNÇÃO: Tela responsável por permitir que o usuário escolha uma categoria 
   (Console, Controle, Jogo, Acessório) e pesquise dinamicamente itens do catálogo. 
-  O módulo filtra os resultados em tempo real via JavaScript, priorizando produtos 
-  que começam com o termo digitado, e também fornece a opção de "Outro produto 
-  não listado" como rota de fuga para itens ausentes no banco.
+  O módulo filtra os resultados em tempo real via JavaScript.
   
   HISTÓRICO DE ALTERAÇÕES:
   - 28/05/2026: Inclusão do cabeçalho padrão de documentação.
-  - 28/05/2026: Refatoração da função filtrarProdutos() para priorizar resultados que iniciam com o caractere digitado.
-  - 03/06/2026: Correção de inversão de chaves. Atualizados os IDs de Jogo (para 4) e Acessório (para 3) no HTML e na constante ID_JOGO do JS para alinhar com a base de dados.
-  - 03/06/2026: Remoção do atalho (bypass) da categoria Jogo no JavaScript para permitir a visualização e seleção dos jogos específicos cadastrados no catálogo.
-  - 19/06/2026: Inclusão de texto de orientação (subtítulo) abaixo de "Selecione a categoria" e controle de exibição dinâmica via JS.
-  - 19/06/2026: Ajuste na estilização do subtítulo com um tom de verde discreto para destaque visual.
-  - 24/06/2026: Unificação da rota de fuga "Outros". Implementada renderização persistente 
-    do card "Outro produto não listado" e bloqueio de itens duplicados vindos do banco de dados.
+  - 03/06/2026: Correção de IDs de Jogo e Acessório.
+  - 24/06/2026: Unificação da rota de fuga "Outros".
+  - 08/07/2026: Implementação de seleção via Radio Button, botão "Continuar", 
+    layout de lista vertical e instrução de busca dinâmica.
+  - 08/07/2026 (Atualização 2): Remoção do padding-top do container principal 
+    para aproximar a interface do logotipo global.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -49,12 +46,18 @@
 
     <div id="stepProdutos" style="display: none;">
         <div class="container-botao-voltar">
-            <button class="btn-secondary" style="padding: 10px 25px; width: auto;" onclick="voltarCategorias()">Voltar</button>
+            <button class="btn-secondary" style="padding: 8px 20px; width: auto; font-size: 14px;" onclick="voltarCategorias()">← Voltar</button>
         </div>
         
         <input type="text" id="inputBusca" class="input-busca" placeholder="Digite o nome do produto..." oninput="filtrarProdutos()">
 
-        <div id="listaProdutos" class="grid-produtos" style="margin-top: 20px;">
+        <div id="listaProdutos" class="lista-produtos-desktop" style="margin-top: 20px;">
+            </div>
+
+        <div id="containerContinuar" style="display: none; justify-content: flex-end; margin-top: 30px; margin-bottom: 40px; width: 100%;">
+            <button class="btn-primary" style="padding: 12px 35px; font-size: 16px; font-weight: bold;" onclick="avancarParaPericia()">
+                Continuar →
+            </button>
         </div>
     </div>
 </div>
@@ -66,9 +69,16 @@
     async function selecionarCategoria(catId, catNome) {
         document.getElementById('stepCategorias').style.display = 'none';
         document.getElementById('stepProdutos').style.display = 'block';
+        
         document.getElementById('tituloEtapa').innerText = `Selecione o ${catNome}`;
-        document.getElementById('subTituloEtapa').style.display = 'none';
+        const subTitulo = document.getElementById('subTituloEtapa');
+        subTitulo.innerText = 'Digite o nome do produto para buscar ou escolha diretamente na lista abaixo.';
+        subTitulo.className = 'instrucao-pesquisa'; 
+        
         document.getElementById('inputBusca').placeholder = `Buscar ${catNome}...`;
+        document.getElementById('containerContinuar').style.display = 'none';
+        
+        setTimeout(() => document.getElementById('inputBusca').focus(), 100);
         
         carregarProdutos(catId);
     }
@@ -76,25 +86,30 @@
     function voltarCategorias() {
         document.getElementById('stepProdutos').style.display = 'none';
         document.getElementById('stepCategorias').style.display = 'grid';
+        
         document.getElementById('tituloEtapa').innerText = 'Selecione a categoria';
-        document.getElementById('subTituloEtapa').style.display = 'block';
+        const subTitulo = document.getElementById('subTituloEtapa');
+        subTitulo.innerText = 'Inserir cada item do seu game separadamente: Console c/ 1 Controle, Controle Adicional, Quantidade de Jogos e Acessórios';
+        subTitulo.className = 'busca-subtitulo'; 
+        
         document.getElementById('inputBusca').value = '';
         document.getElementById('listaProdutos').innerHTML = '';
+        document.getElementById('containerContinuar').style.display = 'none';
     }
 
     async function carregarProdutos(catId) {
         categoriaAtualId = catId;
         const container = document.getElementById('listaProdutos');
-        container.innerHTML = '<p style="text-align: center; color: var(--texto-dim); grid-column: 1/-1;">Carregando catálogo...</p>'; 
+        container.innerHTML = '<p style="text-align: center; color: var(--texto-dim);">Carregando catálogo...</p>'; 
         document.getElementById('inputBusca').value = ''; 
 
         try {
             const response = await fetch(`/api/buscar_produtos?categoria_id=${catId}`);
             produtosDaCategoria = await response.json();
-            filtrarProdutos(); // Garante a renderização imediata ao abrir a categoria
+            filtrarProdutos(); 
         } catch (error) {
             console.error("Erro na busca:", error);
-            container.innerHTML = '<p style="color: #ff4444; text-align: center; grid-column: 1/-1;">Erro ao comunicar com o servidor.</p>';
+            container.innerHTML = '<p style="color: #ff4444; text-align: center;">Erro ao comunicar com o servidor.</p>';
         }
     }
 
@@ -102,6 +117,7 @@
         const termo = document.getElementById('inputBusca').value.toLowerCase().trim();
         const container = document.getElementById('listaProdutos');
         container.innerHTML = ''; 
+        document.getElementById('containerContinuar').style.display = 'none';
 
         let produtosFiltrados = produtosDaCategoria;
 
@@ -124,48 +140,85 @@
         }
 
         produtosFiltrados.forEach(p => {
-            // Bloqueia a exibição de qualquer item chamado "Outros" vindo do banco de dados
             if (p.nome_produto.toLowerCase().includes('outro')) return;
 
-            const card = document.createElement('div');
-            card.className = 'card-produto';
-            card.onclick = () => window.location.href = `/pericia/${p.id}`;
+            const label = document.createElement('label');
+            label.className = 'card-produto-list';
             
-            card.innerHTML = `
-                <div class="card-img-wrapper">
+            label.innerHTML = `
+                <div class="radio-wrapper-desktop">
+                    <input type="radio" name="produto_selecionado" value="${p.id}" onchange="liberarBotao()">
+                </div>
+                <div class="list-img-wrapper">
                     <img src="${p.foto_oficial_url || 'https://via.placeholder.com/150'}" alt="${p.nome_produto}">
                 </div>
-                <h4>${p.nome_produto}</h4>
-                <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+                <div class="list-data-wrapper">
+                    <h4>${p.nome_produto}</h4>
+                    <span class="plataforma-badge">${p.plataforma || 'N/A'}</span>
+                </div>
             `;
-            container.appendChild(card);
+            container.appendChild(label);
         });
 
-        // Injeção persistente do card unificado ao final da lista
-        const cardOutro = document.createElement('div');
-        cardOutro.className = 'card-produto card-outro';
-        cardOutro.onclick = () => window.location.href = `/pericia/outro_cat_${categoriaAtualId}`;
-        cardOutro.innerHTML = `
-            <div class="card-img-wrapper" style="font-size: 40px; color: var(--cor-destaque);">
+        const labelOutro = document.createElement('label');
+        labelOutro.className = 'card-produto-list card-outro';
+        labelOutro.innerHTML = `
+            <div class="radio-wrapper-desktop">
+                <input type="radio" name="produto_selecionado" value="outro_cat_${categoriaAtualId}" onchange="liberarBotao()">
+            </div>
+            <div class="list-img-wrapper" style="font-size: 32px; color: var(--cor-destaque);">
                 ➕
             </div>
-            <h4>Outro produto não listado</h4>
+            <div class="list-data-wrapper">
+                <h4>Outro produto não listado</h4>
+                <span style="font-size: 12px; color: var(--texto-dim);">Avaliação Manual</span>
+            </div>
         `;
-        container.appendChild(cardOutro);
+        container.appendChild(labelOutro);
+    }
+
+    function liberarBotao() {
+        const containerBtn = document.getElementById('containerContinuar');
+        containerBtn.style.display = 'flex';
+        
+        setTimeout(() => {
+            containerBtn.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+        }, 100);
+    }
+
+    function avancarParaPericia() {
+        const selecionado = document.querySelector('input[name="produto_selecionado"]:checked');
+        if (selecionado) {
+            window.location.href = `/pericia/${selecionado.value}`;
+        }
     }
 </script>
 
 <style>
-    .container-busca { max-width: 900px; margin: auto; padding: 20px; }
-    .busca-header { margin-bottom: 30px; text-align: center; }
-    .busca-header h2 { color: var(--texto-br); text-transform: uppercase; font-size: 24px; margin-bottom: 5px; }
+    /* PADDING-TOP ZERADO AQUI PARA APROXIMAR O CONTEÚDO DO LOGO */
+    .container-busca { max-width: 900px; margin: auto; padding: 0 20px 20px 20px; }
+    
+    .busca-header { margin-bottom: 15px; text-align: center; } 
+    .busca-header h2 { color: var(--texto-br); text-transform: uppercase; font-size: 20px; margin-bottom: 2px; }
     
     .busca-subtitulo {
-        color: #00cc00; /* Tom de verde discreto para destaque */
+        color: #00cc00; 
         font-size: 14px;
         margin: 10px auto 0 auto;
         max-width: 630px;
         line-height: 1.5;
+        font-weight: 500;
+    }
+
+    .instrucao-pesquisa {
+        color: rgba(0, 204, 0, 0.8); 
+        font-size: 15px;
+        margin: 5px auto 15px auto;
+        max-width: 630px;
+        line-height: 1.4;
         font-weight: 500;
     }
 
@@ -177,26 +230,45 @@
     .card-categoria:hover { border-color: var(--cor-destaque); transform: translateY(-5px); background: #252525; }
     .card-categoria h3 { color: var(--texto-br); margin: 0; font-size: 20px; }
 
-    .grid-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-    .card-produto { 
-        background: var(--bg-fundo); border: var(--borda-fina); border-radius: 10px; padding: 10px; 
-        text-align: center; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; justify-content: space-between;
+    .lista-produtos-desktop { display: flex; flex-direction: column; gap: 12px; }
+    
+    .card-produto-list { 
+        background: var(--bg-fundo); border: var(--borda-fina); border-radius: 12px; padding: 12px 20px; 
+        cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: row; align-items: center; gap: 20px;
     }
-    .card-produto:hover { transform: translateY(-3px); border-color: var(--cor-destaque); }
+    .card-produto-list:hover { transform: translateY(-2px); border-color: var(--cor-destaque); background: #222; }
     
-    .card-img-wrapper { height: 70px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
-    .card-produto img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+    .card-produto-list:has(input[type="radio"]:checked) {
+        border-color: var(--cor-destaque);
+        background: #252525;
+        box-shadow: 0 4px 10px rgba(0, 204, 0, 0.15);
+    }
+
+    .radio-wrapper-desktop { display: flex; align-items: center; justify-content: center; }
+    input[type="radio"] { width: 18px; height: 18px; accent-color: var(--cor-destaque); cursor: pointer; }
     
-    .card-produto h4 { font-size: 11px; margin: 0 0 5px 0; line-height: 1.1; color: var(--texto-br); }
-    .plataforma-badge { background: #333; color: var(--cor-destaque); padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: bold; text-transform: uppercase; margin-top: auto; display: inline-block;}
+    .list-img-wrapper { 
+        width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; 
+        flex-shrink: 0; background: rgba(0,0,0,0.2); border-radius: 8px; 
+    }
+    .list-img-wrapper img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
     
-    .container-botao-voltar { display: flex; justify-content: flex-end; width: 100%; margin-bottom: 20px; }
+    .list-data-wrapper { 
+        display: flex; align-items: center; justify-content: space-between; flex-grow: 1; gap: 15px; 
+    }
+    .list-data-wrapper h4 { font-size: 15px; margin: 0; color: var(--texto-br); text-align: left; }
+    .plataforma-badge { 
+        background: #333; color: var(--cor-destaque); padding: 5px 12px; border-radius: 20px; 
+        font-size: 11px; font-weight: bold; text-transform: uppercase; white-space: nowrap; 
+    }
     
-    .card-outro { border-style: dashed; border-color: #666; justify-content: center; }
-    .card-outro:hover { border-color: var(--cor-destaque); }
+    .container-botao-voltar { display: flex; justify-content: flex-end; width: 100%; margin-bottom: 15px; }
+    
+    .card-outro { border: 2px dashed #555; background: transparent; }
+    .card-outro:hover { border-color: var(--cor-destaque); background: #1a1a1a; }
 
     .input-busca {
-        width: 100%; padding: 15px; margin-bottom: 20px;
+        width: 100%; padding: 16px; margin-bottom: 20px;
         background: var(--bg-fundo); border: 2px solid #333; border-radius: 10px;
         color: var(--texto-br); font-size: 16px; outline: none; box-sizing: border-box;
         transition: border-color 0.3s;

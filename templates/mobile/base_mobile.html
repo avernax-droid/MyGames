@@ -10,8 +10,10 @@
   
   HISTÓRICO DE ALTERAÇÕES:
   - 20/06/2026: Criação e estruturação inicial do template mestre mobile otimizado.
-  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote) 
-    abaixo do stepper (visível das fases 1 a 4) e correção do endpoint de rota.
+  - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
+  - 08/07/2026: Reestruturação do cabeçalho. Logotipo e botão "VER LOTE" 
+    alinhados na mesma linha (flexbox space-between). Aumento do tamanho do logo 
+    (130px) e redução do espaço em branco inferior.
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -38,7 +40,26 @@
         * { box-sizing: border-box; }
         body { background-color: var(--bg-fundo); color: var(--texto-br); margin: 0; font-family: 'Roboto', sans-serif; }
         
-        .logo-header { max-width: 100px; display: block; margin: 0 auto 15px auto; border-radius: 8px; }
+        /* NOVO: CABEÇALHO GLOBAL ALINHADO - MOBILE */
+        .header-global-mobile {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px; /* Espaço morto reduzido */
+            padding: 0;
+        }
+
+        .logo-header { 
+            max-width: 130px; /* Aumentado de 100px para 130px */
+            display: block; 
+            border-radius: 8px; 
+            margin: 0; /* Margem interna zerada para o flexbox controlar */
+        }
+        
+        .header-carrinho-area {
+            display: flex;
+        }
 
         /* COMPONENTES PADRÃO - MOBILE OPTIMIZED */
         .card-padrao {
@@ -102,14 +123,7 @@
         .fase-item.concluida .circulo-interno { background: var(--cor-destaque); box-shadow: 0 0 8px var(--cor-destaque); }
         .fase-item.concluida .fase-nome { color: var(--cor-destaque); }
 
-        /* NOVO: COMPONENTE DE ACESSO AO CARRINHO (LOTE) */
-        .carrinho-container {
-            display: flex;
-            justify-content: flex-end;
-            width: 100%;
-            margin-bottom: 15px;
-            padding: 0;
-        }
+        /* BOTÃO DE ACESSO AO CARRINHO (LOTE) */
         .btn-carrinho-mobile {
             background: rgba(0, 255, 0, 0.08);
             border: 1px solid var(--cor-destaque);
@@ -158,19 +172,19 @@
         </div>
         {% endif %}
 
-        {# Exibe o botão do carrinho apenas nas fases de 1 a 4 #}
-        {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
-        <div class="carrinho-container">
-            <a href="{{ url_for('resumo') }}" class="btn-carrinho-mobile">
-                <span style="font-size: 15px;">🛒</span> VER LOTE
-            </a>
-        </div>
-        {% endif %}
-
-        <header>
-            <div style="text-align: center; margin-bottom: 20px;">
+        <header class="header-global-mobile">
+            <div class="logo-container">
                 <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo" class="logo-header">
             </div>
+            
+            {# Exibe o botão do carrinho apenas nas fases de 1 a 4 #}
+            {% if fase_atual|default(0) >= 1 and fase_atual|default(0) <= 4 %}
+            <div class="header-carrinho-area">
+                <a href="{{ url_for('resumo') }}" class="btn-carrinho-mobile">
+                    <span style="font-size: 15px;">🛒</span> VER LOTE
+                </a>
+            </div>
+            {% endif %}
         </header>
 
         <main>
