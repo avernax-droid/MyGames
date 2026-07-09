@@ -22,3 +22,4 @@ DOCS/
 static/uploads/
 flask_session/
 instance/ # <- Flask cria essa pasta se usar sqlite em app.instance_path
+utils/run_etl_docker.sh
