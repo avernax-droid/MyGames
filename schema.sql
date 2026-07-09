@@ -418,3 +418,9 @@ CREATE TABLE `usuarios_admin` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-07-09 10:52:34
+
+INSERT INTO usuarios_admin 
+    (nome_completo, usuario_login, email, senha_hash, nivel_acesso, ativo, requer_nova_senha, data_criacao) 
+VALUES 
+    ('Admin MyGames', 'admin', 'admin@mygames.com.br', 'scrypt:32768:8:1$hkHo1bPvBYpysNji$34e60ba4dd2c9419dc07996c808bb6c31935254dc689f685c3b4b777c34dbd3a26bf0d4bfc9dd4edf759c16a23346016a47b2169b3c1ae25cf1179559e786f12', 'Administrador', 1, 1, NOW());
+    
