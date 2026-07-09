@@ -18,6 +18,7 @@ DOCS/
 *.sql
 !schema.sql
 !requirements.txt
+!carga_configs.sql
 
 # Arquivos temporários e uploads locais
 *:Zone.Identifier

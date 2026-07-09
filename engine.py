@@ -40,6 +40,8 @@
 # - 04/07/2026: Integração do campo valor_cred_base nas funções calcular_cotacao_final e buscar_produtos_por_categoria.
 # - 05/07/2026: Correção na função enviar_email_resumo para multiplicar o valor unitário pela quantidade do item na listagem do e-mail.
 # - 07/07/2026: Refatoração na função calcular_cotacao_final para remover a multiplicação por quantidade, garantindo o retorno estrito do valor unitário.
+# - 09/07/2026: Refatoração na função enviar_email_resumo para remover credenciais SMTP hardcoded e parametrizar consumo seguro via 
+#   variáveis de ambiente (.env).
 # ==============================================================================
 
 import mysql.connector
@@ -289,7 +291,11 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         empresa = obter_dados_empresa()
         nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
         
-        remetente_login, senha = "avernax@gmail.com", "nmmawgxrhuyzfpoe"
+        # PARAMETRIZAÇÃO DINÂMICA: Lendo as configurações via variáveis de ambiente (.env)
+        remetente_login = os.getenv('EMAIL_USER')
+        senha = os.getenv('EMAIL_PASS')
+        host_smtp = os.getenv('EMAIL_HOST')
+        porta_smtp = int(os.getenv('EMAIL_PORT', 587))
         
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr((nome_fantasia, remetente_login))
@@ -351,7 +357,7 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             
             {aviso_manual_html}
             
-            <p>Assim que recebermos os itens, os mesmos passarão pela nossa <strong>PERÍCIA TÉCNICA</strong> e vamos te enviar o <strong>LAUDO</strong> e realizar o <strong>PAGAMENTO</strong> em até 48 horas úteis após o envio deste laudo.</p>
+            <p>Assim que recebermos os itens, os mesmos passarão pela nossa <strong>PERÍCIA TÉCNICA</strong> e vamos te enviar o <strong>LAUDO</strong> e realizar o <strong>PAGAMENTO</strong> em até 48 hours úteis após o envio deste laudo.</p>
             <p>Caso haja qualquer divergência nas informações ou falha encontrada na perícia, nossa equipe entrará em contato com você!</p>
             
             <p><strong>POLÍTICA DE AVALIAÇÃO FÍSICA:</strong><br>
@@ -368,7 +374,8 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             
         msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
         
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        # Conexão dinâmica baseada nas configurações de ambiente (.env)
+        server = smtplib.SMTP(host_smtp, porta_smtp)
         server.starttls()
         server.login(remetente_login, senha)
         server.send_message(msg)
