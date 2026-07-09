@@ -17,6 +17,7 @@ DOCS/
 *.txt
 *.sql
 !schema.sql
+!requirements.txt
 
 # Arquivos temporários e uploads locais
 *:Zone.Identifier
