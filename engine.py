@@ -294,6 +294,9 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         # PARAMETRIZAÇÃO DINÂMICA: Lendo as configurações via variáveis de ambiente (.env)
         remetente_login = os.getenv('EMAIL_USER')
         senha = os.getenv('EMAIL_PASS')
+
+        print(f">>> [DEBUG] E-MAIL NA MEMÓRIA DO PYTHON: {remetente_login} <<<")
+
         host_smtp = os.getenv('EMAIL_HOST')
         porta_smtp = int(os.getenv('EMAIL_PORT', 587))
         
@@ -382,7 +385,9 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         server.quit()
         return True
     except Exception as e: 
-        print(f"Erro ao enviar email: {e}")
+        import traceback
+        logging.error(f"FALHA CRÍTICA NO SMTP: {str(e)}")
+        logging.error(traceback.format_exc())
         return False
 
 def finalizar_proposta(dados_proposta):

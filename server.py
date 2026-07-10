@@ -54,7 +54,7 @@ from user_agents import parse # Biblioteca para detecção precisa do dispositiv
 from flask_session import Session # NOVO: Importação para gerenciamento de sessão no servidor
 
 # 1. Carrega variáveis de ambiente ANTES de importar o engine
-load_dotenv()
+load_dotenv(override=True)
 
 # 2. Agora o engine entra, já enxergando as credenciais do banco mygames_dev
 import engine  
