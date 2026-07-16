@@ -115,3 +115,13 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-07-09 15:56:24
+
+--
+-- Dumping data for table `usuarios_admin`
+--
+
+LOCK TABLES `usuarios_admin` WRITE;
+/*!40000 ALTER TABLE `usuarios_admin` DISABLE KEYS */;
+INSERT INTO `usuarios_admin` VALUES (1, 'Administrador do Sistema', 'admin', 'rocklaser@uol.com.br', 'scrypt:32768:8:1$nadItQUaQKHuqCw1$a8562925968c7093d80ab4ed3089d1d9e909c0e18f75de0f020b8eaed51ae2a3b274ac893472e7cccf499ed819381a2a5f00ae310f696109d1b432bc6145bf3c', 'Administrador', 1, CURRENT_TIMESTAMP, NULL, 1);
+/*!40000 ALTER TABLE `usuarios_admin` ENABLE KEYS */;
+UNLOCK TABLES;

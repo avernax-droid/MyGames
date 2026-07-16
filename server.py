@@ -41,6 +41,7 @@
 # - 06/07/2026: Implementação de exceção para itens sob consulta (is_outros) na trava de valor mínimo de R$ 300,00 na rota /resumo.
 # - 07/07/2026: Refatoração na rota /cotar para remover divisão manual de quantidades e corrigir estruturação do dicionário para itens lote (PIX e Crédito).
 # - 07/07/2026: Correção na rota /resumo para calcular o total_lote utilizando valor_pix_unitario, alinhando com a intenção de venda do usuário e travando corretamente em R$ 300,00.
+# - 15/07/2026: Adição da diretiva MAX_CONTENT_LENGTH (50MB) para alinhar limite de upload do Flask com Nginx em produção.
 # ==============================================================================
 
 import os
@@ -61,6 +62,10 @@ import engine
 
 app = Flask(__name__)
 app.secret_key = 'mygames_key_2026'
+
+# --- LIMITE DE UPLOAD ---
+# Define o teto máximo de upload do Flask para 50MB, alinhado ao Nginx
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 
 
 # --- NOVA CONFIGURAÇÃO DE SESSÃO NO SERVIDOR ---
 app.config['SESSION_TYPE'] = 'filesystem'
