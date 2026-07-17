@@ -13,6 +13,7 @@
   - 23/06/2026: Inclusão do botão de atalho para o Carrinho (Resumo do Lote).
   - 08/07/2026: Reestruturação do cabeçalho. Logotipo e botão "VER LOTE" 
     alinhados pela borda superior (flex-start). Margem inferior reduzida.
+  - 16/07/2026: Integração das tags de rastreamento do Google Tag Manager (GTM).
   ==============================================================================
 #}
 <!DOCTYPE html>
@@ -20,6 +21,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-T3GCBRD');</script>
+    <!-- End Google Tag Manager -->
+
     <title>{% block title %}{% endblock %}</title>
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -159,6 +169,11 @@
     </style>
 </head>
 <body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T3GCBRD"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
     <div class="container">
         
         {% if fase_atual|default(0) > 0 %}
