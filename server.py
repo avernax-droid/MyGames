@@ -42,6 +42,7 @@
 # - 07/07/2026: Refatoração na rota /cotar para remover divisão manual de quantidades e corrigir estruturação do dicionário para itens lote (PIX e Crédito).
 # - 07/07/2026: Correção na rota /resumo para calcular o total_lote utilizando valor_pix_unitario, alinhando com a intenção de venda do usuário e travando corretamente em R$ 300,00.
 # - 15/07/2026: Adição da diretiva MAX_CONTENT_LENGTH (50MB) para alinhar limite de upload do Flask com Nginx em produção.
+# - 18/07/2026: Correção na rota /pericia para repassar a variável produto_foto para o frontend.
 # ==============================================================================
 
 import os
@@ -201,6 +202,8 @@ def pericia(produto_id):
         else:
             produto_nome = "Produto não listado"
             categoria_nome = "Outros"
+            
+        produto_foto = None # Inicia nulo para itens que não são do catálogo mestre
     else:
         session['is_outros'] = False
         produto = engine.obter_produto_por_id(produto_id)
@@ -209,6 +212,7 @@ def pericia(produto_id):
         categoria_id = produto.get('categoria_id')
         id_oficial = produto['id']
         produto_nome = produto.get('nome_produto', 'Produto')
+        produto_foto = produto.get('foto_oficial_url', None) # Extrai a foto do banco
         
         mapa_categorias = {
             '1': 'Console',
@@ -245,7 +249,8 @@ def pericia(produto_id):
         token_sessao=token_sessao,
         produto_nome=produto_nome,
         categoria_nome=categoria_nome,
-        permite_desbloqueio=permite_desbloqueio
+        permite_desbloqueio=permite_desbloqueio,
+        produto_foto=produto_foto # Repassa a foto para o frontend
     )
 
 # 3ª TELA: CÁLCULO E EXIBIÇÃO DA COTAÇÃO
