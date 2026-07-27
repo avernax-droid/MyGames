@@ -14,8 +14,9 @@
   - 29/05/2026: Inclusão de feedback visual dinâmico no botão de submit.
   - 29/05/2026: Restauração da máscara e busca automática de endereço pelo CEP (ViaCEP).
   - 19/06/2026: Alteração do título do cabeçalho e do texto do botão de envio.
-  - 23/06/2026: Aplicação do filtro Jinja2 '|e' (escape) nos values dos inputs para 
-    prevenir quebra de layout/HTML injection com caracteres especiais.
+  - 23/06/2026: Aplicação do filtro Jinja2 '|e' (escape) nos values dos inputs para prevenir quebra de layout/HTML injection com caracteres especiais.
+  - 27/07/2026: Inclusão de script de validação matemática visual do CPF no submit do formulário para barrar dados inválidos no front-end.
+  - 27/07/2026: Ajuste na UX: Validação imediata do CPF nos eventos blur e keydown para impedir avanço de campo ao digitar dado inválido.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -147,13 +148,51 @@
         return val;
     }
 
+    function validarCPFVisual(cpf) {
+        cpf = cpf.replace(/[^\d]+/g,'');
+        if(cpf == '') return false;
+        
+        // Elimina CPFs invalidos conhecidos
+        if (cpf.length != 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+        
+        // Valida 1o digito
+        let add = 0;
+        for (let i=0; i < 9; i ++) add += parseInt(cpf.charAt(i)) * (10 - i);
+        let rev = 11 - (add % 11);
+        if (rev == 10 || rev == 11) rev = 0;
+        if (rev != parseInt(cpf.charAt(9))) return false;
+        
+        // Valida 2o digito
+        add = 0;
+        for (let i = 0; i < 10; i ++) add += parseInt(cpf.charAt(i)) * (11 - i);
+        rev = 11 - (add % 11);
+        if (rev == 10 || rev == 11) rev = 0;
+        if (rev != parseInt(cpf.charAt(10))) return false;
+        
+        return true;
+    }
+
     document.getElementById('cpf').addEventListener('blur', function() {
         const cpfLimpo = this.value.replace(/\D/g, ''); 
         const feedback = document.getElementById('feedbackCpf');
+        
         if (cpfLimpo.length === 11) {
+            // TRAVA NOVA: Valida matematicamente ANTES de buscar na API
+            if (!validarCPFVisual(this.value)) {
+                feedback.style.display = 'block';
+                feedback.style.color = '#ff4d4d'; // Vermelho
+                feedback.textContent = 'CPF Inválido!';
+                this.style.borderColor = "#ff4d4d";
+                return; // Bloqueia e não consulta a API
+            }
+            
+            // Passou na validação, limpa alertas de erro
+            this.style.borderColor = "#444";
+            
             feedback.style.display = 'block';
             feedback.style.color = '#ff8c00';
             feedback.textContent = 'Buscando perfil...';
+            
             fetch(`/api/obter_cliente_por_cpf?cpf=${cpfLimpo}`)
                 .then(r => r.json())
                 .then(d => {
@@ -186,20 +225,50 @@
         if (e.target.value.replace(/\D/g, '').length < 11) {
             limparCamposPorAlteracaoCPF();
             document.getElementById('feedbackCpf').style.display = 'none';
+            e.target.style.borderColor = "#444"; // Restaura a borda se estiver apagando
         }
     });
 
     document.querySelector('form').addEventListener('keydown', function(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            if (event.target.id === 'cpf') event.target.blur();
+            
+            if (event.target.id === 'cpf') {
+                const cpfLimpo = event.target.value.replace(/\D/g, '');
+                
+                // TRAVA NOVA: Se o usuário apertar Enter com CPF inválido, bloqueia
+                if (cpfLimpo.length === 11 && !validarCPFVisual(event.target.value)) {
+                    const feedback = document.getElementById('feedbackCpf');
+                    feedback.style.display = 'block';
+                    feedback.style.color = '#ff4d4d';
+                    feedback.textContent = 'CPF Inválido!';
+                    event.target.style.borderColor = "#ff4d4d";
+                    return; // Retorna e não avança de campo
+                }
+                
+                event.target.blur();
+            }
+            
             const inputs = Array.from(this.querySelectorAll('input:not([type="hidden"])'));
             const index = inputs.indexOf(event.target);
             if (index > -1 && index < inputs.length - 1) inputs[index + 1].focus();
         }
     });
 
-    document.querySelector('form').addEventListener('submit', function() {
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const cpfInput = document.getElementById('cpf');
+        
+        // Bloqueio de Segurança Final para o Submit
+        if (cpfInput && !validarCPFVisual(cpfInput.value)) {
+            e.preventDefault(); 
+            alert("O CPF informado é inválido. Por favor, verifique a digitação.");
+            cpfInput.focus();
+            cpfInput.style.borderColor = "#ff4d4d"; 
+            return;
+        } else if (cpfInput) {
+            cpfInput.style.borderColor = "#444"; 
+        }
+
         const btnSubmit = this.querySelector('button[type="submit"]');
         if (btnSubmit) {
             const spinnerSVG = `
@@ -221,21 +290,18 @@
     });
 
     // ==============================================================================
-    // ALTERAÇÃO AQUI: Eventos para o campo CEP (Máscara e Fetch no ViaCEP)
+    // EVENTOS PARA CEP (ViaCEP)
     // ==============================================================================
     const campoCep = document.getElementById('cep');
     
-    // Aplica a máscara enquanto digita
     campoCep.addEventListener('input', function(e) {
         e.target.value = aplicarMascaraCEP(e.target.value);
     });
 
-    // Busca o endereço na API ao sair do campo
     campoCep.addEventListener('blur', function() {
         const cepLimpo = this.value.replace(/\D/g, '');
         
         if (cepLimpo.length === 8) {
-            // Muda o placeholder para dar feedback visual de busca
             document.getElementById('endereco').placeholder = "Buscando...";
             
             fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
@@ -247,10 +313,7 @@
                         document.getElementById('cidade').value = dados.localidade || '';
                         document.getElementById('estado_uf').value = dados.uf || '';
                         
-                        // Restaura o placeholder
                         document.getElementById('endereco').placeholder = "Rua, Av...";
-                        
-                        // Foca no campo número para agilizar a vida do usuário
                         document.getElementById('numero').focus();
                     } else {
                         alert("CEP não encontrado.");

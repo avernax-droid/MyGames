@@ -20,6 +20,7 @@
   - 23/06/2026: Aplicação do filtro moeda_real, inclusão de quebra segura de strings (word-break) 
     nos códigos e estilização das instruções de envio para a cor branca (Paridade Mobile).
   - 23/06/2026: Ajuste no alinhamento do botão do WhatsApp para ficar mais próximo ao número de telefone.
+  - 27/07/2026: Substituição do termo "Logística Reversa" e inclusão visual obrigatória do CEP de destino.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -55,12 +56,17 @@
     {% if codigo_rastreio %}
     <div style="background: rgba(0, 255, 0, 0.05); padding: 25px 20px; border-radius: 12px; border: 2px solid var(--cor-destaque); margin-bottom: 25px; text-align: center; box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);">
         <h3 style="font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 20px 0; font-size: 1.2rem; letter-spacing: 1px;">
-            📦 Logística Reversa (Envio Correios)
+            📦 Código de Rastreio (Envio Correios)
         </h3>
         
-        <div style="margin-bottom: 25px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; display: inline-block; min-width: 80%;">
+        <div style="margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; display: inline-block; min-width: 80%;">
             <span style="display: block; font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 8px;">Código de Rastreio</span>
             <strong style="font-size: 2rem; color: var(--cor-destaque); font-family: 'Courier New', monospace; letter-spacing: 2px; word-break: break-all; overflow-wrap: break-word;">{{ codigo_rastreio }}</strong>
+        </div>
+
+        <div style="margin-bottom: 25px; background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px; display: inline-block; min-width: 80%;">
+            <span style="display: block; font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">CEP de Destino (Obrigatório)</span>
+            <strong style="font-size: 1.5rem; color: #ffffff; font-family: 'Courier New', monospace; letter-spacing: 2px;">{{ cep_empresa_formatado }}</strong>
         </div>
         
         <div style="border-top: 1px solid rgba(0, 255, 0, 0.2); padding-top: 15px; text-align: left;">
@@ -68,7 +74,7 @@
                 PRÓXIMOS PASSOS
             </h4>
             <div style="font-size: 0.9rem; color: var(--texto-dim); line-height: 1.5;">
-                <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;">Embale os itens com segurança dentro de uma caixa, dirija-se a qualquer agência dos Correios e informe o <b><i>código de rastreio</i></b>. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
+                <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;"><b>Atenção:</b> Para realizar a postagem gratuita, apresente ao atendente o <b>Código de Rastreio</b> acima junto com o nosso <b>CEP de Destino</b>. Embale os itens com segurança dentro de uma caixa e dirija-se a qualquer agência dos Correios. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
             </div>
         </div>
     </div>

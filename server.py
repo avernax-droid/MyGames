@@ -23,7 +23,7 @@
 # - 04/06/2026: Correção na rota /cotar para passar o parâmetro de quantidade à engine e remoção de multiplicação redundante.
 # - 04/06/2026: Implementação de roteamento dinâmico para mobile (render_smart_template) usando a biblioteca user-agents.
 # - 07/06/2026: Correção de colisão de nomes de arquivos em uploads simultâneos via mobile (uso de enumerate na rota /cotar).
-# - 10/06/2026: Recebimento e repasse dos dados de logística reversa (e-ticket e rastreio) na rota /finalizar.
+# - 10/06/2026: Recebimento e repasse dos dados de postagem (e-ticket e código de rastreio) na rota /finalizar.
 # - 10/06/2026: Inclusão dos campos e_ticket e codigo_rastreio no dicionário dados_email para envio por e-mail.
 # - 15/06/2026: Integração da rota /finalizar com a tabela dados_empresa para exibição dinâmica no sucesso.html.
 # - 16/06/2026: Tratamento seguro da variável nome_fantasia na rota /finalizar com fallback para evitar erros de renderização no Jinja2.
@@ -43,6 +43,8 @@
 # - 07/07/2026: Correção na rota /resumo para calcular o total_lote utilizando valor_pix_unitario, alinhando com a intenção de venda do usuário e travando corretamente em R$ 300,00.
 # - 15/07/2026: Adição da diretiva MAX_CONTENT_LENGTH (50MB) para alinhar limite de upload do Flask com Nginx em produção.
 # - 18/07/2026: Correção na rota /pericia para repassar a variável produto_foto para o frontend.
+# - 27/07/2026: Inclusão de trava de segurança no backend (rota /finalizar-lote) com validação matemática de CPF.
+# - 27/07/2026: Injeção da variável cep_empresa_formatado na rota /finalizar e adequação do termo 'código de rastreio'.
 # ==============================================================================
 
 import os
@@ -73,6 +75,25 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
 Session(app)
+
+# --- FUNÇÃO AUXILIAR: VALIDAÇÃO MATEMÁTICA DE CPF ---
+def validar_cpf(cpf):
+    """Verifica se o CPF informado é matematicamente válido."""
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    
+    # Verifica tamanho e se todos os números são iguais (ex: 111.111.111-11)
+    if len(cpf) != 11 or cpf == cpf[0] * 11:
+        return False
+    
+    def calcular_digito(cpf_parcial):
+        soma = sum(int(digito) * peso for digito, peso in zip(cpf_parcial, range(len(cpf_parcial) + 1, 1, -1)))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+        
+    digito1 = calcular_digito(cpf[:9])
+    digito2 = calcular_digito(cpf[:9] + str(digito1))
+    
+    return cpf[-2:] == f"{digito1}{digito2}"
 
 # --- FUNÇÃO CORE DE ROTEAMENTO MOBILE ---
 def render_smart_template(template_name, **context):
@@ -531,6 +552,12 @@ def finalizar_lote():
         return redirect(url_for('produto'))
     
     cpf_puro = ''.join(filter(str.isdigit, request.form.get('cpf', '')))
+    
+    # --- NOVA TRAVA DE SEGURANÇA: VALIDAÇÃO DE CPF ---
+    if not validar_cpf(cpf_puro):
+        return "Erro: O CPF informado é inválido. Por favor, retorne e tente novamente.", 400
+    # -------------------------------------------------
+
     cep_puro = ''.join(filter(str.isdigit, request.form.get('cep', '')))
     whatsapp_puro = ''.join(filter(str.isdigit, request.form.get('whatsapp', '')))
         
@@ -603,6 +630,10 @@ def finalizar():
         # Busca dados atualizados da empresa na tabela dados_empresa
         empresa = engine.obter_dados_empresa()
         
+        # Formatar CEP para envio para a view (Obrigatório mostrar pro cliente)
+        cep_bruto = ''.join(filter(str.isdigit, str(empresa.get('cep', '')))) if empresa else ''
+        cep_empresa_formatado = f"{cep_bruto[:5]}-{cep_bruto[5:]}" if len(cep_bruto) == 8 else cep_bruto
+        
         # Fallback seguro: se a tabela estiver vazia, define um padrão
         nome_fantasia_seguro = empresa.get('nome_fantasia', 'MyGames') if empresa else 'MyGames'
 
@@ -626,7 +657,8 @@ def finalizar():
             codigo_rastreio=codigo_rastreio,
             nome_fantasia=nome_fantasia_seguro,
             dados_empresa=empresa,
-            empresa=empresa 
+            empresa=empresa,
+            cep_empresa_formatado=cep_empresa_formatado
         )
     
     return "Erro ao finalizar agendamento.", 500

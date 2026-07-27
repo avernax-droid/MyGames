@@ -21,7 +21,7 @@
 # - 09/06/2026: Implementação da função de integração com API dos Correios (Logística Reversa) para validação via log.
 # - 10/06/2026: Inclusão do interceptador Mock 'fake' e integração automática da logística reversa na criação do protocolo.
 # - 10/06/2026: Hotfix na função calcular_cotacao_final para corrigir digitação no nome da coluna (fator_depreciacao).
-# - 10/06/2026: Formatação e inserção dos dados de logística reversa (e-ticket e rastreio) no corpo do e-mail de resumo.
+# - 10/06/2026: Formatação e inserção dos dados de postagem (e-ticket e rastreio) no corpo do e-mail de resumo.
 # - 11/06/2026: Inclusão de status_id = 1 na função finalizar_proposta.
 # - 13/06/2026: Migração da integração dos Correios para arquitetura SOAP/XML. Inclusão de roteamento dinâmico de serviço (PAC/SEDEX) por faixa de CEP.
 # - 15/06/2026: Inclusão da função obter_dados_empresa para corrigir o AttributeError na geração do protocolo mobile.
@@ -40,8 +40,9 @@
 # - 04/07/2026: Integração do campo valor_cred_base nas funções calcular_cotacao_final e buscar_produtos_por_categoria.
 # - 05/07/2026: Correção na função enviar_email_resumo para multiplicar o valor unitário pela quantidade do item na listagem do e-mail.
 # - 07/07/2026: Refatoração na função calcular_cotacao_final para remover a multiplicação por quantidade, garantindo o retorno estrito do valor unitário.
-# - 09/07/2026: Refatoração na função enviar_email_resumo para remover credenciais SMTP hardcoded e parametrizar consumo seguro via 
-#   variáveis de ambiente (.env).
+# - 09/07/2026: Refatoração na função enviar_email_resumo para remover credenciais SMTP hardcoded e parametrizar consumo seguro via variáveis de ambiente (.env).
+# - 27/07/2026: Substituição da terminologia 'Logística Reversa' por 'Código de Rastreio', e formatação/exibição do CEP de destino no e-mail.
+# - 27/07/2026: Implementação da Solução "Modo 1" (Workaround Portal Postal): Remoção da tag <reversa>1</reversa>. Empresa alocada na raiz (Destinatário) para viabilizar chave de busca por CEP no balcão, resultando em etiqueta espelhada. Cliente alocado no bloco <remetente>.
 # ==============================================================================
 
 import mysql.connector
@@ -291,6 +292,10 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         empresa = obter_dados_empresa()
         nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
         
+        # Recuperando e formatando o CEP dinamicamente
+        cep_bruto = ''.join(filter(str.isdigit, str(empresa.get('cep', '')))) if empresa else ''
+        cep_empresa_formatado = f"{cep_bruto[:5]}-{cep_bruto[5:]}" if len(cep_bruto) == 8 else cep_bruto
+
         # PARAMETRIZAÇÃO DINÂMICA: Lendo as configurações via variáveis de ambiente (.env)
         remetente_login = os.getenv('EMAIL_USER')
         senha = os.getenv('EMAIL_PASS')
@@ -336,11 +341,12 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         html_logistica = ""
         if dados_email.get('codigo_rastreio'):
             html_logistica = f"""
-            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima de sua residência juntamente com o código de <strong>LOGÍSTICA REVERSA</strong> apresentado abaixo.</p>
+            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima de sua residência juntamente com o seu <strong>CÓDIGO DE RASTREIO</strong> apresentado abaixo e o nosso CEP de destino.</p>
             <p><strong>ATENÇÃO: Você não deve realizar nenhum pagamento, o custo do envio é por nossa conta!</strong></p>
-            <p><strong>DADOS DE POSTAGEM (LOGÍSTICA REVERSA):</strong><br>
-            <strong>Código de Rastreio dos Correios:</strong> {dados_email['codigo_rastreio']}</p>
-            <p><strong>Instruções:</strong> Embale os itens com segurança, dirija-se a uma agência dos Correios e informe o código de rastreio acima.<br>
+            <p><strong>DADOS DE POSTAGEM:</strong><br>
+            <strong>Código de Rastreio dos Correios:</strong> {dados_email['codigo_rastreio']}<br>
+            <strong>CEP de Destino (Obrigatório):</strong> {cep_empresa_formatado}</p>
+            <p><strong>Instrução:</strong> Dirija-se a uma agência dos Correios e informe ao atendente o <strong>Código de Rastreio</strong> e o nosso <strong>CEP de Destino</strong> para localizar a sua postagem pré-paga.<br>
             O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, sendo 100% gratuito para você.</p>
             """
 
@@ -418,7 +424,7 @@ def finalizar_proposta(dados_proposta):
         if not itens_avaliados:
             itens_avaliados = [{'produto_nome': 'Produtos Diversos', 'quantidade': 1, 'valor_pix_unitario': 0.00}]
             
-        e_ticket, codigo_rastreio = gerar_logistica_reversa(dados_remetente, protocolo, itens_avaliados)
+        e_ticket, codigo_rastreio = gerar_codigo_rastreio(dados_remetente, protocolo, itens_avaliados)
         
         sql = """INSERT INTO protocolos_recompra 
                   (cliente_id, numero_protocolo, status, status_id, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) 
@@ -537,7 +543,7 @@ def buscar_canais_aquisicao():
 
 # --- INTEGRAÇÃO CORREIOS ---
 
-def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
+def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     """
     Integração com Web Service do Portal Postal (Correios AGF).
     Utiliza o método PrePostagemXml (Sem Sequência Lógica).
@@ -552,10 +558,28 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
         logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
         return "888888888", "BR987654321BR"
 
-    empresa = obter_dados_empresa()
-    nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
+    # A Empresa é o DESTINATÁRIO da postagem
+    empresa = obter_dados_empresa() or {}
+    nome_fantasia = empresa.get('nome_fantasia', 'Loja')
+    cep_empresa = ''.join(filter(str.isdigit, str(empresa.get('cep', ''))))
+    logradouro_empresa = escape(str(empresa.get('logradouro', '')))[:100]
+    numero_empresa = escape(str(empresa.get('numero', '')))[:10]
+    complemento_empresa = escape(str(empresa.get('complemento', '')))[:100]
+    bairro_empresa = escape(str(empresa.get('bairro', '')))[:100]
+    cidade_empresa = escape(str(empresa.get('cidade', '')))[:100]
+    uf_empresa = escape(str(empresa.get('estado_uf', '')))[:2]
 
+    # O Cliente é o REMETENTE da postagem
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
+    nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
+    logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
+    numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
+    complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]
+    bairro_seguro = escape(str(dados_remetente.get('bairro', '')))[:100]
+    cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]
+    uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
+
+    # Ajuste definitivo conforme padrão oficial do Web Service do Portal Postal
     servico_correios = "PAC"
     
     if cep_cliente and len(cep_cliente) == 8:
@@ -564,7 +588,7 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
             logging.info(f"Roteamento: CEP {cep_cliente} classificado como SEDEX")
         else:
             logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC")
-
+            
     xml_itens = ""
     for item in itens_avaliados:
         descricao_limpa = escape(str(item.get('produto_nome', f'Item {nome_fantasia}')))[:100]
@@ -578,26 +602,31 @@ def gerar_logistica_reversa(dados_remetente, numero_protocolo, itens_avaliados):
             <valor>{escape(str(item.get('valor_pix_unitario', '0.00')))}</valor>
         </item>"""
 
-    nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
-    logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
-    numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
-    complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]
-    bairro_seguro = escape(str(dados_remetente.get('bairro', '')))[:100]
-    cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]
-    uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
-
+    # XML gerado como Pré-Postagem Padrão (Sem tag reversa)
+    # A Empresa fica na raiz (assumindo o papel de Destinatário)
+    # O Cliente fica encapsulado na tag <remetente>
     xml_dados_postagem = f"""<portalpostal>
     <pre_postagem>
         <chave>{numero_protocolo}</chave>
-        <nome>{nome_seguro}</nome>
-        <cep>{cep_cliente}</cep>
-        <endereco>{logradouro_seguro}</endereco>
-        <numero>{numero_seguro}</numero>
-        <complemento>{complemento_seguro}</complemento>
-        <bairro>{bairro_seguro}</bairro>
-        <cidade>{cidade_seguro}</cidade>
-        <estado>{uf_seguro}</estado>
+        <nome>{nome_fantasia}</nome>
+        <cep>{cep_empresa}</cep>
+        <endereco>{logradouro_empresa}</endereco>
+        <numero>{numero_empresa}</numero>
+        <complemento>{complemento_empresa}</complemento>
+        <bairro>{bairro_empresa}</bairro>
+        <cidade>{cidade_empresa}</cidade>
+        <estado>{uf_empresa}</estado>
         <servico>{servico_correios}</servico>
+        <remetente>
+            <nome>{nome_seguro}</nome>
+            <cep>{cep_cliente}</cep>
+            <endereco>{logradouro_seguro}</endereco>
+            <numero>{numero_seguro}</numero>
+            <complemento>{complemento_seguro}</complemento>
+            <bairro>{bairro_seguro}</bairro>
+            <cidade>{cidade_seguro}</cidade>
+            <estado>{uf_seguro}</estado>
+        </remetente>
         <conteudo>{xml_itens}</conteudo>
     </pre_postagem>
 </portalpostal>"""

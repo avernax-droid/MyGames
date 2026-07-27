@@ -18,6 +18,8 @@
     aplicação da cor branca no texto explicativo.
   - 23/06/2026: Aplicação do filtro moeda_real no valor total da proposta.
   - 23/06/2026: Ajuste no alinhamento da classe .contato-flex-mobile para aproximar o ícone do WhatsApp do número de telefone (flex-start com gap).
+  - 27/07/2026: Substituição do termo "Logística Reversa" por "Código de Rastreio" e 
+    inclusão visual obrigatória do CEP de destino nas instruções.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -55,18 +57,23 @@
         {% if codigo_rastreio %}
         <div class="logistica-box-mobile">
             <h3 class="logistica-titulo-mobile">
-                📦 Logística Reversa (Envio Correios)
+                📦 Código de Rastreio (Envio Correios)
             </h3>
             
             <div class="rastreio-box-mobile">
                 <span class="rastreio-label-mobile">Código de Rastreio</span>
                 <strong class="codigo-longo-mobile codigo-destaque-mobile">{{ codigo_rastreio }}</strong>
             </div>
+
+            <div class="cep-box-mobile">
+                <span class="cep-label-mobile">CEP de Destino (Obrigatório)</span>
+                <strong class="codigo-longo-mobile cep-destaque-mobile">{{ cep_empresa_formatado }}</strong>
+            </div>
             
             <div class="passos-box-mobile">
                 <h4 class="passos-titulo-mobile">PRÓXIMOS PASSOS</h4>
                 <div class="passos-texto-mobile">
-                    <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;">Embale os itens com segurança dentro de uma caixa, dirija-se a qualquer agência dos Correios e informe o <b><i>código de rastreio</i></b>. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
+                    <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;"><b>Atenção:</b> Para realizar a postagem gratuita, apresente ao atendente o <b>Código de Rastreio</b> acima junto com o nosso <b>CEP de Destino</b>. Embale os itens com segurança dentro de uma caixa e dirija-se a qualquer agência dos Correios. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
                 </div>
             </div>
         </div>
@@ -152,13 +159,17 @@
     .protocolo-label-mobile { font-size: 12px; color: var(--texto-dim); text-transform: uppercase; }
     .protocolo-box-mobile .codigo-longo-mobile { font-size: 18px; letter-spacing: 1px; }
 
-    /* Logística Reversa */
+    /* Código de Rastreio e CEP */
     .logistica-box-mobile { background: rgba(0, 255, 0, 0.05); padding: 20px 15px; border-radius: 12px; border: 2px solid var(--cor-destaque); margin-bottom: 25px; box-shadow: 0 0 15px rgba(0, 255, 0, 0.1); }
     .logistica-titulo-mobile { font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-transform: uppercase; margin: 0 0 15px 0; font-size: 18px; letter-spacing: 1px; }
     
-    .rastreio-box-mobile { margin-bottom: 20px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; }
+    .rastreio-box-mobile { margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; }
     .rastreio-label-mobile { display: block; font-size: 11px; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
     .codigo-destaque-mobile { font-size: 26px; color: var(--cor-destaque); letter-spacing: 2px; }
+
+    .cep-box-mobile { margin-bottom: 20px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; }
+    .cep-label-mobile { display: block; font-size: 11px; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+    .cep-destaque-mobile { font-size: 22px; color: #ffffff; letter-spacing: 2px; }
 
     .passos-box-mobile { border-top: 1px solid rgba(0, 255, 0, 0.2); padding-top: 15px; text-align: left; }
     .passos-titulo-mobile { color: #ff4444; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; margin: 0 0 10px 0; font-size: 16px; }
