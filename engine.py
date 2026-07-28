@@ -43,6 +43,7 @@
 # - 09/07/2026: Refatoração na função enviar_email_resumo para remover credenciais SMTP hardcoded e parametrizar consumo seguro via variáveis de ambiente (.env).
 # - 27/07/2026: Substituição da terminologia 'Logística Reversa' por 'Código de Rastreio', e formatação/exibição do CEP de destino no e-mail.
 # - 27/07/2026: Implementação da Solução "Modo 1" (Workaround Portal Postal): Remoção da tag <reversa>1</reversa>. Empresa alocada na raiz (Destinatário) para viabilizar chave de busca por CEP no balcão, resultando em etiqueta espelhada. Cliente alocado no bloco <remetente>.
+# - 28/07/2026: AJUSTE FINAL: Adição da tag <cartao_postagem>, <peso> e <dimensoes> para garantir faturamento no contrato e não reprovação do Portal Postal. Mantido Modo Espelhado.
 # ==============================================================================
 
 import mysql.connector
@@ -93,16 +94,13 @@ def salvar_lead(dados):
 
         cliente_existente_id = None
 
-        # Passo 1: Verifica se o lead já existe pelo CPF
         if cpf:
             cursor.execute("SELECT id FROM clientes_usuarios WHERE cpf = %s LIMIT 1", (cpf,))
             res = cursor.fetchone()
             if res:
                 cliente_existente_id = res['id']
 
-        # Passo 2: UPSERT manual
         if cliente_existente_id:
-            # UPDATE: Se achou, atualiza os dados para não duplicar
             sql_update = """UPDATE clientes_usuarios SET 
                             nome_completo = %s, email = %s, whatsapp = %s, 
                             cidade = %s, estado_nome = %s, estado_uf = %s, 
@@ -116,7 +114,6 @@ def salvar_lead(dados):
             db.commit()
             return cliente_existente_id
         else:
-            # INSERT: Se não achou (ou não tem CPF ainda), cria um novo registro
             sql_insert = """INSERT INTO clientes_usuarios 
                      (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead, cpf, cep) 
                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
@@ -194,35 +191,27 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         cursor.execute("SELECT descricao, fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
         estado = cursor.fetchone()
         
-        # -----------------------------------------------------------------
-        # DUPLA BARREIRA DE VALIDAÇÃO (Regras de Negócio do Backend)
-        # -----------------------------------------------------------------
         categoria_id_str = str(produto.get('categoria_id'))
         texto_estado = estado['descricao'].lower() if estado and estado.get('descricao') else ""
         texto_extra = str(pergunta_extra).lower()
         
-        if categoria_id_str == '1': # Console
+        if categoria_id_str == '1':
             if 'não funciona' in texto_estado:
                 raise ValueError("Item recusado pela regra de negócio: Console não funciona.")
             if 'desbloqueado' in texto_extra:
-                # Nova Regra: Exceção para consoles desbloqueados (PS1, PS2, PS Vita)
                 nome_lower = produto.get('nome_produto', '').lower()
                 excecoes = ['ps1', 'playstation 1', 'ps2', 'playstation 2', 'vita']
                 if not any(exc in nome_lower for exc in excecoes):
                     raise ValueError("Item recusado pela regra de negócio: Este modelo de console não é aceito desbloqueado.")
-                
-        elif categoria_id_str == '2': # Controle
+        elif categoria_id_str == '2':
             if 'pirata' in texto_extra:
                 raise ValueError("Item recusado pela regra de negócio: Controle não original.")
-                
-        elif categoria_id_str == '4': # Jogo
+        elif categoria_id_str == '4':
             if 'não funciona' in texto_estado:
                 raise ValueError("Item recusado pela regra de negócio: Jogo não funciona.")
-                
-        elif categoria_id_str == '3': # Acessório
+        elif categoria_id_str == '3':
             if 'pirata' in texto_extra:
                 raise ValueError("Item recusado pela regra de negócio: Acessório não original.")
-        # -----------------------------------------------------------------
         
         fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
         fator = Decimal(str(fator_raw).replace(',', '.'))
@@ -231,18 +220,16 @@ def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, qua
         base_pix_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
         base_cred_raw = produto['valor_cred_base'] if produto.get('valor_cred_base') is not None else 0.0
         
-        # CORREÇÃO CIRÚRGICA: A quantidade foi removida da equação matemática base.
-        # O motor agora calcula EXCLUSIVAMENTE o valor unitário final daquele produto.
         valor_unitario_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador
         valor_unitario_cred = Decimal(str(base_cred_raw).replace(',', '.')) * fator * multiplicador
         
         return {
             "produto": produto['nome_produto'], 
-            "valor_final": float(valor_unitario_pix), # Mantido por retrocompatibilidade no dict
+            "valor_final": float(valor_unitario_pix),
             "valor_final_pix": float(valor_unitario_pix),
             "valor_final_cred": float(valor_unitario_cred),
             "multiplicador_aplicado": float(multiplicador_regiao),
-            "quantidade_considerada": int(quantidade) # Mantido apenas para repassar o estado, sem afetar o cálculo
+            "quantidade_considerada": int(quantidade)
         }
     
     finally:
@@ -253,7 +240,6 @@ def registrar_item_periciado(protocolo_id, item):
     if not db: return False
     try:
         cursor = db.cursor(dictionary=True)
-        # CORREÇÃO: O campo no banco de dados se chama 'qtd_declarada', não 'quantidade'.
         sql = "INSERT INTO itens_periciados (protocolo_id, produto_id, qtd_declarada, fotos_json, comentarios, valor_pix_unitario, valor_cred_unitario) VALUES (%s, %s, %s, %s, %s, %s, %s)"
         cursor.execute(sql, (
             protocolo_id, 
@@ -291,17 +277,13 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
     try:
         empresa = obter_dados_empresa()
         nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
+        cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM', '')
         
-        # Recuperando e formatando o CEP dinamicamente
         cep_bruto = ''.join(filter(str.isdigit, str(empresa.get('cep', '')))) if empresa else ''
         cep_empresa_formatado = f"{cep_bruto[:5]}-{cep_bruto[5:]}" if len(cep_bruto) == 8 else cep_bruto
 
-        # PARAMETRIZAÇÃO DINÂMICA: Lendo as configurações via variáveis de ambiente (.env)
         remetente_login = os.getenv('EMAIL_USER')
         senha = os.getenv('EMAIL_PASS')
-
-        print(f">>> [DEBUG] E-MAIL NA MEMÓRIA DO PYTHON: {remetente_login} <<<")
-
         host_smtp = os.getenv('EMAIL_HOST')
         porta_smtp = int(os.getenv('EMAIL_PORT', 587))
         
@@ -310,12 +292,10 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         msg['To'] = cliente['email']
         msg['Subject'] = f"Confirmação {nome_fantasia} - Protocolo {dados_email['protocolo']}"
 
-        # Preparação da lista de itens em HTML
         html_itens = "<p><strong>ÍTENS INCLUÍDOS NA VENDA:</strong></p>"
         tem_analise_manual = False
         
         for item in itens_avaliados:
-            # Resgata a quantidade (padrão 1 se não fornecida)
             quantidade = int(item.get('quantidade', 1))
             html_itens += f"<p><strong>Produto:</strong> {item.get('produto_nome')} (Qtd: {quantidade})<br>"
             
@@ -323,7 +303,6 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
                 html_itens += "<strong>Valor:</strong> Sob Consulta</p>"
                 tem_analise_manual = True
             else:
-                # CORREÇÃO: Multiplica o valor unitário pela quantidade informada no lote
                 valor_final = float(item['valor_pix_unitario']) * quantidade
                 html_itens += f"<strong>Valor:</strong> R$ {valor_final:.2f}</p>"
 
@@ -341,13 +320,13 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         html_logistica = ""
         if dados_email.get('codigo_rastreio'):
             html_logistica = f"""
-            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima de sua residência juntamente com o seu <strong>CÓDIGO DE RASTREIO</strong> apresentado abaixo e o nosso CEP de destino.</p>
-            <p><strong>ATENÇÃO: Você não deve realizar nenhum pagamento, o custo do envio é por nossa conta!</strong></p>
+            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima.</p>
+            <p><strong>ATENÇÃO: Você não deve realizar nenhum pagamento. O custo do envio é por nossa conta!</strong></p>
             <p><strong>DADOS DE POSTAGEM:</strong><br>
-            <strong>Código de Rastreio dos Correios:</strong> {dados_email['codigo_rastreio']}<br>
-            <strong>CEP de Destino (Obrigatório):</strong> {cep_empresa_formatado}</p>
-            <p><strong>Instrução:</strong> Dirija-se a uma agência dos Correios e informe ao atendente o <strong>Código de Rastreio</strong> e o nosso <strong>CEP de Destino</strong> para localizar a sua postagem pré-paga.<br>
-            O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, sendo 100% gratuito para você.</p>
+            <strong>1. Código de Postagem:</strong> {dados_email['codigo_rastreio']}<br>
+            <strong>2. CEP de Destino OBRIGATÓRIO:</strong> {cep_empresa_formatado}</p>
+            <p><strong>Instrução para o Atendente:</strong> "Postagem Pré-Paga por Contrato". Informe o <strong>Código</strong> e o <strong>CEP de Destino</strong> acima para localizar a postagem.<br>
+            O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, Cartão {cartao_postagem}.</p>
             """
 
         corpo_html = f"""
@@ -383,7 +362,6 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             
         msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
         
-        # Conexão dinâmica baseada nas configurações de ambiente (.env)
         server = smtplib.SMTP(host_smtp, porta_smtp)
         server.starttls()
         server.login(remetente_login, senha)
@@ -541,14 +519,17 @@ def buscar_canais_aquisicao():
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-# --- INTEGRAÇÃO CORREIOS ---
+# --- INTEGRAÇÃO CORREIOS - MODO ESPELHADO ---
 
 def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     """
     Integração com Web Service do Portal Postal (Correios AGF).
-    Utiliza o método PrePostagemXml (Sem Sequência Lógica).
+    MODO ESPELHADO: Empresa na Raiz = Destinatário | Cliente na tag <remetente>
+    Busca no balcão: Código + CEP da Empresa
+    Pagamento: Amarrado no cartao_postagem do contrato
     """
     cod_agencia = os.getenv('CORREIOS_AGENCIA')
+    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM')
     login_ws    = os.getenv('CORREIOS_USER')
     senha_ws    = os.getenv('CORREIOS_PASS')
     url_soap    = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
@@ -556,9 +537,9 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     
     if ambiente == "fake":
         logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
-        return "888888888", "BR987654321BR"
+        codigo_fake = "ET" + str(datetime.datetime.now().strftime('%H%M%S'))
+        return codigo_fake, codigo_fake
 
-    # A Empresa é o DESTINATÁRIO da postagem
     empresa = obter_dados_empresa() or {}
     nome_fantasia = empresa.get('nome_fantasia', 'Loja')
     cep_empresa = ''.join(filter(str.isdigit, str(empresa.get('cep', ''))))
@@ -569,7 +550,6 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     cidade_empresa = escape(str(empresa.get('cidade', '')))[:100]
     uf_empresa = escape(str(empresa.get('estado_uf', '')))[:2]
 
-    # O Cliente é o REMETENTE da postagem
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
     nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
     logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
@@ -579,9 +559,7 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]
     uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
 
-    # Ajuste definitivo conforme padrão oficial do Web Service do Portal Postal
     servico_correios = "PAC"
-    
     if cep_cliente and len(cep_cliente) == 8:
         if int(cep_cliente) < 20000000:
             servico_correios = "SEDEX"
@@ -590,21 +568,21 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
             logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC")
             
     xml_itens = ""
+    peso_total = 0.5
     for item in itens_avaliados:
-        descricao_limpa = escape(str(item.get('produto_nome', f'Item {nome_fantasia}')))[:100]
+        descricao_limpa = escape(str(item.get('produto_nome', 'Game Usado')))[:100]
         if len(descricao_limpa) < 5:
             descricao_limpa = descricao_limpa.ljust(5, 'x')
-            
+        qtd = int(item.get('quantidade', 1))
+        peso_total += qtd * 0.2
+        
         xml_itens += f"""
         <item>
             <descricao>{descricao_limpa}</descricao>
-            <quantidade>{escape(str(item.get('quantidade', 1)))}</quantidade>
+            <quantidade>{qtd}</quantidade>
             <valor>{escape(str(item.get('valor_pix_unitario', '0.00')))}</valor>
         </item>"""
 
-    # XML gerado como Pré-Postagem Padrão (Sem tag reversa)
-    # A Empresa fica na raiz (assumindo o papel de Destinatário)
-    # O Cliente fica encapsulado na tag <remetente>
     xml_dados_postagem = f"""<portalpostal>
     <pre_postagem>
         <chave>{numero_protocolo}</chave>
@@ -616,7 +594,13 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         <bairro>{bairro_empresa}</bairro>
         <cidade>{cidade_empresa}</cidade>
         <estado>{uf_empresa}</estado>
+        
         <servico>{servico_correios}</servico>
+        <peso>{peso_total:.2f}</peso>
+        <largura>20</largura>
+        <altura>10</altura>
+        <comprimento>30</comprimento>
+        
         <remetente>
             <nome>{nome_seguro}</nome>
             <cep>{cep_cliente}</cep>
@@ -627,7 +611,9 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
             <cidade>{cidade_seguro}</cidade>
             <estado>{uf_seguro}</estado>
         </remetente>
+        
         <conteudo>{xml_itens}</conteudo>
+        <cartao_postagem>{cartao_postagem}</cartao_postagem>
     </pre_postagem>
 </portalpostal>"""
 
@@ -649,31 +635,35 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     }
     
     try:
-        logging.info("Enviando requisição SOAP para o Portal Postal...")
-        resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=15)
+        logging.info("Enviando requisição SOAP para o Portal Postal - MODO ESPELHADO...")
+        resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=20)
         
         if resp.status_code == 200:
+            logging.info(f"RESPOSTA BRUTA PORTAL POSTAL: {resp.text}")
+            
             root = ET.fromstring(resp.text)
-            codigo_rastreio = None
+            codigo_postagem = None
             detalhes_erro = None
             
             for elem in root.iter():
                 if 'PrePostagemXmlReturn' in elem.tag or 'return' in elem.tag:
                     retorno_xml_str = elem.text
                     if retorno_xml_str:
+                        logging.info(f"XML INTERNO RETORNO: {retorno_xml_str}")
                         retorno_root = ET.fromstring(retorno_xml_str)
-                        for postagem in retorno_root.findall('.//postagem'):
-                            codigo_rastreio = postagem.findtext('codigo_rastreio')
-                            if codigo_rastreio == 'erro':
-                                detalhes_erro = postagem.findtext('detalhes')
-                                codigo_rastreio = None
                         
-                        for erro in retorno_root.findall('.//erro'):
-                            detalhes_erro = erro.text
-
-            if codigo_rastreio:
-                logging.info(f"SUCESSO! Código de Rastreio gerado: {codigo_rastreio}")
-                return codigo_rastreio, codigo_rastreio
+                        for postagem in retorno_root.findall('.//postagem'):
+                            codigo_postagem = postagem.findtext('codigo_rastreio')
+                            status = postagem.findtext('detalhes')
+                            
+                            if codigo_postagem and status == 'POSTADO':
+                                logging.info(f"SUCESSO! Código de Postagem gerado: {codigo_postagem}")
+                            else:
+                                detalhes_erro = status
+                                codigo_postagem = None
+                                
+            if codigo_postagem:
+                return codigo_postagem, codigo_postagem 
             else:
                 logging.error(f"Falha ao gerar etiqueta no Portal Postal. Motivo: {detalhes_erro}")
                 return None, None

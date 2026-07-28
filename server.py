@@ -45,6 +45,7 @@
 # - 18/07/2026: Correção na rota /pericia para repassar a variável produto_foto para o frontend.
 # - 27/07/2026: Inclusão de trava de segurança no backend (rota /finalizar-lote) com validação matemática de CPF.
 # - 27/07/2026: Injeção da variável cep_empresa_formatado na rota /finalizar e adequação do termo 'código de rastreio'.
+# - 28/07/2026: Correção de bug na rota /finalizar-lote para buscar o nome correto do canal de aquisição (Origem do Lead) a partir da sessão.
 # ==============================================================================
 
 import os
@@ -440,7 +441,6 @@ def cotar():
         
         cat_nome = session.get('categoria_nome', 'Produto')
         
-        # --- ADICIONE ESTA LINHA AQUI ---
         # Multiplicamos o valor unitário pela quantidade apenas para o visual da tela de resultado
         resultado['valor_final'] = valor_unit_pix * qtd_final_calculo
         
@@ -560,7 +560,20 @@ def finalizar_lote():
 
     cep_puro = ''.join(filter(str.isdigit, request.form.get('cep', '')))
     whatsapp_puro = ''.join(filter(str.isdigit, request.form.get('whatsapp', '')))
-        
+    
+    # --- RESOLUÇÃO DO BUG: BUSCA DA ORIGEM DO LEAD PELA SESSÃO ---
+    canal_id = session.get('canal_aquisicao_id')
+    nome_origem = 'Direto' # Fallback
+    if canal_id:
+        try:
+            canais = engine.buscar_canais_aquisicao()
+            for c in canais:
+                if str(c.get('id')) == str(canal_id):
+                    nome_origem = c.get('nome_exibicao', 'Direto')
+                    break
+        except Exception:
+            pass
+            
     dados_cadastro_lote = {
         'nome_completo': request.form.get('nome'),  
         'email': request.form.get('email'),
@@ -575,7 +588,7 @@ def finalizar_lote():
         'complemento': request.form.get('complemento'),
         'bairro': request.form.get('bairro'),
         'chave_pix': request.form.get('chave_pix'),
-        'origem_lead': request.form.get('origem_lead', 'Direto')
+        'origem_lead': nome_origem
     }
 
     cliente_id = engine.salvar_lead(dados_cadastro_lote)
