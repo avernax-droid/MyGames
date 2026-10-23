@@ -46,6 +46,8 @@
 # - 27/07/2026: Inclusão de trava de segurança no backend (rota /finalizar-lote) com validação matemática de CPF.
 # - 27/07/2026: Injeção da variável cep_empresa_formatado na rota /finalizar e adequação do termo 'código de rastreio'.
 # - 28/07/2026: Correção de bug na rota /finalizar-lote para buscar o nome correto do canal de aquisição (Origem do Lead) a partir da sessão.
+# - 20/10/2026: Chamada da função enviar_webhook_novo_protocolo na rota /finalizar para o Fluxo A do Agente WhatsApp.
+# - 23/10/2026: Remoção da rota /api/buscar_cidades, pois a busca de municípios do IBGE foi descentralizada para o front-end.
 # ==============================================================================
 
 import os
@@ -661,6 +663,19 @@ def finalizar():
         # Envia o e-mail
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
+        # --- DISPARO GATILHO A (AGENTE WHATSAPP) ---
+        try:
+            engine.enviar_webhook_novo_protocolo(
+                protocolo=res_protocolo['numero'],
+                cliente=cliente,
+                itens_avaliados=itens,
+                total_pix=total_pix,
+                codigo_rastreio=codigo_rastreio
+            )
+        except Exception as e:
+            print(f"Erro ao disparar webhook do Agente na rota /finalizar: {e}")
+        # ------------------------------------------
+        
         return render_smart_template(
             'sucesso.html', 
             protocolo=res_protocolo['numero'], 
@@ -724,30 +739,6 @@ def api_buscar_produtos():
         return jsonify([])
     produtos = engine.buscar_produtos_por_categoria(categoria_id)
     return jsonify(produtos)
-
-@app.route('/api/buscar_cidades')
-def api_buscar_cidades():
-    termo = request.args.get('q', '')
-    if not termo or len(termo) < 3:
-        return jsonify([])
-
-    dados = engine.consultar_municipios_ibge()
-    cidades_filtradas = []
-    
-    if dados:
-        for m in dados:
-            nome_cidade = m.get('nome', '')
-            if termo.lower() in nome_cidade.lower():
-                micro = m.get('microrregiao') or {}
-                meso = micro.get('mesorregiao') or {}
-                uf_obj = meso.get('UF') or {}
-                uf = uf_obj.get('sigla', '??')
-                
-                cidades_filtradas.append({'cidade': nome_cidade, 'uf': uf})
-                if len(cidades_filtradas) >= 8:
-                    break
-
-    return jsonify(cidades_filtradas)
 
 # --- ENDPOINTS DE HANDOFF E UPLOAD REMOTO (MOBILE) ---
 

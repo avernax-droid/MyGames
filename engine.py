@@ -44,6 +44,7 @@
 # - 27/07/2026: Substituição da terminologia 'Logística Reversa' por 'Código de Rastreio', e formatação/exibição do CEP de destino no e-mail.
 # - 27/07/2026: Implementação da Solução "Modo 1" (Workaround Portal Postal): Remoção da tag <reversa>1</reversa>. Empresa alocada na raiz (Destinatário) para viabilizar chave de busca por CEP no balcão, resultando em etiqueta espelhada. Cliente alocado no bloco <remetente>.
 # - 28/07/2026: AJUSTE FINAL: Adição da tag <cartao_postagem>, <peso> e <dimensoes> para garantir faturamento no contrato e não reprovação do Portal Postal. Mantido Modo Espelhado.
+# - 23/10/2026: Remoção da função consultar_municipios_ibge() e rotinas de cache, pois a busca foi descentralizada para o front-end, aliviando o servidor.
 # ==============================================================================
 
 import mysql.connector
@@ -503,11 +504,6 @@ def buscar_opcoes_pericia(categoria_id):
         return cursor.fetchall()
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
-
-def consultar_municipios_ibge():
-    try:
-        return requests.get("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", timeout=5).json()
-    except: return []
 
 def buscar_canais_aquisicao():
     db = conectar_bd()

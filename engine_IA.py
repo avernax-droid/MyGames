@@ -1,0 +1,343 @@
+# ==============================================================================
+# PROJETO: MyGames
+# MÓDULO: engine.py
+# AJUSTE: 17/08/2026 - Ativação Logística Reversa Portal Postal
+# ==============================================================================
+
+import mysql.connector
+from mysql.connector import Error
+from decimal import Decimal
+import datetime
+import smtplib
+import json
+import requests
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
+import logging
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS] %(levelname)s - %(message)s')
+
+def conectar_bd():
+    try:
+        connection = mysql.connector.connect(
+            host=os.getenv("DB_HOST"), port=int(os.getenv("DB_PORT")),
+            user=os.getenv("DB_USER"), password=os.getenv("DB_PASS"),
+            database=os.getenv("DB_NAME")
+        )
+        return connection
+    except Error as e:
+        print(f"ERRO CRÍTICO: Falha na conexão com o MySQL: {e}")
+        return None
+
+# --- MÓDULO DE IDENTIFICAÇÃO ---
+def salvar_lead(dados):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        whatsapp = ''.join(filter(str.isdigit, str(dados['whatsapp'])))
+        cpf = ''.join(filter(str.isdigit, str(dados.get('cpf', '')))) if dados.get('cpf') else None
+        cep = ''.join(filter(str.isdigit, str(dados.get('cep', '')))) if dados.get('cep') else None
+        cliente_existente_id = None
+        if cpf:
+            cursor.execute("SELECT id FROM clientes_usuarios WHERE cpf = %s LIMIT 1", (cpf,))
+            res = cursor.fetchone()
+            if res: cliente_existente_id = res['id']
+        if cliente_existente_id:
+            sql_update = """UPDATE clientes_usuarios SET nome_completo = %s, email = %s, whatsapp = %s, cidade = %s, estado_nome = %s, estado_uf = %s, origem_lead = %s, cep = COALESCE(%s, cep) WHERE id = %s"""
+            cursor.execute(sql_update, (dados['nome_completo'], dados['email'], whatsapp, dados['cidade'], dados.get('estado_nome'), dados.get('estado_uf'), dados['origem_lead'], cep, cliente_existente_id))
+            db.commit()
+            return cliente_existente_id
+        else:
+            sql_insert = """INSERT INTO clientes_usuarios (nome_completo, email, whatsapp, cidade, estado_nome, estado_uf, origem_lead, cpf, cep) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            cursor.execute(sql_insert, (dados['nome_completo'], dados['email'], whatsapp, dados['cidade'], dados.get('estado_nome'), dados.get('estado_uf'), dados['origem_lead'], cpf, cep))
+            db.commit()
+            return cursor.lastrowid
+    except Error as e:
+        print(f"ERRO: Falha ao persistir lead: {e}")
+        return None
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+# --- MÓDULO DE GESTÃO DE CLIENTES ---
+def obter_cliente(cliente_id):
+    db = conectar_bd()
+    if not db: return {}
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        cursor.execute("SELECT * FROM clientes_usuarios WHERE id = %s", (cliente_id,))
+        return cursor.fetchone() or {}
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+def atualizar_cadastro_completo(cliente_id, dados):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        cpf = ''.join(filter(str.isdigit, str(dados.get('cpf', ''))))
+        cep = ''.join(filter(str.isdigit, str(dados.get('cep', ''))))
+        whatsapp = ''.join(filter(str.isdigit, str(dados.get('whatsapp', ''))))
+        sql = "UPDATE clientes_usuarios SET cpf = %s, cep = %s, whatsapp = %s, endereco = %s, numero = %s, complemento = %s, bairro = %s, chave_pix = %s WHERE id = %s"
+        cursor.execute(sql, (cpf, cep, whatsapp, dados.get('endereco'), dados.get('numero'), dados.get('complemento'), dados.get('bairro'), dados.get('chave_pix'), cliente_id))
+        db.commit()
+        return True
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+# --- MÓDULO DE PERÍCIA E CÁLCULOS ---
+def obter_produto_por_id(produto_id):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        cursor.execute("SELECT * FROM catalogo_mestre WHERE id = %s", (produto_id,))
+        return cursor.fetchone()
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+def calcular_cotacao_final(produto_id, estado_id, multiplicador_regiao=1.00, quantidade=1, pergunta_extra=""):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        produto = obter_produto_por_id(produto_id)
+        if not produto: return None
+        cursor.execute("SELECT descricao, fator_depreciacao FROM opcoes_estado WHERE id = %s", (estado_id,))
+        estado = cursor.fetchone()
+        categoria_id_str = str(produto.get('categoria_id'))
+        texto_estado = estado['descricao'].lower() if estado and estado.get('descricao') else ""
+        texto_extra = str(pergunta_extra).lower()
+        if categoria_id_str == '1':
+            if 'não funciona' in texto_estado: raise ValueError("Item recusado pela regra de negócio: Console não funciona.")
+            if 'desbloqueado' in texto_extra:
+                nome_lower = produto.get('nome_produto', '').lower()
+                excecoes = ['ps1', 'playstation 1', 'ps2', 'playstation 2', 'vita']
+                if not any(exc in nome_lower for exc in excecoes): raise ValueError("Item recusado pela regra de negócio: Este modelo de console não é aceito desbloqueado.")
+        elif categoria_id_str == '2':
+            if 'pirata' in texto_extra: raise ValueError("Item recusado pela regra de negócio: Controle não original.")
+        elif categoria_id_str == '4':
+            if 'não funciona' in texto_estado: raise ValueError("Item recusado pela regra de negócio: Jogo não funciona.")
+        elif categoria_id_str == '3':
+            if 'pirata' in texto_extra: raise ValueError("Item recusado pela regra de negócio: Acessório não original.")
+        fator_raw = estado['fator_depreciacao'] if estado and estado.get('fator_depreciacao') is not None else 1.0
+        fator = Decimal(str(fator_raw).replace(',', '.'))
+        multiplicador = Decimal(str(multiplicador_regiao))
+        base_pix_raw = produto['valor_pix_base'] if produto.get('valor_pix_base') is not None else 0.0
+        base_cred_raw = produto['valor_cred_base'] if produto.get('valor_cred_base') is not None else 0.0
+        valor_unitario_pix = Decimal(str(base_pix_raw).replace(',', '.')) * fator * multiplicador
+        valor_unitario_cred = Decimal(str(base_cred_raw).replace(',', '.')) * fator * multiplicador
+        return {"produto": produto['nome_produto'], "valor_final": float(valor_unitario_pix), "valor_final_pix": float(valor_unitario_pix), "valor_final_cred": float(valor_unitario_cred), "multiplicador_aplicado": float(multiplicador_regiao), "quantidade_considerada": int(quantidade)}
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+def registrar_item_periciado(protocolo_id, item):
+    db = conectar_bd()
+    if not db: return False
+    try:
+        cursor = db.cursor(dictionary=True)
+        sql = "INSERT INTO itens_periciados (protocolo_id, produto_id, qtd_declarada, fotos_json, comentarios, valor_pix_unitario, valor_cred_unitario) VALUES (%s, %s, %s, %s, %s)"
+        cursor.execute(sql, (protocolo_id, item['produto_id'], item.get('quantidade', 1), item.get('fotos_json'), item.get('comentarios', ''), item['valor_pix_unitario'], item['valor_cred_unitario']))
+        db.commit()
+        return True
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+# --- MÓDULO DE FINALIZAÇÃO ---
+def obter_dados_empresa():
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM dados_empresa LIMIT 1")
+        return cursor.fetchone()
+    except Exception as e:
+        print(f"Erro ao buscar dados da empresa: {e}")
+        return None
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+def enviar_email_resumo(cliente, dados_email, itens_avaliados):
+    try:
+        empresa = obter_dados_empresa()
+        nome_fantasia = empresa.get('nome_fantasia', 'Loja') if empresa else 'Loja'
+        cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM_REVERSA', os.getenv('CORREIOS_CARTAO_POSTAGEM', ''))
+        cep_bruto = ''.join(filter(str.isdigit, str(empresa.get('cep', '')))) if empresa else ''
+        cep_empresa_formatado = f"{cep_bruto[:5]}-{cep_bruto[5:]}" if len(cep_bruto) == 8 else cep_bruto
+        remetente_login = os.getenv('EMAIL_USER'); senha = os.getenv('EMAIL_PASS'); host_smtp = os.getenv('EMAIL_HOST'); porta_smtp = int(os.getenv('EMAIL_PORT', 587))
+        
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr((nome_fantasia, remetente_login)); msg['To'] = cliente['email']; msg['Subject'] = f"Confirmação {nome_fantasia} - Protocolo {dados_email['protocolo']}"
+
+        html_itens = "<p><strong>ÍTENS INCLUÍDOS NA VENDA:</strong></p>"
+        for item in itens_avaliados:
+            quantidade = int(item.get('quantidade', 1))
+            html_itens += f"<p><strong>Produto:</strong> {item.get('produto_nome')} (Qtd: {quantidade})<br>"
+            if item.get('is_outros'): html_itens += "<strong>Valor:</strong> Sob Consulta</p>"
+            else:
+                valor_final = float(item['valor_pix_unitario']) * quantidade
+                html_itens += f"<strong>Valor:</strong> R$ {valor_final:.2f}</p>"
+
+        html_logistica = ""
+        if dados_email.get('codigo_rastreio'):
+            # TEXTO AJUSTADO PARA REVERSA
+            html_logistica = f"""
+            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima.</p>
+            <p><strong>ATENÇÃO: Você não deve realizar nenhum pagamento. O custo do envio é por nossa conta!</strong></p>
+            <p><strong>DADOS DE POSTAGEM REVERSA:</strong><br>
+            <strong>1. Código de Rastreio:</strong> {dados_email['codigo_rastreio']}<br>
+            <strong>2. CEP de Destino:</strong> {cep_empresa_formatado}</p>
+            <p><strong>Instrução para o Atendente:</strong> "Postagem por <strong>Logística Reversa</strong>". Basta informar o <strong>Código de Rastreio</strong> acima.<br>
+            O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, Cartão {cartao_postagem}.</p>
+            """
+
+        corpo_html = f"""<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
+            <p>Olá {cliente['nome_completo']},</p>
+            <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_fantasia}</strong>!</p>
+            <p><strong>Protocolo:</strong> {dados_email['protocolo']}<br><strong>Valor Total do Lote (PIX):</strong> R$ {dados_email.get('total_pix', 0.0):.2f}</p>
+            {html_logistica} {html_itens}
+            <p>Assim que recebermos os itens, os mesmos passarão pela nossa <strong>PERÍCIA TÉCNICA</strong> e vamos te enviar o <strong>LAUDO</strong> e realizar o <strong>PAGAMENTO</strong> em até 48 hours úteis.</p>
+            <p>Atenciosamente,<br>Equipe <strong>{nome_fantasia}</strong></p>
+        </div>"""
+        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+        server = smtplib.SMTP(host_smtp, porta_smtp); server.starttls(); server.login(remetente_login, senha); server.send_message(msg); server.quit()
+        return True
+    except Exception as e: 
+        import traceback
+        logging.error(f"FALHA CRÍTICA NO SMTP: {str(e)}"); logging.error(traceback.format_exc())
+        return False
+
+def finalizar_proposta(dados_proposta):
+    db = conectar_bd()
+    if not db: return None
+    try:
+        cursor = db.cursor()
+        agora = datetime.datetime.now()
+        protocolo = f"MG-{agora.year}-{dados_proposta['cliente_id']}-{agora.strftime('%H%M%S')}"
+        canal_id = dados_proposta.get('canal_aquisicao_id')
+        cliente = obter_cliente(dados_proposta['cliente_id'])
+        dados_remetente = {"nome": cliente.get('nome_completo', ''), "cep": cliente.get('cep', ''), "logradouro": cliente.get('endereco', ''), "numero": cliente.get('numero', ''), "complemento": cliente.get('complemento', ''), "bairro": cliente.get('bairro', ''), "cidade": cliente.get('cidade', ''), "uf": cliente.get('estado_uf', ''), "ddd": "11", "telefone": cliente.get('whatsapp', '')}
+        itens_avaliados = dados_proposta.get('itens', [])
+        if not itens_avaliados: itens_avaliados = [{'produto_nome': 'Produtos Diversos', 'quantidade': 1, 'valor_pix_unitario': 0.00}]
+        e_ticket, codigo_rastreio = gerar_codigo_rastreio(dados_remetente, protocolo, itens_avaliados)
+        sql = """INSERT INTO protocolos_recompra (cliente_id, numero_protocolo, status, status_id, valor_total_pix, valor_total_credito, data_criacao, canal_aquisicao_id, e_ticket, codigo_rastreio) VALUES (%s, %s, 'Aberto', 1, %s, %s, NOW(), %s, %s, %s)"""
+        cursor.execute(sql, (dados_proposta['cliente_id'], protocolo, dados_proposta['total_pix'], dados_proposta['total_cred'], canal_id, e_ticket, codigo_rastreio))
+        p_id = cursor.lastrowid; db.commit()
+        return {"id": p_id, "numero": protocolo, "e_ticket": e_ticket, "codigo_rastreio": codigo_rastreio}
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()
+
+# --- INTEGRAÇÃO CORREIOS - MODO REVERSA ---
+def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
+    """
+    Integração com Web Service do Portal Postal (Correios AGF).
+    MODO REVERSA: Gera etiqueta de Logística Reversa
+    """
+    cod_agencia = os.getenv('CORREIOS_AGENCIA')
+    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM_REVERSA', os.getenv('CORREIOS_CARTAO_POSTAGEM'))
+    cod_adm_reversa = os.getenv('CORREIOS_COD_ADM_REVERSA')
+    login_ws = os.getenv('CORREIOS_USER'); senha_ws = os.getenv('CORREIOS_PASS')
+    url_soap = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
+    ambiente = os.getenv('CORREIOS_AMBIENTE')
+    
+    if ambiente == "fake":
+        logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
+        codigo_fake = "ET" + str(datetime.datetime.now().strftime('%H%M%S'))
+        return codigo_fake, codigo_fake
+
+    empresa = obter_dados_empresa() or {}
+    nome_fantasia = empresa.get('nome_fantasia', 'Loja')
+    cep_empresa = ''.join(filter(str.isdigit, str(empresa.get('cep', ''))))
+    logradouro_empresa = escape(str(empresa.get('logradouro', '')))[:100]; numero_empresa = escape(str(empresa.get('numero', '')))[:10]
+    complemento_empresa = escape(str(empresa.get('complemento', '')))[:100]; bairro_empresa = escape(str(empresa.get('bairro', '')))[:100]
+    cidade_empresa = escape(str(empresa.get('cidade', '')))[:100]; uf_empresa = escape(str(empresa.get('estado_uf', '')))[:2]
+
+    cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
+    nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
+    logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]; numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
+    complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]; bairro_seguro = escape(str(dados_remetente.get('bairro', '')))[:100]
+    cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]; uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
+
+    # 1. SERVIÇO REVERSA: 41068=PAC  41199=SEDEX
+    servico_correios = "41068"
+    if cep_cliente and len(cep_cliente) == 8:
+        if int(cep_cliente) < 20000000: servico_correios = "41199"
+            logging.info(f"Roteamento: CEP {cep_cliente} classificado como SEDEX REVERSA")
+        else: logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC REVERSA")
+            
+    xml_itens = ""; peso_total = 0.5
+    for item in itens_avaliados:
+        descricao_limpa = escape(str(item.get('produto_nome', 'Game Usado')))[:100]
+        if len(descricao_limpa) < 5: descricao_limpa = descricao_limpa.ljust(5, 'x')
+        qtd = int(item.get('quantidade', 1)); peso_total += qtd * 0.2
+        xml_itens += f"<item><descricao>{descricao_limpa}</descricao><quantidade>{qtd}</quantidade><valor>{escape(str(item.get('valor_pix_unitario', '0.00')))}</valor></item>"
+
+    # 2. XML COM <reversa>1</reversa> E <codigo_administrativo>
+    xml_dados_postagem = f"""<portalpostal>
+    <pre_postagem>
+        <chave>{numero_protocolo}</chave>
+        <reversa>1</reversa>
+        <nome>{nome_fantasia}</nome><cep>{cep_empresa}</cep><endereco>{logradouro_empresa}</endereco>
+        <numero>{numero_empresa}</numero><complemento>{complemento_empresa}</complemento>
+        <bairro>{bairro_empresa}</bairro><cidade>{cidade_empresa}</cidade><estado>{uf_empresa}</estado>
+        <servico>{servico_correios}</servico><peso>{peso_total:.2f}</peso><largura>20</largura><altura>10</altura><comprimento>30</comprimento>
+        <remetente>
+            <nome>{nome_seguro}</nome><cep>{cep_cliente}</cep><endereco>{logradouro_seguro}</endereco>
+            <numero>{numero_seguro}</numero><complemento>{complemento_seguro}</complemento>
+            <bairro>{bairro_seguro}</bairro><cidade>{cidade_seguro}</cidade><estado>{uf_seguro}</estado>
+        </remetente>
+        <conteudo>{xml_itens}</conteudo>
+        <cartao_postagem>{cartao_postagem}</cartao_postagem>
+        <codigo_administrativo>{cod_adm_reversa}</codigo_administrativo>
+    </pre_postagem>
+</portalpostal>"""
+
+    soap_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:pos="http://postagem/xsd">
+       <soapenv:Header/><soapenv:Body><pos:PrePostagemXml>
+             <pos:xml><![CDATA[{xml_dados_postagem}]]></pos:xml>
+             <pos:codAgencia>{cod_agencia}</pos:codAgencia><pos:login>{login_ws}</pos:login><pos:senha>{senha_ws}</pos:senha>
+          </pos:PrePostagemXml></soapenv:Body></soapenv:Envelope>"""
+
+    headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": "urn:PrePostagemXml"}
+    
+    try:
+        logging.info("Enviando requisição SOAP para o Portal Postal - MODO REVERSA...")
+        resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=20)
+        if resp.status_code == 200:
+            root = ET.fromstring(resp.text)
+            for elem in root.iter():
+                if 'PrePostagemXmlReturn' in elem.tag or 'return' in elem.tag:
+                    retorno_xml_str = elem.text
+                    if retorno_xml_str:
+                        retorno_root = ET.fromstring(retorno_xml_str)
+                        for postagem in retorno_root.findall('.//postagem'):
+                            codigo_postagem = postagem.findtext('codigo_rastreio')
+                            status = postagem.findtext('detalhes')
+                            if codigo_postagem and status == 'POSTADO':
+                                logging.info(f"SUCESSO REVERSA! Código: {codigo_postagem}")
+                                return codigo_postagem, codigo_postagem 
+            logging.error(f"Falha ao gerar etiqueta reversa. Retorno: {resp.text}")
+            return None, None
+        else:
+            logging.error(f"Falha na integração HTTP {resp.status_code}: {resp.text}")
+            return None, None
+    except Exception as e:
+        logging.error(f"Erro interno no processamento: {e}")
+        return None, None
+
+# --- DEMAIS FUNÇÕES ---
+def buscar_produtos_por_categoria(categoria_id):
+    db = conectar_bd()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True, buffered=True)
+        cursor.execute("SELECT id, nome_produto, plataforma, foto_oficial_url, valor_pix_base, valor_cred_base FROM catalogo_mestre WHERE categoria_id = %s AND ativo = 1 ORDER BY nome_produto", (categoria_id,))
+        return cursor.fetchall()
+    finally:
+        if db and db.is_connected(): cursor.close(); db.close()

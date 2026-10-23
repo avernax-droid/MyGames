@@ -20,6 +20,8 @@
   - 06/07/2026: Refatoração da UX inicial. Ocultação do formulário de localização.
   - 06/07/2026: Alteração do quadro de localização para um Modal Flutuante (Overlay) 
     para evitar o salto ("pulo") e rolagem indesejada da página ao clicar no botão iniciar.
+  - 23/10/2026: Inserção de timestamp e headers de controle na requisição fetch para contornar cache agressiva de navegadores.
+  - 23/10/2026: Descentralização da busca de cidades consumindo a API do IBGE diretamente no frontend via JavaScript (com cache em memória local) para contornar bloqueio de IP do servidor.
   ==============================================================================
 #}
 {% extends 'base.html' %}
@@ -234,10 +236,29 @@
     const inputUf = document.getElementById('campo-uf');
     const modalCanal = document.getElementById('secao-canal-overlay');
     const btnEntrar = document.getElementById('btn-entrar');
+    let debounceTimeout;
+
+    // Função para pré-carregar os dados do IBGE
+    async function preCarregarIBGE() {
+        if (!window.ibgeCache) {
+            try {
+                const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/municipios");
+                if (response.ok) {
+                    window.ibgeCache = await response.json();
+                }
+            } catch (error) {
+                console.error('Erro ao pré-carregar municípios do IBGE:', error);
+            }
+        }
+    }
+
+    // Pré-carrega no foco do input
+    inputCidade.addEventListener('focus', preCarregarIBGE);
 
     // NOVO: Funções para abrir e fechar o Modal de Localização sem mover a página
     function abrirModalLocalizacao() {
         document.getElementById('modal-localizacao-overlay').style.display = 'flex';
+        preCarregarIBGE(); // Inicia o carregamento em background ao abrir o modal
         setTimeout(() => {
             inputCidade.focus({ preventScroll: true });
         }, 100);
@@ -248,31 +269,58 @@
         inputCidade.value = ''; // Limpa o input caso feche
     }
 
-    inputCidade.addEventListener('input', async () => {
-        const termo = inputCidade.value;
-        if (termo.length < 3) { listaCidades.style.display = 'none'; return; }
-
-        const response = await fetch(`/api/buscar_cidades?q=${encodeURIComponent(termo)}`);
-        const dados = await response.json();
-
-        listaCidades.innerHTML = '';
-        if (dados.length > 0) {
-            dados.forEach(item => {
-                const div = document.createElement('div');
-                div.textContent = `${item.cidade} - ${item.uf}`;
-                div.onmousedown = () => {
-                    inputCidade.value = item.cidade;
-                    inputUf.value = item.uf;
-                    listaCidades.style.display = 'none';
-                    // Abre o modal sobreposto de canais
-                    modalCanal.style.display = 'flex';
-                };
-                listaCidades.appendChild(div);
-            });
-            listaCidades.style.display = 'block';
-        } else {
-            listaCidades.style.display = 'none';
+    inputCidade.addEventListener('input', () => {
+        clearTimeout(debounceTimeout);
+        const termoOriginal = inputCidade.value.trim();
+        
+        if (termoOriginal.length < 3) { 
+            listaCidades.style.display = 'none'; 
+            return; 
         }
+
+        debounceTimeout = setTimeout(async () => {
+            try {
+                if (!window.ibgeCache) await preCarregarIBGE();
+                if (!window.ibgeCache) throw new Error("Dados do IBGE não disponíveis");
+
+                // Normaliza o termo de busca (remove acentos e converte para minúsculas)
+                const termoNormalizado = termoOriginal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+                // Filtra localmente os resultados limitando a 8 itens
+                const filtradas = window.ibgeCache.filter(m => {
+                    const nomeNormalizado = m.nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    return nomeNormalizado.includes(termoNormalizado);
+                }).slice(0, 8);
+
+                // Mapeia para o formato necessário
+                const dados = filtradas.map(m => ({
+                    cidade: m.nome,
+                    uf: m.microrregiao.mesorregiao.UF.sigla
+                }));
+
+                listaCidades.innerHTML = '';
+                if (dados.length > 0) {
+                    dados.forEach(item => {
+                        const div = document.createElement('div');
+                        div.textContent = `${item.cidade} - ${item.uf}`;
+                        div.onmousedown = () => {
+                            inputCidade.value = item.cidade;
+                            inputUf.value = item.uf;
+                            listaCidades.style.display = 'none';
+                            // Abre o modal sobreposto de canais
+                            modalCanal.style.display = 'flex';
+                        };
+                        listaCidades.appendChild(div);
+                    });
+                    listaCidades.style.display = 'block';
+                } else {
+                    listaCidades.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Erro na filtragem de municípios:', error);
+                listaCidades.style.display = 'none';
+            }
+        }, 350); // Reduzido debounce pois a busca agora é local
     });
 
     document.addEventListener('click', (e) => {
