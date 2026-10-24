@@ -45,6 +45,7 @@
 # - 27/07/2026: Implementação da Solução "Modo 1" (Workaround Portal Postal): Remoção da tag <reversa>1</reversa>. Empresa alocada na raiz (Destinatário) para viabilizar chave de busca por CEP no balcão, resultando em etiqueta espelhada. Cliente alocado no bloco <remetente>.
 # - 28/07/2026: AJUSTE FINAL: Adição da tag <cartao_postagem>, <peso> e <dimensoes> para garantir faturamento no contrato e não reprovação do Portal Postal. Mantido Modo Espelhado.
 # - 23/10/2026: Remoção da função consultar_municipios_ibge() e rotinas de cache, pois a busca foi descentralizada para o front-end, aliviando o servidor.
+# - 23/10/2026: Implementação da função enviar_webhook_novo_protocolo para integração com o Agente de WhatsApp (Fluxo A), consumindo parâmetros dinâmicos do .env.
 # ==============================================================================
 
 import mysql.connector
@@ -676,3 +677,69 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     except Exception as e:
         logging.error(f"Erro interno no processamento: {e}")
         return None, None
+
+# --- INTEGRAÇÃO AGENTE WHATSAPP (FLUXO A) ---
+
+def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix, codigo_rastreio):
+    """
+    Monta o payload JSON e dispara o Gatilho A (Novo Protocolo) para o Agente de WhatsApp.
+    """
+    url_webhook = os.getenv('WEBHOOK_AGENTE_URL_A')
+    
+    if not url_webhook:
+        logging.warning("WEBHOOK_AGENTE_URL_A não configurada no .env. Webhook não enviado.")
+        return False
+
+    ambiente = os.getenv('AMBIENTE_EXECUCAO', 'homologacao')
+    telefone_limpo = ''.join(filter(str.isdigit, str(cliente.get('whatsapp', ''))))
+    
+    produtos_formatados = []
+    for item in itens_avaliados:
+        qtd = int(item.get('quantidade', 1))
+        valor_un = float(item.get('valor_pix_unitario', 0.0))
+        produtos_formatados.append({
+            "nome": str(item.get('produto_nome', 'Produto')),
+            "quantidade": qtd,
+            "valor_unitario": valor_un,
+            "valor_total": valor_un * qtd
+        })
+
+    payload = {
+        "evento": "novo_protocolo",
+        "dados": {
+            "protocolo": str(protocolo),
+            "cliente": str(cliente.get('nome_completo', '')),
+            "email": str(cliente.get('email', '')),
+            "telefone": telefone_limpo,
+            "valor_total_cotacao": float(total_pix),
+            "codigo_rastreio": str(codigo_rastreio) if codigo_rastreio else "",
+            "ambiente": ambiente,
+            "produtos": produtos_formatados
+        }
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    token_envio = os.getenv('AGENTE_TOKEN_ENVIO')
+    if token_envio:
+        headers["Authorization"] = f"Bearer {token_envio}"
+
+    try:
+        logging.info(f"Disparando Webhook (Fluxo A) para o Agente de WhatsApp. Protocolo: {protocolo}")
+        resposta = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
+        
+        if resposta.status_code in [200, 201]:
+            logging.info("Webhook (Fluxo A) enviado com sucesso.")
+            return True
+        else:
+            logging.error(f"Falha ao enviar Webhook (Fluxo A). Status: {resposta.status_code} - Resposta: {resposta.text}")
+            return False
+            
+    except requests.exceptions.Timeout:
+        logging.error("Timeout ao enviar Webhook (Fluxo A) para o Agente de WhatsApp.")
+        return False
+    except Exception as e:
+        logging.error(f"Erro inesperado ao enviar Webhook (Fluxo A): {e}")
+        return False

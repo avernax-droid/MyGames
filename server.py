@@ -46,8 +46,8 @@
 # - 27/07/2026: Inclusão de trava de segurança no backend (rota /finalizar-lote) com validação matemática de CPF.
 # - 27/07/2026: Injeção da variável cep_empresa_formatado na rota /finalizar e adequação do termo 'código de rastreio'.
 # - 28/07/2026: Correção de bug na rota /finalizar-lote para buscar o nome correto do canal de aquisição (Origem do Lead) a partir da sessão.
-# - 20/10/2026: Chamada da função enviar_webhook_novo_protocolo na rota /finalizar para o Fluxo A do Agente WhatsApp.
 # - 23/10/2026: Remoção da rota /api/buscar_cidades, pois a busca de municípios do IBGE foi descentralizada para o front-end.
+# - 23/10/2026: Invocação da função enviar_webhook_novo_protocolo na rota /finalizar para alimentar o Gatilho A (Agente WhatsApp).
 # ==============================================================================
 
 import os
