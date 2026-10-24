@@ -46,6 +46,8 @@
 # - 28/07/2026: AJUSTE FINAL: Adição da tag <cartao_postagem>, <peso> e <dimensoes> para garantir faturamento no contrato e não reprovação do Portal Postal. Mantido Modo Espelhado.
 # - 23/10/2026: Remoção da função consultar_municipios_ibge() e rotinas de cache, pois a busca foi descentralizada para o front-end, aliviando o servidor.
 # - 23/10/2026: Implementação da função enviar_webhook_novo_protocolo para integração com o Agente de WhatsApp (Fluxo A), consumindo parâmetros dinâmicos do .env.
+# - 24/10/2026: Refatoração da função gerar_codigo_rastreio para consumir a API REST/JSON dos Correios (Pré-postagem V1). Inclusão do mecanismo de autenticação OAuth2 (obter_token_correios) e remoção das bibliotecas XML.
+# - 24/10/2026: Correção de validações PPN da API REST dos Correios: injeção de CPF/CNPJ obrigatórios, ajuste de logisticaReversa para 'N', formatação do cienteObjetoNaoProibido como numérico e formato de caixa (2).
 # ==============================================================================
 
 import mysql.connector
@@ -55,8 +57,7 @@ import datetime
 import smtplib
 import json
 import requests
-import xml.etree.ElementTree as ET
-from xml.sax.saxutils import escape
+import base64
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -68,6 +69,46 @@ load_dotenv()
 
 # Configuração de log focada na validação da API dos Correios via terminal
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS] %(levelname)s - %(message)s')
+
+TOKEN_CACHE = {"token": None, "expira_em": None}
+
+def obter_token_correios():
+    global TOKEN_CACHE
+    
+    cliente_id = os.getenv('CORREIOS_CLIENT_ID', '').strip()
+    cliente_secret = os.getenv('CORREIOS_CLIENT_SECRET', '').strip()
+    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM', '').strip()
+    
+    if not cliente_id or not cliente_secret:
+        logging.error("Credenciais CORREIOS_CLIENT_ID ou CORREIOS_CLIENT_SECRET ausentes no .env")
+        return None
+
+    if TOKEN_CACHE["token"] and TOKEN_CACHE["expira_em"] and TOKEN_CACHE["expira_em"] > datetime.datetime.now() + datetime.timedelta(minutes=5):
+        return TOKEN_CACHE["token"]
+
+    url_token = "https://api.correios.com.br/token/v1/autentica/cartaopostagem"
+    auth_str = f"{cliente_id}:{cliente_secret}"
+    auth_base64 = base64.b64encode(auth_str.encode("utf-8")).decode("utf-8")
+    
+    headers = {
+        "Authorization": f"Basic {auth_base64}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    payload = {"numero": cartao_postagem}
+    
+    try:
+        resp = requests.post(url_token, json=payload, headers=headers, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        token = data.get("token") or data.get("access_token")
+        TOKEN_CACHE["token"] = token
+        TOKEN_CACHE["expira_em"] = datetime.datetime.now() + datetime.timedelta(seconds=data.get("expires_in", 28800))
+        return token
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Erro na API de autenticação Correios: {e}")
+        return None
 
 def conectar_bd():
     try:
@@ -397,7 +438,8 @@ def finalizar_proposta(dados_proposta):
             "cidade": cliente.get('cidade', ''),
             "uf": cliente.get('estado_uf', ''),
             "ddd": "11",  
-            "telefone": cliente.get('whatsapp', '')
+            "telefone": cliente.get('whatsapp', ''),
+            "cpf": cliente.get('cpf', '') 
         }
         
         itens_avaliados = dados_proposta.get('itens', [])
@@ -520,162 +562,134 @@ def buscar_canais_aquisicao():
 
 def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     """
-    Integração com Web Service do Portal Postal (Correios AGF).
-    MODO ESPELHADO: Empresa na Raiz = Destinatário | Cliente na tag <remetente>
-    Busca no balcão: Código + CEP da Empresa
-    Pagamento: Amarrado no cartao_postagem do contrato
+    Integração com a API REST Oficial dos Correios (Pré-postagem V1).
+    MODO ESPELHADO: Empresa = Destinatário | Cliente = Remetente
+    O cliente postará a caixa sem custos, informando o código no balcão.
     """
-    cod_agencia = os.getenv('CORREIOS_AGENCIA')
-    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM')
-    login_ws    = os.getenv('CORREIOS_USER')
-    senha_ws    = os.getenv('CORREIOS_PASS')
-    url_soap    = "http://www.portalpostal.com.br/axis2/services/PrePostagemWS"
     ambiente = os.getenv('CORREIOS_AMBIENTE')
     
     if ambiente == "fake":
-        logging.info("MODO FAKE ATIVADO: Simulando resposta do Portal Postal...")
+        logging.info("MODO FAKE ATIVADO: Simulando resposta da API REST dos Correios...")
         codigo_fake = "ET" + str(datetime.datetime.now().strftime('%H%M%S'))
         return codigo_fake, codigo_fake
 
+    # Dados da Empresa (Destinatário Físico)
     empresa = obter_dados_empresa() or {}
     nome_fantasia = empresa.get('nome_fantasia', 'Loja')
     cep_empresa = ''.join(filter(str.isdigit, str(empresa.get('cep', ''))))
-    logradouro_empresa = escape(str(empresa.get('logradouro', '')))[:100]
-    numero_empresa = escape(str(empresa.get('numero', '')))[:10]
-    complemento_empresa = escape(str(empresa.get('complemento', '')))[:100]
-    bairro_empresa = escape(str(empresa.get('bairro', '')))[:100]
-    cidade_empresa = escape(str(empresa.get('cidade', '')))[:100]
-    uf_empresa = escape(str(empresa.get('estado_uf', '')))[:2]
-
+    cnpj_empresa = ''.join(filter(str.isdigit, str(empresa.get('cnpj', os.getenv('CORREIOS_CNPJ', '')))))
+    cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM')
+    
+    # Dados do Cliente (Remetente Logístico)
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
-    nome_seguro = escape(str(dados_remetente.get('nome', f'Cliente {nome_fantasia}')))[:100]
-    logradouro_seguro = escape(str(dados_remetente.get('logradouro', '')))[:100]
-    numero_seguro = escape(str(dados_remetente.get('numero', '')))[:10]
-    complemento_seguro = escape(str(dados_remetente.get('complemento', '')))[:100]
-    bairro_seguro = escape(str(dados_remetente.get('bairro', '')))[:100]
-    cidade_seguro = escape(str(dados_remetente.get('cidade', '')))[:100]
-    uf_seguro = escape(str(dados_remetente.get('uf', '')))[:2]
+    cpf_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cpf', ''))))
 
-    servico_correios = "PAC"
+    # --- ROTEAMENTO INTELIGENTE DE SERVIÇO (PAC/SEDEX) ---
+    codigo_servico = "03220" # PAC
     if cep_cliente and len(cep_cliente) == 8:
         if int(cep_cliente) < 20000000:
-            servico_correios = "SEDEX"
-            logging.info(f"Roteamento: CEP {cep_cliente} classificado como SEDEX")
+            codigo_servico = "03298" # SEDEX
+            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como SEDEX (03298)")
         else:
-            logging.info(f"Roteamento: CEP {cep_cliente} classificado como PAC")
-            
-    xml_itens = ""
+            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como PAC (03220)")
+
+    # --- PROCESSAMENTO DE ITENS E PESO CUBADO ---
     peso_total = 0.5
+    itens_formatados = []
+    
     for item in itens_avaliados:
-        descricao_limpa = escape(str(item.get('produto_nome', 'Game Usado')))[:100]
-        if len(descricao_limpa) < 5:
-            descricao_limpa = descricao_limpa.ljust(5, 'x')
         qtd = int(item.get('quantidade', 1))
         peso_total += qtd * 0.2
+        valor_item = float(item.get('valor_pix_unitario', '0.00'))
         
-        xml_itens += f"""
-        <item>
-            <descricao>{descricao_limpa}</descricao>
-            <quantidade>{qtd}</quantidade>
-            <valor>{escape(str(item.get('valor_pix_unitario', '0.00')))}</valor>
-        </item>"""
+        itens_formatados.append({
+            "conteudo": str(item.get('produto_nome', 'Game Usado'))[:100],
+            "quantidade": str(qtd),
+            "valor": f"{valor_item:.2f}"
+        })
 
-    xml_dados_postagem = f"""<portalpostal>
-    <pre_postagem>
-        <chave>{numero_protocolo}</chave>
-        <nome>{nome_fantasia}</nome>
-        <cep>{cep_empresa}</cep>
-        <endereco>{logradouro_empresa}</endereco>
-        <numero>{numero_empresa}</numero>
-        <complemento>{complemento_empresa}</complemento>
-        <bairro>{bairro_empresa}</bairro>
-        <cidade>{cidade_empresa}</cidade>
-        <estado>{uf_empresa}</estado>
+    # --- CONSTRUÇÃO DO PAYLOAD JSON (Request Body) ---
+    payload = {
+        "codigoServico": codigo_servico,
+        "numeroCartaoPostagem": cartao_postagem,
+        "observacao": numero_protocolo,
+        "logisticaReversa": "N", 
+        "embalagem": "S",
+        "cienteObjetoNaoProibido": 1, # CORREÇÃO: O servidor Java dos Correios espera o número 1 (True), e não a letra "S"
+        "pesoInformado": str(int(peso_total * 1000)),
+        "codigoFormatoObjetoInformado": "2", 
+        "alturaInformada": "10",
+        "larguraInformada": "20",
+        "comprimentoInformado": "30",
         
-        <servico>{servico_correios}</servico>
-        <peso>{peso_total:.2f}</peso>
-        <largura>20</largura>
-        <altura>10</altura>
-        <comprimento>30</comprimento>
+        "remetente": {
+            "nome": str(dados_remetente.get('nome', f'Cliente {nome_fantasia}'))[:100],
+            "cpfCnpj": cpf_cliente, 
+            "dddCelular": str(dados_remetente.get('telefone', ''))[:2] if len(str(dados_remetente.get('telefone', ''))) > 2 else "11",
+            "celular": str(dados_remetente.get('telefone', ''))[2:11] if len(str(dados_remetente.get('telefone', ''))) > 2 else "999999999",
+            "endereco": {
+                "cep": cep_cliente,
+                "logradouro": str(dados_remetente.get('logradouro', ''))[:100],
+                "numero": str(dados_remetente.get('numero', ''))[:10],
+                "complemento": str(dados_remetente.get('complemento', ''))[:100],
+                "bairro": str(dados_remetente.get('bairro', ''))[:100],
+                "cidade": str(dados_remetente.get('cidade', ''))[:100],
+                "uf": str(dados_remetente.get('uf', ''))[:2]
+            }
+        },
         
-        <remetente>
-            <nome>{nome_seguro}</nome>
-            <cep>{cep_cliente}</cep>
-            <endereco>{logradouro_seguro}</endereco>
-            <numero>{numero_seguro}</numero>
-            <complemento>{complemento_seguro}</complemento>
-            <bairro>{bairro_seguro}</bairro>
-            <cidade>{cidade_seguro}</cidade>
-            <estado>{uf_seguro}</estado>
-        </remetente>
-        
-        <conteudo>{xml_itens}</conteudo>
-        <cartao_postagem>{cartao_postagem}</cartao_postagem>
-    </pre_postagem>
-</portalpostal>"""
-
-    soap_payload = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:pos="http://postagem/xsd">
-       <soapenv:Header/>
-       <soapenv:Body>
-          <pos:PrePostagemXml>
-             <pos:xml><![CDATA[{xml_dados_postagem}]]></pos:xml>
-             <pos:codAgencia>{cod_agencia}</pos:codAgencia>
-             <pos:login>{login_ws}</pos:login>
-             <pos:senha>{senha_ws}</pos:senha>
-          </pos:PrePostagemXml>
-       </soapenv:Body>
-    </soapenv:Envelope>"""
-
-    headers = {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "urn:PrePostagemXml"
+        "destinatario": {
+            "nome": nome_fantasia[:100],
+            "cpfCnpj": cnpj_empresa,
+            "endereco": {
+                "cep": cep_empresa,
+                "logradouro": str(empresa.get('logradouro', ''))[:100],
+                "numero": str(empresa.get('numero', ''))[:10],
+                "complemento": str(empresa.get('complemento', ''))[:100],
+                "bairro": str(empresa.get('bairro', ''))[:100],
+                "cidade": str(empresa.get('cidade', ''))[:100],
+                "uf": str(empresa.get('estado_uf', ''))[:2]
+            }
+        },
+        "itensDeclaracaoConteudo": itens_formatados
     }
-    
+
+    token = obter_token_correios() 
+    if not token:
+        logging.error("Falha ao gerar Token OAuth2 dos Correios.")
+        return None, None
+
+    url_api = "https://api.correios.com.br/prepostagem/v1/prepostagens"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
     try:
-        logging.info("Enviando requisição SOAP para o Portal Postal - MODO ESPELHADO...")
-        resp = requests.post(url_soap, data=soap_payload.encode('utf-8'), headers=headers, timeout=20)
+        resp = requests.post(url_api, json=payload, headers=headers, timeout=20)
         
-        if resp.status_code == 200:
-            logging.info(f"RESPOSTA BRUTA PORTAL POSTAL: {resp.text}")
+        if resp.status_code in (200, 201):
+            dados_resposta = resp.json()
+            codigo_rastreio = dados_resposta.get('codigoObjeto')
+            e_ticket = dados_resposta.get('eticket', codigo_rastreio)
             
-            root = ET.fromstring(resp.text)
-            codigo_postagem = None
-            detalhes_erro = None
-            
-            for elem in root.iter():
-                if 'PrePostagemXmlReturn' in elem.tag or 'return' in elem.tag:
-                    retorno_xml_str = elem.text
-                    if retorno_xml_str:
-                        logging.info(f"XML INTERNO RETORNO: {retorno_xml_str}")
-                        retorno_root = ET.fromstring(retorno_xml_str)
-                        
-                        for postagem in retorno_root.findall('.//postagem'):
-                            codigo_postagem = postagem.findtext('codigo_rastreio')
-                            status = postagem.findtext('detalhes')
-                            
-                            if codigo_postagem and status == 'POSTADO':
-                                logging.info(f"SUCESSO! Código de Postagem gerado: {codigo_postagem}")
-                            else:
-                                detalhes_erro = status
-                                codigo_postagem = None
-                                
-            if codigo_postagem:
-                return codigo_postagem, codigo_postagem 
+            if codigo_rastreio:
+                logging.info(f"SUCESSO REST! Código de Postagem: {codigo_rastreio}")
+                return e_ticket, codigo_rastreio 
             else:
-                logging.error(f"Falha ao gerar etiqueta no Portal Postal. Motivo: {detalhes_erro}")
+                logging.error(f"Sucesso HTTP, mas JSON sem código de rastreio: {resp.text}")
                 return None, None
+                
+        elif resp.status_code == 400:
+            logging.error(f"Erro 400 - Validação dos Correios: {resp.json().get('msgs', resp.text)}")
+            return None, None
         else:
-            logging.error(f"Falha na integração HTTP {resp.status_code}: {resp.text}")
+            logging.error(f"Falha na integração REST HTTP {resp.status_code}: {resp.text}")
             return None, None
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Erro de conexão com o Portal Postal: {e}")
-        return None, None
-    except ET.ParseError as e:
-        logging.error(f"Erro ao processar XML de retorno: {e}")
-        return None, None
     except Exception as e:
-        logging.error(f"Erro interno no processamento: {e}")
+        logging.error(f"Erro interno no processamento JSON: {e}")
         return None, None
 
 # --- INTEGRAÇÃO AGENTE WHATSAPP (FLUXO A) ---
