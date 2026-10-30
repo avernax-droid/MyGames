@@ -48,6 +48,8 @@
 # - 23/10/2026: Implementação da função enviar_webhook_novo_protocolo para integração com o Agente de WhatsApp (Fluxo A), consumindo parâmetros dinâmicos do .env.
 # - 24/10/2026: Refatoração da função gerar_codigo_rastreio para consumir a API REST/JSON dos Correios (Pré-postagem V1). Inclusão do mecanismo de autenticação OAuth2 (obter_token_correios) e remoção das bibliotecas XML.
 # - 24/10/2026: Correção de validações PPN da API REST dos Correios: injeção de CPF/CNPJ obrigatórios, ajuste de logisticaReversa para 'N', formatação do cienteObjetoNaoProibido como numérico e formato de caixa (2).
+# - 29/10/2026: Integração dinâmica do webhook (Gatilho A) na finalização da proposta utilizando processamento assíncrono (Thread).
+# - 29/10/2026: Adição de sobreposição (override) de telefone (5532998522450) no enviar_webhook_novo_protocolo exclusivo para ambiente de homologação.
 # ==============================================================================
 
 import mysql.connector
@@ -59,6 +61,7 @@ import json
 import requests
 import base64
 import logging
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr 
@@ -465,6 +468,16 @@ def finalizar_proposta(dados_proposta):
         p_id = cursor.lastrowid
         db.commit()
         
+        # DISPARO DO GATILHO A (WhatsApp) EM BACKGROUND
+        # Executado em thread isolada para garantir que a lentidão da rede externa não trave o ecrã de sucesso do utilizador.
+        try:
+            threading.Thread(
+                target=enviar_webhook_novo_protocolo,
+                args=(protocolo, cliente, itens_avaliados, dados_proposta['total_pix'], codigo_rastreio)
+            ).start()
+        except Exception as e:
+            logging.error(f"Falha ao iniciar thread do webhook N8N: {e}")
+
         return {
             "id": p_id, 
             "numero": protocolo,
@@ -614,7 +627,7 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         "numeroCartaoPostagem": cartao_postagem,
         "observacao": numero_protocolo,
         "logisticaReversa": "N", 
-        "embalagem": "S",
+        "embalagem": "N",
         "cienteObjetoNaoProibido": 1, # CORREÇÃO: O servidor Java dos Correios espera o número 1 (True), e não a letra "S"
         "pesoInformado": str(int(peso_total * 1000)),
         "codigoFormatoObjetoInformado": "2", 
@@ -707,12 +720,19 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
     ambiente = os.getenv('AMBIENTE_EXECUCAO', 'homologacao')
     telefone_limpo = ''.join(filter(str.isdigit, str(cliente.get('whatsapp', ''))))
     
+    # --- INÍCIO DA SOBREPOSIÇÃO DE HOMOLOGAÇÃO (Trava de Segurança N8N) ---
+    # Força o telefone de teste exigido pelo Agente quando em ambiente de homologação
+    if ambiente == "homologacao":
+        telefone_limpo = "5532998522450"
+        logging.info(f"Modo Homologação: Telefone substituído pelo contato de teste autorizado ({telefone_limpo}).")
+    # --- FIM DA SOBREPOSIÇÃO ---
+    
     produtos_formatados = []
     for item in itens_avaliados:
         qtd = int(item.get('quantidade', 1))
         valor_un = float(item.get('valor_pix_unitario', 0.0))
         produtos_formatados.append({
-            "nome": str(item.get('produto_nome', 'Produto')),
+            "nome": str(item.get('produto_nome', 'Produto'))[:500],
             "quantidade": qtd,
             "valor_unitario": valor_un,
             "valor_total": valor_un * qtd
@@ -721,12 +741,12 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
     payload = {
         "evento": "novo_protocolo",
         "dados": {
-            "protocolo": str(protocolo),
-            "cliente": str(cliente.get('nome_completo', '')),
+            "protocolo": str(protocolo)[:100],
+            "cliente": str(cliente.get('nome_completo', ''))[:200],
             "email": str(cliente.get('email', '')),
             "telefone": telefone_limpo,
             "valor_total_cotacao": float(total_pix),
-            "codigo_rastreio": str(codigo_rastreio) if codigo_rastreio else "",
+            "codigo_rastreio": str(codigo_rastreio)[:100] if codigo_rastreio else "",
             "ambiente": ambiente,
             "produtos": produtos_formatados
         }

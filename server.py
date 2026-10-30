@@ -48,6 +48,8 @@
 # - 28/07/2026: Correção de bug na rota /finalizar-lote para buscar o nome correto do canal de aquisição (Origem do Lead) a partir da sessão.
 # - 23/10/2026: Remoção da rota /api/buscar_cidades, pois a busca de municípios do IBGE foi descentralizada para o front-end.
 # - 23/10/2026: Invocação da função enviar_webhook_novo_protocolo na rota /finalizar para alimentar o Gatilho A (Agente WhatsApp).
+# - 29/10/2026: Correção na rota /finalizar repassando a chave 'itens' para o engine, corrigindo o fallback vazio no webhook N8N.
+# - 29/10/2026: Remoção do disparo síncrono duplicado do webhook do N8N na rota /finalizar.
 # ==============================================================================
 
 import os
@@ -627,7 +629,8 @@ def finalizar():
         'cliente_id': cliente_id,
         'total_pix': total_pix,
         'total_cred': total_cred,
-        'canal_aquisicao_id': session.get('canal_aquisicao_id') 
+        'canal_aquisicao_id': session.get('canal_aquisicao_id'),
+        'itens': itens
     }
 
     res_protocolo = engine.finalizar_proposta(dados_protocolo)
@@ -662,19 +665,6 @@ def finalizar():
         
         # Envia o e-mail
         engine.enviar_email_resumo(cliente, dados_email, itens)
-        
-        # --- DISPARO GATILHO A (AGENTE WHATSAPP) ---
-        try:
-            engine.enviar_webhook_novo_protocolo(
-                protocolo=res_protocolo['numero'],
-                cliente=cliente,
-                itens_avaliados=itens,
-                total_pix=total_pix,
-                codigo_rastreio=codigo_rastreio
-            )
-        except Exception as e:
-            print(f"Erro ao disparar webhook do Agente na rota /finalizar: {e}")
-        # ------------------------------------------
         
         return render_smart_template(
             'sucesso.html', 
