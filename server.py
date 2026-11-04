@@ -50,6 +50,10 @@
 # - 23/10/2026: Invocação da função enviar_webhook_novo_protocolo na rota /finalizar para alimentar o Gatilho A (Agente WhatsApp).
 # - 29/10/2026: Correção na rota /finalizar repassando a chave 'itens' para o engine, corrigindo o fallback vazio no webhook N8N.
 # - 29/10/2026: Remoção do disparo síncrono duplicado do webhook do N8N na rota /finalizar.
+# - 04/11/2026: Criação da rota /salvar_agendamento e modificação da rota /aceitar_termos para direcionar à nova etapa isolada de micro-compromisso logístico.
+# - 04/11/2026: Correção no range do laço da rota /aceitar_termos para incluir a data de hoje nas opções.
+# - 04/11/2026: Inclusão da data_expiracao no dicionário dados_email na rota /finalizar para envio ao cliente.
+# - 04/11/2026: Inclusão da data_promessa no dicionário dados_email na rota /finalizar.
 # ==============================================================================
 
 import os
@@ -58,7 +62,7 @@ import uuid
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
 from user_agents import parse # Biblioteca para detecção precisa do dispositivo
 from flask_session import Session # NOVO: Importação para gerenciamento de sessão no servidor
 
@@ -501,7 +505,40 @@ def termos_oferta():
 
 @app.route('/aceitar_termos', methods=['POST'])
 def aceitar_termos():
-    return redirect(url_for('identificacao'))
+    # --- NOVA LÓGICA: CÁLCULO DE DATAS N8N ---
+    try:
+        prazo_horas = int(os.getenv('PRAZO_POSTAGEM_HORAS', 72))
+    except ValueError:
+        prazo_horas = 72
+        
+    hoje = datetime.now()
+    data_expiracao_dt = hoje + timedelta(hours=prazo_horas)
+    data_expiracao_str = data_expiracao_dt.strftime('%d/%m/%Y')
+    
+    datas_disponiveis = []
+    dias_totais = prazo_horas // 24
+    
+    for i in range(0, dias_totais + 1):
+        data_opcao = hoje + timedelta(days=i)
+        datas_disponiveis.append(data_opcao.strftime('%d/%m/%Y'))
+        
+    session['data_expiracao'] = data_expiracao_str
+    
+    return render_smart_template(
+        'agendar_postagem.html',
+        datas_disponiveis=datas_disponiveis,
+        data_expiracao=data_expiracao_str,
+        fase_atual=4
+    )
+
+@app.route('/salvar_agendamento', methods=['POST'])
+def salvar_agendamento():
+    data_promessa = request.form.get('data_promessa')
+    if data_promessa:
+        session['data_promessa'] = data_promessa
+        return redirect(url_for('identificacao'))
+    
+    return "Erro: Data de postagem não selecionada.", 400
 
 @app.route('/descartar-lote-final', methods=['POST'])
 def descartar_lote_final():
@@ -557,17 +594,14 @@ def finalizar_lote():
     
     cpf_puro = ''.join(filter(str.isdigit, request.form.get('cpf', '')))
     
-    # --- NOVA TRAVA DE SEGURANÇA: VALIDAÇÃO DE CPF ---
     if not validar_cpf(cpf_puro):
         return "Erro: O CPF informado é inválido. Por favor, retorne e tente novamente.", 400
-    # -------------------------------------------------
 
     cep_puro = ''.join(filter(str.isdigit, request.form.get('cep', '')))
     whatsapp_puro = ''.join(filter(str.isdigit, request.form.get('whatsapp', '')))
     
-    # --- RESOLUÇÃO DO BUG: BUSCA DA ORIGEM DO LEAD PELA SESSÃO ---
     canal_id = session.get('canal_aquisicao_id')
-    nome_origem = 'Direto' # Fallback
+    nome_origem = 'Direto'
     if canal_id:
         try:
             canais = engine.buscar_canais_aquisicao()
@@ -630,7 +664,9 @@ def finalizar():
         'total_pix': total_pix,
         'total_cred': total_cred,
         'canal_aquisicao_id': session.get('canal_aquisicao_id'),
-        'itens': itens
+        'itens': itens,
+        'data_promessa': session.get('data_promessa'),
+        'data_expiracao': session.get('data_expiracao')
     }
 
     res_protocolo = engine.finalizar_proposta(dados_protocolo)
@@ -645,25 +681,24 @@ def finalizar():
         e_ticket = res_protocolo.get('e_ticket')
         codigo_rastreio = res_protocolo.get('codigo_rastreio')
 
-        # Busca dados atualizados da empresa na tabela dados_empresa
         empresa = engine.obter_dados_empresa()
         
-        # Formatar CEP para envio para a view (Obrigatório mostrar pro cliente)
         cep_bruto = ''.join(filter(str.isdigit, str(empresa.get('cep', '')))) if empresa else ''
         cep_empresa_formatado = f"{cep_bruto[:5]}-{cep_bruto[5:]}" if len(cep_bruto) == 8 else cep_bruto
         
-        # Fallback seguro: se a tabela estiver vazia, define um padrão
         nome_fantasia_seguro = empresa.get('nome_fantasia', 'MyGames') if empresa else 'MyGames'
 
+        # --- REPASSE COMPLETO DE DATAS E DADOS PARA O E-MAIL ---
         dados_email = {
             'protocolo': res_protocolo['numero'],
             'quantidade_itens': len(itens),
             'total_pix': total_pix,
             'e_ticket': e_ticket,
-            'codigo_rastreio': codigo_rastreio
+            'codigo_rastreio': codigo_rastreio,
+            'data_promessa': session.get('data_promessa'),
+            'data_expiracao': session.get('data_expiracao')
         }
         
-        # Envia o e-mail
         engine.enviar_email_resumo(cliente, dados_email, itens)
         
         return render_smart_template(

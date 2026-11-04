@@ -1,0 +1,83 @@
+{# 
+  ==============================================================================
+  PROJETO: MyGames
+  MÓDULO: mobile/agendar_postagem.html
+  DATA DE CRIAÇÃO: 04/11/2026
+  TÍTULO: Agendamento de Postagem (N8N)
+  FUNÇÃO: Tela intermediária exclusiva para smartphones onde o cliente seleciona 
+  a data prevista para postagem antes de preencher os dados de cadastro.
+  
+  HISTÓRICO DE ALTERAÇÕES:
+  - 04/11/2026: Criação do módulo para isolar o micro-compromisso logístico.
+  - 04/11/2026: Ajuste de flexbox para aproximar a data do radio button (UI Fix).
+  ==============================================================================
+#}
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Agendar Postagem{% endblock %}
+
+{% block content %}
+<div class="container-cadastro-mobile" style="padding: 15px; width: 100%; box-sizing: border-box;">
+    <div class="card-padrao-mobile">
+        <header style="margin-bottom: 25px;">
+            <h2 class="titulo-pagina-mobile" style="font-family: 'Rajdhani', sans-serif; color: var(--cor-destaque); text-align: center; text-transform: uppercase; margin: 0; font-size: 20px; line-height: 1.2;">
+                DATA PREVISTA PARA POSTAGEM *
+            </h2>
+        </header>
+
+        <p style="font-size: 14px; color: #ffaa00; margin-bottom: 25px; line-height: 1.4; text-align: center;">
+            Atenção: Para garantir o valor desta oferta, a postagem deve ser realizada nos Correios no máximo até o dia <strong>{{ data_expiracao }}</strong>.
+        </p>
+
+        <form action="/salvar_agendamento" method="POST" id="formAgendamento">
+            
+            <div class="radio-group-mobile" style="margin-bottom: 30px;">
+                {% for data in datas_disponiveis %}
+                <div class="radio-item-mobile" style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 12px; background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid #444;">
+                    <input type="radio" id="data_{{ loop.index }}" name="data_promessa" value="{{ data }}" style="transform: scale(1.3); margin: 0;" required>
+                    <label for="data_{{ loop.index }}" style="font-size: 16px; color: var(--texto-br); cursor: pointer; margin: 0;">
+                        {{ data }}
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="botoes-acao-inline-mobile" style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                <button type="button" onclick="history.back()" class="btn-secondary" style="width: max-content; padding: 14px 24px; font-size: 14px; flex-shrink: 0;">
+                    VOLTAR
+                </button>
+                <button type="submit" class="btn-primary" style="width: max-content; padding: 14px 24px; font-size: 14px; flex-shrink: 0;">
+                    CONTINUAR
+                </button>
+            </div>
+            
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('formAgendamento').addEventListener('submit', function(e) {
+        const radios = document.querySelectorAll('input[name="data_promessa"]');
+        let selecionado = false;
+        
+        for (const radio of radios) {
+            if (radio.checked) {
+                selecionado = true;
+                break;
+            }
+        }
+        
+        if (!selecionado) {
+            e.preventDefault();
+            alert("Por favor, selecione uma data prevista para a postagem.");
+        } else {
+            const btnSubmit = this.querySelector('button[type="submit"]');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = "A PROCESSAR...";
+            btnSubmit.style.opacity = "0.8";
+        }
+    });
+</script>
+{% endblock %}

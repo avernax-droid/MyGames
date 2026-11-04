@@ -50,6 +50,8 @@
 # - 24/10/2026: Correção de validações PPN da API REST dos Correios: injeção de CPF/CNPJ obrigatórios, ajuste de logisticaReversa para 'N', formatação do cienteObjetoNaoProibido como numérico e formato de caixa (2).
 # - 29/10/2026: Integração dinâmica do webhook (Gatilho A) na finalização da proposta utilizando processamento assíncrono (Thread).
 # - 29/10/2026: Adição de sobreposição (override) de telefone (5532998522450) no enviar_webhook_novo_protocolo exclusivo para ambiente de homologação.
+# - 04/11/2026: Atualização da função finalizar_proposta e enviar_webhook_novo_protocolo para inclusão de data_promessa e data_expiracao no payload do Gatilho A (N8N).
+# - 04/11/2026: Padronização total do e-mail com tabelas HTML para alinhamento absoluto dos dois pontos e formatação de negritos nos dados de postagem e itens.
 # ==============================================================================
 
 import mysql.connector
@@ -70,7 +72,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuração de log focada na validação da API dos Correios via terminal
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS] %(levelname)s - %(message)s')
 
 TOKEN_CACHE = {"token": None, "expira_em": None}
@@ -127,8 +128,6 @@ def conectar_bd():
         print(f"ERRO CRÍTICO: Falha na conexão com o MySQL: {e}")
         return None
 
-# --- MÓDULO DE IDENTIFICAÇÃO ---
-
 def salvar_lead(dados):
     db = conectar_bd()
     if not db: return None
@@ -177,8 +176,6 @@ def salvar_lead(dados):
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-# --- MÓDULO DE GESTÃO DE CLIENTES ---
-
 def obter_cliente(cliente_id):
     db = conectar_bd()
     if not db: return {}
@@ -213,8 +210,6 @@ def atualizar_cadastro_completo(cliente_id, dados):
         return True
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
-
-# --- MÓDULO DE PERÍCIA E CÁLCULOS ---
 
 def obter_produto_por_id(produto_id):
     db = conectar_bd()
@@ -301,8 +296,6 @@ def registrar_item_periciado(protocolo_id, item):
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-# --- MÓDULO DE FINALIZAÇÃO ---
-
 def obter_dados_empresa():
     db = conectar_bd()
     if not db: return None
@@ -338,19 +331,41 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
         msg['To'] = cliente['email']
         msg['Subject'] = f"Confirmação {nome_fantasia} - Protocolo {dados_email['protocolo']}"
 
-        html_itens = "<p><strong>ÍTENS INCLUÍDOS NA VENDA:</strong></p>"
+        # --- ITENS INCLUÍDOS ALINHADOS POR TABELA ---
+        html_itens_linhas = ""
         tem_analise_manual = False
         
         for item in itens_avaliados:
             quantidade = int(item.get('quantidade', 1))
-            html_itens += f"<p><strong>Produto:</strong> {item.get('produto_nome')} (Qtd: {quantidade})<br>"
+            nome_prod = f"{item.get('produto_nome')} (Qtd: {quantidade})"
             
             if item.get('is_outros'):
-                html_itens += "<strong>Valor:</strong> Sob Consulta</p>"
+                valor_str = "Sob Consulta"
                 tem_analise_manual = True
             else:
                 valor_final = float(item['valor_pix_unitario']) * quantidade
-                html_itens += f"<strong>Valor:</strong> R$ {valor_final:.2f}</p>"
+                valor_str = f"R$ {valor_final:.2f}"
+                
+            html_itens_linhas += f"""
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">Produto</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;">{nome_prod}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">Valor</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;">{valor_str}</td>
+                </tr>
+                <tr><td colspan="3" style="padding: 5px 0;"></td></tr>
+            """
+
+        html_itens = f"""
+        <p><strong>ÍTENS INCLUÍDOS NA VENDA:</strong></p>
+        <table style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse; margin-bottom: 15px;">
+            {html_itens_linhas}
+        </table>
+        """
 
         aviso_manual_html = ""
         if tem_analise_manual:
@@ -365,25 +380,58 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
 
         html_logistica = ""
         if dados_email.get('codigo_rastreio'):
+            data_promessa_str = dados_email.get('data_promessa', '')
+            data_expiracao_str = dados_email.get('data_expiracao', '')
+            
+            alerta_atencao_html = f"""
+            <div style="background-color: #fff3f3; border-left: 4px solid #d32f2f; padding: 12px; margin: 15px 0;">
+                <p style="color: #d32f2f; margin: 0 0 8px 0; font-weight: bold;">ATENÇÃO!</p>
+                <p style="color: #333; margin: 0 0 6px 0;">Conforme agendamento, a sua postagem está prevista para o dia <strong>{data_promessa_str}</strong>.</p>
+                <p style="color: #333; margin: 0 0 6px 0;">Para garantir o valor desta oferta, a postagem deve ser realizada nos Correios no máximo até o dia <strong>{data_expiracao_str}</strong>.</p>
+                <p style="color: #333; margin: 0; font-weight: bold;">Você não deve realizar nenhum pagamento. O custo do envio é por nossa conta!</p>
+            </div>
+            """
+            
+            # --- DADOS DE POSTAGEM ALINHADOS POR TABELA E NEGRITOS AJUSTADOS ---
             html_logistica = f"""
             <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima.</p>
-            <p><strong>ATENÇÃO: Você não deve realizar nenhum pagamento. O custo do envio é por nossa conta!</strong></p>
-            <p><strong>DADOS DE POSTAGEM:</strong><br>
-            <strong>1. Código de Postagem:</strong> {dados_email['codigo_rastreio']}<br>
-            <strong>2. CEP de Destino OBRIGATÓRIO:</strong> {cep_empresa_formatado}</p>
-            <p><strong>Instrução para o Atendente:</strong> "Postagem Pré-Paga por Contrato". Informe o <strong>Código</strong> e o <strong>CEP de Destino</strong> acima para localizar a postagem.<br>
+            {alerta_atencao_html}
+            <p><strong>DADOS DE POSTAGEM:</strong></p>
+            <table style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse; margin-bottom: 15px;">
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">Código de Postagem</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;"><strong>{dados_email['codigo_rastreio']}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">CEP de Destino OBRIGATÓRIO</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;"><strong>{cep_empresa_formatado}</strong></td>
+                </tr>
+            </table>
+            <p>Instrução para o Atendente: "<em><strong>Postagem Pré-Paga por Contrato</strong></em>". Informe o <strong>Código de Postagem</strong> e o <strong>CEP</strong> de Destino acima para localizar a postagem.<br>
             O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, Cartão {cartao_postagem}.</p>
             """
 
+        # --- CABEÇALHO COM TABELA PARA ALINHAMENTO PERFEITO DOS DOIS PONTOS ---
         corpo_html = f"""
         <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.5;">
             <p>Olá {cliente['nome_completo']},</p>
             <p>Muito obrigado por realizar a venda de seu Game Usado para a <strong>{nome_fantasia}</strong>!</p>
             <p>Segue seu protocolo abaixo para acompanhamento do processo:</p>
-            <p>
-                <strong>Protocolo:</strong> {dados_email['protocolo']}<br>
-                <strong>Valor Total do Lote (PIX):</strong> R$ {dados_email.get('total_pix', 0.0):.2f}
-            </p>
+            
+            <table style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse; margin-bottom: 15px;">
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">Protocolo</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;"><strong>{dados_email['protocolo']}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 2px 0; vertical-align: top;">Valor Total do Lote (PIX)</td>
+                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
+                    <td style="padding: 2px 0; vertical-align: top;"><strong>R$ {dados_email.get('total_pix', 0.0):.2f}</strong></td>
+                </tr>
+            </table>
             
             {html_logistica}
             
@@ -468,12 +516,18 @@ def finalizar_proposta(dados_proposta):
         p_id = cursor.lastrowid
         db.commit()
         
-        # DISPARO DO GATILHO A (WhatsApp) EM BACKGROUND
-        # Executado em thread isolada para garantir que a lentidão da rede externa não trave o ecrã de sucesso do utilizador.
         try:
             threading.Thread(
                 target=enviar_webhook_novo_protocolo,
-                args=(protocolo, cliente, itens_avaliados, dados_proposta['total_pix'], codigo_rastreio)
+                args=(
+                    protocolo, 
+                    cliente, 
+                    itens_avaliados, 
+                    dados_proposta['total_pix'], 
+                    codigo_rastreio,
+                    dados_proposta.get('data_promessa'),
+                    dados_proposta.get('data_expiracao')
+                )
             ).start()
         except Exception as e:
             logging.error(f"Falha ao iniciar thread do webhook N8N: {e}")
@@ -486,8 +540,6 @@ def finalizar_proposta(dados_proposta):
         }
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
-
-# --- MÓDULO DE FEEDBACK E RECUSA ---
 
 def salvar_feedback_recusa(dados):
     db = conectar_bd()
@@ -519,8 +571,6 @@ def salvar_feedback_recusa(dados):
         return False
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
-
-# --- MÓDULO DE BUSCA ---
 
 def obter_multiplicador_regiao(cidade, estado_uf):
     db = conectar_bd()
@@ -571,14 +621,7 @@ def buscar_canais_aquisicao():
     finally:
         if db and db.is_connected(): cursor.close(); db.close()
 
-# --- INTEGRAÇÃO CORREIOS - MODO ESPELHADO ---
-
 def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
-    """
-    Integração com a API REST Oficial dos Correios (Pré-postagem V1).
-    MODO ESPELHADO: Empresa = Destinatário | Cliente = Remetente
-    O cliente postará a caixa sem custos, informando o código no balcão.
-    """
     ambiente = os.getenv('CORREIOS_AMBIENTE')
     
     if ambiente == "fake":
@@ -586,18 +629,15 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         codigo_fake = "ET" + str(datetime.datetime.now().strftime('%H%M%S'))
         return codigo_fake, codigo_fake
 
-    # Dados da Empresa (Destinatário Físico)
     empresa = obter_dados_empresa() or {}
     nome_fantasia = empresa.get('nome_fantasia', 'Loja')
     cep_empresa = ''.join(filter(str.isdigit, str(empresa.get('cep', ''))))
     cnpj_empresa = ''.join(filter(str.isdigit, str(empresa.get('cnpj', os.getenv('CORREIOS_CNPJ', '')))))
     cartao_postagem = os.getenv('CORREIOS_CARTAO_POSTAGEM')
     
-    # Dados do Cliente (Remetente Logístico)
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
     cpf_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cpf', ''))))
 
-    # --- ROTEAMENTO INTELIGENTE DE SERVIÇO (PAC/SEDEX) ---
     codigo_servico = "03220" # PAC
     if cep_cliente and len(cep_cliente) == 8:
         if int(cep_cliente) < 20000000:
@@ -606,7 +646,6 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         else:
             logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como PAC (03220)")
 
-    # --- PROCESSAMENTO DE ITENS E PESO CUBADO ---
     peso_total = 0.5
     itens_formatados = []
     
@@ -621,14 +660,13 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
             "valor": f"{valor_item:.2f}"
         })
 
-    # --- CONSTRUÇÃO DO PAYLOAD JSON (Request Body) ---
     payload = {
         "codigoServico": codigo_servico,
         "numeroCartaoPostagem": cartao_postagem,
         "observacao": numero_protocolo,
         "logisticaReversa": "N", 
         "embalagem": "N",
-        "cienteObjetoNaoProibido": 1, # CORREÇÃO: O servidor Java dos Correios espera o número 1 (True), e não a letra "S"
+        "cienteObjetoNaoProibido": 1,
         "pesoInformado": str(int(peso_total * 1000)),
         "codigoFormatoObjetoInformado": "2", 
         "alturaInformada": "10",
@@ -705,12 +743,7 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         logging.error(f"Erro interno no processamento JSON: {e}")
         return None, None
 
-# --- INTEGRAÇÃO AGENTE WHATSAPP (FLUXO A) ---
-
-def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix, codigo_rastreio):
-    """
-    Monta o payload JSON e dispara o Gatilho A (Novo Protocolo) para o Agente de WhatsApp.
-    """
+def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix, codigo_rastreio, data_promessa, data_expiracao):
     url_webhook = os.getenv('WEBHOOK_AGENTE_URL_A')
     
     if not url_webhook:
@@ -720,12 +753,9 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
     ambiente = os.getenv('AMBIENTE_EXECUCAO', 'homologacao')
     telefone_limpo = ''.join(filter(str.isdigit, str(cliente.get('whatsapp', ''))))
     
-    # --- INÍCIO DA SOBREPOSIÇÃO DE HOMOLOGAÇÃO (Trava de Segurança N8N) ---
-    # Força o telefone de teste exigido pelo Agente quando em ambiente de homologação
     if ambiente == "homologacao":
         telefone_limpo = "5532998522450"
         logging.info(f"Modo Homologação: Telefone substituído pelo contato de teste autorizado ({telefone_limpo}).")
-    # --- FIM DA SOBREPOSIÇÃO ---
     
     produtos_formatados = []
     for item in itens_avaliados:
@@ -748,6 +778,8 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
             "valor_total_cotacao": float(total_pix),
             "codigo_rastreio": str(codigo_rastreio)[:100] if codigo_rastreio else "",
             "ambiente": ambiente,
+            "data_promessa": str(data_promessa) if data_promessa else "",
+            "data_expiracao": str(data_expiracao) if data_expiracao else "",
             "produtos": produtos_formatados
         }
     }
