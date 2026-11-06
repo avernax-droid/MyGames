@@ -52,6 +52,9 @@
 # - 29/10/2026: Adição de sobreposição (override) de telefone (5532998522450) no enviar_webhook_novo_protocolo exclusivo para ambiente de homologação.
 # - 04/11/2026: Atualização da função finalizar_proposta e enviar_webhook_novo_protocolo para inclusão de data_promessa e data_expiracao no payload do Gatilho A (N8N).
 # - 04/11/2026: Padronização total do e-mail com tabelas HTML para alinhamento absoluto dos dois pontos e formatação de negritos nos dados de postagem e itens.
+# - 06/11/2026: Migração da integração dos Correios de SOAP para REST API V1 com Logística Reversa parametrizada e injeção de e-mail (PPN-252) e cálculo dinâmico do prazoValidadePrePostagem com base no .env.
+# - 06/11/2026: Remoção das instruções ao atendente no e-mail de resumo de desenvolvimento.
+# - 06/11/2026: Refatoração visual do e-mail do cliente, removendo o CEP de Destino e ajustando o texto de instruções de postagem (Logística Reversa).
 # ==============================================================================
 
 import mysql.connector
@@ -374,7 +377,7 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             <p><strong>AVISO SOBRE ITENS SOB CONSULTA:</strong></p>
             <p>Notamos que o seu lote contém itens que não estão cadastrados em nosso sistema padrão. 
             Nossa equipe técnica avaliará as informações e fotos enviadas, e entrará em contato 
-            com você em até 24 horas úteis para apresentar a oferta final destes itens.</p>
+            com você em até 24 hours úteis para apresentar a oferta final destes itens.</p>
             <br>
             """
 
@@ -394,7 +397,6 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             
             # --- DADOS DE POSTAGEM ALINHADOS POR TABELA E NEGRITOS AJUSTADOS ---
             html_logistica = f"""
-            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima.</p>
             {alerta_atencao_html}
             <p><strong>DADOS DE POSTAGEM:</strong></p>
             <table style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse; margin-bottom: 15px;">
@@ -403,14 +405,8 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
                     <td style="padding: 2px 8px; vertical-align: top;">:</td>
                     <td style="padding: 2px 0; vertical-align: top;"><strong>{dados_email['codigo_rastreio']}</strong></td>
                 </tr>
-                <tr>
-                    <td style="padding: 2px 0; vertical-align: top;">CEP de Destino OBRIGATÓRIO</td>
-                    <td style="padding: 2px 8px; vertical-align: top;">:</td>
-                    <td style="padding: 2px 0; vertical-align: top;"><strong>{cep_empresa_formatado}</strong></td>
-                </tr>
             </table>
-            <p>Instrução para o Atendente: "<em><strong>Postagem Pré-Paga por Contrato</strong></em>". Informe o <strong>Código de Postagem</strong> e o <strong>CEP</strong> de Destino acima para localizar a postagem.<br>
-            O envio é faturado diretamente para a conta comercial da <strong>{nome_fantasia}</strong>, Cartão {cartao_postagem}.</p>
+            <p>O próximo passo é você embalar todos os itens numa caixa e se dirigir a unidade dos CORREIOS mais próxima com o código de postagem: <strong>{dados_email['codigo_rastreio']}</strong>.</p>
             """
 
         # --- CABEÇALHO COM TABELA PARA ALINHAMENTO PERFEITO DOS DOIS PONTOS ---
@@ -447,7 +443,7 @@ def enviar_email_resumo(cliente, dados_email, itens_avaliados):
             A aprovação da oferta e o pagamento final estão sujeitos à conferência e avaliação técnica presencial pela nossa equipe, assim que os produtos forem recebidos em nossa empresa via Correios.</p>
             
             <p>A <strong>{nome_fantasia}</strong> atua a mais de 34 anos no mercado tendo atendido dezenas de milhares de clientes satisfeitos.</p>
-            <p>É um grande prazer tê-lo como nosso cliente.</p>
+            <p>É grande prazer tê-lo como nosso cliente.</p>
             
             <br>
             <p>Atenciosamente,<br>Equipe <strong>{nome_fantasia}</strong></p>
@@ -481,6 +477,7 @@ def finalizar_proposta(dados_proposta):
         
         dados_remetente = {
             "nome": cliente.get('nome_completo', ''),
+            "email": cliente.get('email', ''), 
             "cep": cliente.get('cep', ''),
             "logradouro": cliente.get('endereco', ''),
             "numero": cliente.get('numero', ''),
@@ -638,13 +635,24 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
     cep_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cep', ''))))
     cpf_cliente = ''.join(filter(str.isdigit, str(dados_remetente.get('cpf', ''))))
 
-    codigo_servico = "03220" # PAC
+    # --- NOVO: CÁLCULO DINÂMICO DE VALIDADE DA ETIQUETA ---
+    try:
+        prazo_horas = int(os.getenv('PRAZO_POSTAGEM_HORAS', 72))
+        prazo_dias = max(1, prazo_horas // 24)
+    except ValueError:
+        prazo_dias = 3
+        
+    # --- ROTEAMENTO PARAMETRIZADO DE CÓDIGOS DE LOGÍSTICA REVERSA ---
+    codigo_pac_reverso = os.getenv('CORREIOS_CODIGO_PAC_REVERSO', '03301').strip()
+    codigo_sedex_reverso = os.getenv('CORREIOS_CODIGO_SEDEX_REVERSO', '03247').strip()
+    
+    codigo_servico = codigo_pac_reverso
     if cep_cliente and len(cep_cliente) == 8:
         if int(cep_cliente) < 20000000:
-            codigo_servico = "03298" # SEDEX
-            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como SEDEX (03298)")
+            codigo_servico = codigo_sedex_reverso
+            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como SEDEX Reverso ({codigo_servico})")
         else:
-            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como PAC (03220)")
+            logging.info(f"Roteamento REST: CEP {cep_cliente} classificado como PAC Reverso ({codigo_servico})")
 
     peso_total = 0.5
     itens_formatados = []
@@ -664,7 +672,7 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         "codigoServico": codigo_servico,
         "numeroCartaoPostagem": cartao_postagem,
         "observacao": numero_protocolo,
-        "logisticaReversa": "N", 
+        "logisticaReversa": "S", 
         "embalagem": "N",
         "cienteObjetoNaoProibido": 1,
         "pesoInformado": str(int(peso_total * 1000)),
@@ -675,6 +683,7 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         
         "remetente": {
             "nome": str(dados_remetente.get('nome', f'Cliente {nome_fantasia}'))[:100],
+            "email": str(dados_remetente.get('email', 'contato@mygames.com.br'))[:50], 
             "cpfCnpj": cpf_cliente, 
             "dddCelular": str(dados_remetente.get('telefone', ''))[:2] if len(str(dados_remetente.get('telefone', ''))) > 2 else "11",
             "celular": str(dados_remetente.get('telefone', ''))[2:11] if len(str(dados_remetente.get('telefone', ''))) > 2 else "999999999",
@@ -796,11 +805,26 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
         logging.info(f"Disparando Webhook (Fluxo A) para o Agente de WhatsApp. Protocolo: {protocolo}")
         resposta = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
         
+        # ==============================================================================
+        # INÍCIO DO CÓDIGO DE TESTE (DUPLICIDADE)
+        # Atenção: Remover este bloco assim que o teste de trava do N8N for validado.
+        # ==============================================================================
+        import time
+        logging.info("TESTE DE DUPLICIDADE: Aguardando 5 segundos para o disparo secundário...")
+        time.sleep(5)
+        
+        logging.info(f"TESTE DE DUPLICIDADE: Disparando cópia idêntica do Webhook. Protocolo: {protocolo}")
+        resposta_duplicada = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
+        logging.info(f"TESTE DE DUPLICIDADE CONCLUÍDO. Status da cópia: {resposta_duplicada.status_code}")
+        # ==============================================================================
+        # FIM DO CÓDIGO DE TESTE
+        # ==============================================================================
+
         if resposta.status_code in [200, 201]:
-            logging.info("Webhook (Fluxo A) enviado com sucesso.")
+            logging.info("Webhook (Fluxo A) original enviado com sucesso.")
             return True
         else:
-            logging.error(f"Falha ao enviar Webhook (Fluxo A). Status: {resposta.status_code} - Resposta: {resposta.text}")
+            logging.error(f"Falha ao enviar Webhook (Fluxo A) original. Status: {resposta.status_code} - Resposta: {resposta.text}")
             return False
             
     except requests.exceptions.Timeout:

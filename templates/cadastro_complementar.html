@@ -17,6 +17,7 @@
   - 23/06/2026: Aplicação do filtro Jinja2 '|e' (escape) nos values dos inputs para prevenir quebra de layout/HTML injection com caracteres especiais.
   - 27/07/2026: Inclusão de script de validação matemática visual do CPF no submit do formulário para barrar dados inválidos no front-end.
   - 27/07/2026: Ajuste na UX: Validação imediata do CPF nos eventos blur e keydown para impedir avanço de campo ao digitar dado inválido.
+  - 04/11/2026: Inclusão dos atributos de acessibilidade (inputmode e type="tel") vindos da versão mobile.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -37,7 +38,7 @@
             <div class="input-group" style="flex: 0 0 40%;">
                 <label for="cpf">CPF *</label>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <input type="text" id="cpf" name="cpf" value="{{ (cliente.cpf or '')|e }}" placeholder="000.000.000-00" maxlength="14" required autocomplete="off" style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; width: 100%;">
+                    <input type="text" id="cpf" name="cpf" value="{{ (cliente.cpf or '')|e }}" placeholder="000.000.000-00" maxlength="14" required autocomplete="off" inputmode="numeric" style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; width: 100%;">
                 </div>
                 <span id="feedbackCpf" style="display:none; font-size: 0.75rem; margin-top: 4px;"></span>
             </div>
@@ -50,11 +51,11 @@
         <div class="row" style="display: flex; gap: 15px; margin-bottom: 15px;">
             <div class="input-group" style="flex: 1;">
                 <label for="whatsapp">WhatsApp *</label>
-                <input type="text" id="whatsapp" name="whatsapp" value="{{ (cliente.whatsapp or '')|e }}" placeholder="(00) 00000-0000" maxlength="15" required style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
+                <input type="tel" id="whatsapp" name="whatsapp" value="{{ (cliente.whatsapp or '')|e }}" placeholder="(00) 00000-0000" maxlength="15" required style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
             </div>
             <div class="input-group" style="flex: 1;">
                 <label for="email">E-mail *</label>
-                <input type="email" id="email" name="email" value="{{ (cliente.email or '')|e }}" placeholder="seu@email.com" required style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
+                <input type="email" id="email" name="email" value="{{ (cliente.email or '')|e }}" placeholder="seu@email.com" required inputmode="email" style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
             </div>
         </div>
 
@@ -63,7 +64,7 @@
         <div class="row" style="display: flex; gap: 15px; margin-bottom: 15px;">
             <div class="input-group" style="flex: 0 0 35%;">
                 <label for="cep">CEP *</label>
-                <input type="text" id="cep" name="cep" value="{{ (cliente.cep or '')|e }}" placeholder="00000-000" maxlength="9" required style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
+                <input type="text" id="cep" name="cep" value="{{ (cliente.cep or '')|e }}" placeholder="00000-000" maxlength="9" required inputmode="numeric" style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
             </div>
             <div class="input-group" style="flex: 1;">
                 <label for="endereco">ENDEREÇO (LOGRADOURO) *</label>
@@ -74,7 +75,7 @@
         <div class="row" style="display: flex; gap: 15px; margin-bottom: 15px;">
             <div class="input-group" style="flex: 0 0 25%;">
                 <label for="numero">Nº *</label>
-                <input type="text" id="numero" name="numero" value="{{ (cliente.numero or '')|e }}" required style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
+                <input type="text" id="numero" name="numero" value="{{ (cliente.numero or '')|e }}" required inputmode="numeric" style="background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px;">
             </div>
             <div class="input-group" style="flex: 1;">
                 <label for="bairro">BAIRRO *</label>

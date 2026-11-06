@@ -21,6 +21,7 @@
     nos códigos e estilização das instruções de envio para a cor branca (Paridade Mobile).
   - 23/06/2026: Ajuste no alinhamento do botão do WhatsApp para ficar mais próximo ao número de telefone.
   - 27/07/2026: Substituição do termo "Logística Reversa" e inclusão visual obrigatória do CEP de destino.
+  - 06/11/2026: Remoção da instrução de informar o CEP no balcão, devido à mudança para Logística Reversa nativa.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -74,7 +75,7 @@
                 PRÓXIMOS PASSOS
             </h4>
             <div style="font-size: 0.9rem; color: var(--texto-dim); line-height: 1.5;">
-                <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;"><b>Atenção:</b> Para realizar a postagem gratuita, apresente ao atendente o <b>Código de Rastreio</b> acima junto com o nosso <b>CEP de Destino</b>. Embale os itens com segurança dentro de uma caixa e dirija-se a qualquer agência dos Correios. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
+                <strong style="color: var(--texto-br);">INSTRUÇÕES PARA ENVIO:</strong> <span style="color: #ffffff;"><b>Atenção:</b> Para realizar a postagem gratuita, apresente ao atendente o <b>Código de Rastreio</b> acima. Embale os itens com segurança dentro de uma caixa e dirija-se a qualquer agência dos Correios. O frete já está pago pela <strong>{{ nome_fantasia if nome_fantasia else 'TROCA GAME' }}</strong>.</span>
             </div>
         </div>
     </div>
