@@ -54,6 +54,7 @@
 # - 04/11/2026: Correção no range do laço da rota /aceitar_termos para incluir a data de hoje nas opções.
 # - 04/11/2026: Inclusão da data_expiracao no dicionário dados_email na rota /finalizar para envio ao cliente.
 # - 04/11/2026: Inclusão da data_promessa no dicionário dados_email na rota /finalizar.
+# - 09/11/2026: Criação do endpoint POST /api/webhook/agente/cancelar_protocolo para tratar o Gatilho C2 (Cancelamento via WhatsApp).
 # ==============================================================================
 
 import os
@@ -765,6 +766,67 @@ def api_buscar_produtos():
     produtos = engine.buscar_produtos_por_categoria(categoria_id)
     return jsonify(produtos)
 
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (GATILHO C2: CANCELAMENTO ATIVO) ---
+# ==============================================================================
+@app.route('/api/webhook/agente/cancelar_protocolo', methods=['POST'])
+def webhook_cancelar_protocolo():
+    """
+    Endpoint seguro para receber a solicitação de cancelamento via Agente de WhatsApp.
+    Requer Header: Authorization: Bearer <AGENTE_TOKEN_ENVIO>
+    """
+    # 1. Validação de Segurança (Bearer Token)
+    auth_header = request.headers.get('Authorization')
+    token_esperado = os.getenv('AGENTE_TOKEN_ENVIO')
+    
+    # --- LOG PARA DEBUG DO TOKEN ---
+    print("\n--- DEBUG WEBHOOK N8N (GATILHO C2) ---")
+    print(f"Header Authorization recebido: '{auth_header}'")
+    print(f"Token esperado pelo sistema:   '{token_esperado}'")
+    
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print("Resultado: FALHA (Header ausente ou não começa com 'Bearer ')")
+        print("--------------------------------------\n")
+        return jsonify({'erro': 'Token de autorização ausente ou mal formatado'}), 401
+        
+    token_recebido = auth_header.split(' ')[1].strip()
+    print(f"Token extraído da requisição:  '{token_recebido}'")
+    
+    if token_recebido != token_esperado:
+        print("Resultado: FALHA (Tokens não conferem)")
+        print("--------------------------------------\n")
+        return jsonify({'erro': 'Token de autorização inválido'}), 403
+
+    print("Resultado: SUCESSO (Tokens conferem!)")
+    print("--------------------------------------\n")
+    # -------------------------------
+
+    # 2. Validação do Payload (Estrutura JSON esperada)
+    dados = request.get_json()
+    if not dados:
+        return jsonify({'erro': 'Payload JSON ausente'}), 400
+        
+    evento = dados.get('evento')
+    protocolo = dados.get('protocolo')
+    motivo = dados.get('motivo', 'Cancelado pelo cliente via WhatsApp')
+    
+    if evento != 'cancelar_protocolo' or not protocolo:
+        return jsonify({'erro': 'Payload inválido: evento incorreto ou protocolo ausente'}), 400
+
+    # 3. Interação com a camada de persistência (engine.py)
+    try:
+        sucesso = engine.cancelar_protocolo_por_webhook(protocolo, motivo)
+        
+        if sucesso:
+            return jsonify({'status': 'sucesso', 'mensagem': f'Protocolo {protocolo} cancelado com sucesso no banco de dados.'}), 200
+        else:
+            return jsonify({'erro': f'Protocolo {protocolo} não encontrado ou já processado.'}), 404
+            
+    except Exception as e:
+        print(f"Erro ao processar webhook de cancelamento: {e}")
+        return jsonify({'erro': 'Erro interno no servidor ao processar o cancelamento.'}), 500
+    
 # --- ENDPOINTS DE HANDOFF E UPLOAD REMOTO (MOBILE) ---
 
 @app.route('/upload-remoto/<token>', methods=['GET'])

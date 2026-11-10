@@ -55,6 +55,10 @@
 # - 06/11/2026: Migração da integração dos Correios de SOAP para REST API V1 com Logística Reversa parametrizada e injeção de e-mail (PPN-252) e cálculo dinâmico do prazoValidadePrePostagem com base no .env.
 # - 06/11/2026: Remoção das instruções ao atendente no e-mail de resumo de desenvolvimento.
 # - 06/11/2026: Refatoração visual do e-mail do cliente, removendo o CEP de Destino e ajustando o texto de instruções de postagem (Logística Reversa).
+# - 09/11/2026: Criação da função cancelar_protocolo_por_webhook para integração do Gatilho C2 (Cancelamento via WhatsApp).
+# - 09/11/2026: Ajuste na função cancelar_protocolo_por_webhook para apontar o status_id = 17 (Cancelado pelo cliente).
+# - 09/11/2026 (TESTE GATILHO C1): Data de expiração fixa ("08/11/2026") injetada temporariamente no webhook (Gatilho A) para validar regra do N8N.
+# - 10/11/2026: Limpeza de código removendo mocks de testes de duplicidade e expiração fixa no webhook (Gatilho A).
 # ==============================================================================
 
 import mysql.connector
@@ -805,21 +809,6 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
         logging.info(f"Disparando Webhook (Fluxo A) para o Agente de WhatsApp. Protocolo: {protocolo}")
         resposta = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
         
-        # ==============================================================================
-        # INÍCIO DO CÓDIGO DE TESTE (DUPLICIDADE)
-        # Atenção: Remover este bloco assim que o teste de trava do N8N for validado.
-        # ==============================================================================
-        import time
-        logging.info("TESTE DE DUPLICIDADE: Aguardando 5 segundos para o disparo secundário...")
-        time.sleep(5)
-        
-        logging.info(f"TESTE DE DUPLICIDADE: Disparando cópia idêntica do Webhook. Protocolo: {protocolo}")
-        resposta_duplicada = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
-        logging.info(f"TESTE DE DUPLICIDADE CONCLUÍDO. Status da cópia: {resposta_duplicada.status_code}")
-        # ==============================================================================
-        # FIM DO CÓDIGO DE TESTE
-        # ==============================================================================
-
         if resposta.status_code in [200, 201]:
             logging.info("Webhook (Fluxo A) original enviado com sucesso.")
             return True
@@ -833,3 +822,49 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
     except Exception as e:
         logging.error(f"Erro inesperado ao enviar Webhook (Fluxo A): {e}")
         return False
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (GATILHO C2: CANCELAMENTO ATIVO) ---
+# ==============================================================================
+def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
+    """
+    Localiza o protocolo no banco e altera o seu status para "Cancelado".
+    Rejeita a alteração se o protocolo já estiver "Finalizado" (postado) ou se não existir.
+    O status_id = 17 é o status mapeado para "Cancelado pelo cliente" na tabela status_protocolos.
+    """
+    db = conectar_bd()
+    if not db: return False
+    
+    try:
+        cursor = db.cursor(dictionary=True)
+        
+        # 1. Verifica se o protocolo existe e se é elegível para cancelamento
+        cursor.execute("SELECT id, status FROM protocolos_recompra WHERE numero_protocolo = %s", (protocolo_str,))
+        resultado = cursor.fetchone()
+        
+        if not resultado:
+            logging.warning(f"Webhook C2: Protocolo {protocolo_str} não encontrado na base de dados.")
+            return False
+            
+        if resultado['status'] == 'Finalizado':
+            logging.warning(f"Webhook C2: Recusa ao cancelar {protocolo_str} pois o mesmo já encontra-se Finalizado.")
+            return False
+
+        # 2. Executa o UPDATE (altera o status enum para 'Recusado' e o status_id para 17 - Cancelado pelo cliente)
+        sql_update = """UPDATE protocolos_recompra 
+                        SET status = 'Recusado', status_id = 17 
+                        WHERE numero_protocolo = %s"""
+        cursor.execute(sql_update, (protocolo_str,))
+        db.commit()
+        
+        logging.info(f"Webhook C2: Protocolo {protocolo_str} cancelado com sucesso. Motivo: {motivo_cancelamento}")
+        
+        return True
+        
+    except Error as e:
+        logging.error(f"Erro no banco de dados ao tentar cancelar o protocolo {protocolo_str}: {e}")
+        return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
