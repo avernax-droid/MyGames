@@ -21,6 +21,7 @@
   - 27/07/2026: Substituição do termo "Logística Reversa" por "Código de Rastreio" e 
     inclusão visual obrigatória do CEP de destino nas instruções.
   - 06/11/2026: Remoção da instrução de informar o CEP no balcão, devido à mudança para Logística Reversa nativa.
+  - 12/11/2026: Remoção completa do quadro visual 'CEP de Destino (Obrigatório)'.
   ==============================================================================
 #}
 {% extends "mobile/base_mobile.html" %}
@@ -64,11 +65,6 @@
             <div class="rastreio-box-mobile">
                 <span class="rastreio-label-mobile">Código de Rastreio</span>
                 <strong class="codigo-longo-mobile codigo-destaque-mobile">{{ codigo_rastreio }}</strong>
-            </div>
-
-            <div class="cep-box-mobile">
-                <span class="cep-label-mobile">CEP de Destino (Obrigatório)</span>
-                <strong class="codigo-longo-mobile cep-destaque-mobile">{{ cep_empresa_formatado }}</strong>
             </div>
             
             <div class="passos-box-mobile">
@@ -167,10 +163,6 @@
     .rastreio-box-mobile { margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; }
     .rastreio-label-mobile { display: block; font-size: 11px; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
     .codigo-destaque-mobile { font-size: 26px; color: var(--cor-destaque); letter-spacing: 2px; }
-
-    .cep-box-mobile { margin-bottom: 20px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; }
-    .cep-label-mobile { display: block; font-size: 11px; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
-    .cep-destaque-mobile { font-size: 22px; color: #ffffff; letter-spacing: 2px; }
 
     .passos-box-mobile { border-top: 1px solid rgba(0, 255, 0, 0.2); padding-top: 15px; text-align: left; }
     .passos-titulo-mobile { color: #ff4444; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; margin: 0 0 10px 0; font-size: 16px; }

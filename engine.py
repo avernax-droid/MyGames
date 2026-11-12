@@ -59,12 +59,14 @@
 # - 09/11/2026: Ajuste na função cancelar_protocolo_por_webhook para apontar o status_id = 17 (Cancelado pelo cliente).
 # - 09/11/2026 (TESTE GATILHO C1): Data de expiração fixa ("08/11/2026") injetada temporariamente no webhook (Gatilho A) para validar regra do N8N.
 # - 10/11/2026: Limpeza de código removendo mocks de testes de duplicidade e expiração fixa no webhook (Gatilho A).
+# - 11/11/2026: Implementação de política de retentativas (backoff 1m, 5m, 15m, 60m) na função enviar_webhook_novo_protocolo conforme contrato N8N de produção.
 # ==============================================================================
 
 import mysql.connector
 from mysql.connector import Error
 from decimal import Decimal
 import datetime
+import time
 import smtplib
 import json
 import requests
@@ -805,23 +807,60 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
     if token_envio:
         headers["Authorization"] = f"Bearer {token_envio}"
 
-    try:
-        logging.info(f"Disparando Webhook (Fluxo A) para o Agente de WhatsApp. Protocolo: {protocolo}")
-        resposta = requests.post(url_webhook, json=payload, headers=headers, timeout=3)
-        
-        if resposta.status_code in [200, 201]:
-            logging.info("Webhook (Fluxo A) original enviado com sucesso.")
-            return True
-        else:
-            logging.error(f"Falha ao enviar Webhook (Fluxo A) original. Status: {resposta.status_code} - Resposta: {resposta.text}")
-            return False
+    intervalos_retentativa = [60, 300, 900, 3600]
+    tentativas = 0
+    max_tentativas = len(intervalos_retentativa) + 1
+
+    while tentativas < max_tentativas:
+        try:
+            logging.info(f"Disparando Webhook (Fluxo A). Tentativa {tentativas + 1}/{max_tentativas}. Protocolo: {protocolo}")
+            resposta = requests.post(url_webhook, json=payload, headers=headers, timeout=20)
             
-    except requests.exceptions.Timeout:
-        logging.error("Timeout ao enviar Webhook (Fluxo A) para o Agente de WhatsApp.")
-        return False
-    except Exception as e:
-        logging.error(f"Erro inesperado ao enviar Webhook (Fluxo A): {e}")
-        return False
+            if resposta.status_code == 200:
+                try:
+                    json_resp = resposta.json()
+                    if json_resp.get("ok") is True:
+                        logging.info("Webhook (Fluxo A) enviado e aceito com sucesso pelo N8N.")
+                        return True
+                    else:
+                        logging.warning(f"Webhook (Fluxo A) retornou HTTP 200 sem 'ok=true'. Retorno: {resposta.text}")
+                except ValueError:
+                    logging.warning(f"Webhook (Fluxo A) retornou HTTP 200, mas o corpo não é JSON válido: {resposta.text}")
+
+            elif resposta.status_code in (400, 401, 403, 404, 409):
+                logging.error(f"Erro definitivo do cliente ou segurança (HTTP {resposta.status_code}). Retentativas abortadas. Retorno: {resposta.text}")
+                return False
+
+            elif resposta.status_code == 429:
+                retry_after = resposta.headers.get("Retry-After")
+                espera_atual = int(retry_after) if retry_after else intervalos_retentativa[tentativas]
+                logging.warning(f"Too Many Requests (HTTP 429). Aguardando {espera_atual}s.")
+                if tentativas < len(intervalos_retentativa):
+                    time.sleep(espera_atual)
+                    tentativas += 1
+                    continue
+                else:
+                    return False
+
+            else:
+                logging.warning(f"Falha ao enviar Webhook (Fluxo A). Status: {resposta.status_code}. Retorno: {resposta.text}")
+
+        except requests.exceptions.Timeout:
+            logging.error(f"Timeout ao enviar Webhook (Fluxo A) na tentativa {tentativas + 1}.")
+        except requests.exceptions.ConnectionError as ce:
+            logging.error(f"Erro de conexão ao enviar Webhook (Fluxo A) na tentativa {tentativas + 1}: {ce}")
+        except Exception as e:
+            logging.error(f"Erro inesperado ao enviar Webhook (Fluxo A) na tentativa {tentativas + 1}: {e}")
+
+        if tentativas < len(intervalos_retentativa):
+            tempo_espera = intervalos_retentativa[tentativas]
+            logging.info(f"Aguardando {tempo_espera}s para a próxima retentativa...")
+            time.sleep(tempo_espera)
+        
+        tentativas += 1
+
+    logging.error(f"Esgotadas as {max_tentativas} tentativas do Webhook (Fluxo A) para o protocolo {protocolo}. Evento pendente para reconciliação.")
+    return False
 
 # ==============================================================================
 # --- INTEGRAÇÃO N8N (GATILHO C2: CANCELAMENTO ATIVO) ---

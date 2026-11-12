@@ -22,6 +22,7 @@
   - 23/06/2026: Ajuste no alinhamento do botão do WhatsApp para ficar mais próximo ao número de telefone.
   - 27/07/2026: Substituição do termo "Logística Reversa" e inclusão visual obrigatória do CEP de destino.
   - 06/11/2026: Remoção da instrução de informar o CEP no balcão, devido à mudança para Logística Reversa nativa.
+  - 12/11/2026: Remoção completa do quadro visual 'CEP de Destino (Obrigatório)'.
   ==============================================================================
 #}
 {% extends "base.html" %}
@@ -63,11 +64,6 @@
         <div style="margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; display: inline-block; min-width: 80%;">
             <span style="display: block; font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 8px;">Código de Rastreio</span>
             <strong style="font-size: 2rem; color: var(--cor-destaque); font-family: 'Courier New', monospace; letter-spacing: 2px; word-break: break-all; overflow-wrap: break-word;">{{ codigo_rastreio }}</strong>
-        </div>
-
-        <div style="margin-bottom: 25px; background: rgba(255,255,255,0.1); padding: 12px; border-radius: 8px; display: inline-block; min-width: 80%;">
-            <span style="display: block; font-size: 0.85rem; color: var(--texto-dim); text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">CEP de Destino (Obrigatório)</span>
-            <strong style="font-size: 1.5rem; color: #ffffff; font-family: 'Courier New', monospace; letter-spacing: 2px;">{{ cep_empresa_formatado }}</strong>
         </div>
         
         <div style="border-top: 1px solid rgba(0, 255, 0, 0.2); padding-top: 15px; text-align: left;">
