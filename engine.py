@@ -60,6 +60,8 @@
 # - 09/11/2026 (TESTE GATILHO C1): Data de expiração fixa ("08/11/2026") injetada temporariamente no webhook (Gatilho A) para validar regra do N8N.
 # - 10/11/2026: Limpeza de código removendo mocks de testes de duplicidade e expiração fixa no webhook (Gatilho A).
 # - 11/11/2026: Implementação de política de retentativas (backoff 1m, 5m, 15m, 60m) na função enviar_webhook_novo_protocolo conforme contrato N8N de produção.
+# - 13/11/2026: Padronização e sanitização da leitura de variáveis .env (N8N_WEBHOOK_URL, N8N_BEARER_TOKEN, AMBIENTE_EXECUCAO, PILOTO_TELEFONE_OVERRIDE) em enviar_webhook_novo_protocolo e registro de motivo no cancelamento via webhook C2.
+# - 16/11/2026: Atualização da função cancelar_protocolo_por_webhook para gravar status = 'Cancelado' (novo valor do ENUM) juntamente com status_id = 17 e validar estados terminais ('Finalizado', 'Cancelado', 'Expirado', 'Recusado').
 # ==============================================================================
 
 import mysql.connector
@@ -84,6 +86,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [CORREIOS] %(levelname)s - %(message)s')
 
 TOKEN_CACHE = {"token": None, "expira_em": None}
+
+def _limpar_env(chave, padrao=''):
+    valor = os.getenv(chave)
+    if valor is None:
+        return padrao
+    return str(valor).strip().strip('"').strip("'").strip()
 
 def obter_token_correios():
     global TOKEN_CACHE
@@ -759,16 +767,20 @@ def gerar_codigo_rastreio(dados_remetente, numero_protocolo, itens_avaliados):
         return None, None
 
 def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix, codigo_rastreio, data_promessa, data_expiracao):
-    url_webhook = os.getenv('WEBHOOK_AGENTE_URL_A')
+    url_webhook = _limpar_env('N8N_WEBHOOK_URL') or _limpar_env('WEBHOOK_AGENTE_URL_A')
     
     if not url_webhook:
-        logging.warning("WEBHOOK_AGENTE_URL_A não configurada no .env. Webhook não enviado.")
+        logging.warning("N8N_WEBHOOK_URL não configurada no .env. Webhook não enviado.")
         return False
 
-    ambiente = os.getenv('AMBIENTE_EXECUCAO', 'homologacao')
+    ambiente = _limpar_env('AMBIENTE_EXECUCAO', 'homologacao').lower()
     telefone_limpo = ''.join(filter(str.isdigit, str(cliente.get('whatsapp', ''))))
+    telefone_override = ''.join(filter(str.isdigit, _limpar_env('PILOTO_TELEFONE_OVERRIDE')))
     
-    if ambiente == "homologacao":
+    if telefone_override:
+        telefone_limpo = telefone_override
+        logging.info(f"Piloto Override Ativo ({ambiente}): Telefone substituído pelo contato autorizado ({telefone_limpo}).")
+    elif ambiente == "homologacao":
         telefone_limpo = "5532998522450"
         logging.info(f"Modo Homologação: Telefone substituído pelo contato de teste autorizado ({telefone_limpo}).")
     
@@ -803,7 +815,7 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
         "Content-Type": "application/json"
     }
     
-    token_envio = os.getenv('AGENTE_TOKEN_ENVIO')
+    token_envio = _limpar_env('N8N_BEARER_TOKEN') or _limpar_env('AGENTE_TOKEN_ENVIO')
     if token_envio:
         headers["Authorization"] = f"Bearer {token_envio}"
 
@@ -868,7 +880,7 @@ def enviar_webhook_novo_protocolo(protocolo, cliente, itens_avaliados, total_pix
 def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
     """
     Localiza o protocolo no banco e altera o seu status para "Cancelado".
-    Rejeita a alteração se o protocolo já estiver "Finalizado" (postado) ou se não existir.
+    Rejeita a alteração se o protocolo já estiver em estado terminal ("Finalizado", "Cancelado", "Expirado" ou "Recusado") ou se não existir.
     O status_id = 17 é o status mapeado para "Cancelado pelo cliente" na tabela status_protocolos.
     """
     db = conectar_bd()
@@ -878,22 +890,26 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
         cursor = db.cursor(dictionary=True)
         
         # 1. Verifica se o protocolo existe e se é elegível para cancelamento
-        cursor.execute("SELECT id, status FROM protocolos_recompra WHERE numero_protocolo = %s", (protocolo_str,))
+        cursor.execute("SELECT id, status, laudo_tecnico FROM protocolos_recompra WHERE numero_protocolo = %s", (protocolo_str,))
         resultado = cursor.fetchone()
         
         if not resultado:
             logging.warning(f"Webhook C2: Protocolo {protocolo_str} não encontrado na base de dados.")
             return False
             
-        if resultado['status'] == 'Finalizado':
-            logging.warning(f"Webhook C2: Recusa ao cancelar {protocolo_str} pois o mesmo já encontra-se Finalizado.")
+        if resultado['status'] in ('Finalizado', 'Cancelado', 'Expirado', 'Recusado'):
+            logging.warning(f"Webhook C2: Recusa ao cancelar {protocolo_str} pois o mesmo encontra-se com status '{resultado['status']}'.")
             return False
 
-        # 2. Executa o UPDATE (altera o status enum para 'Recusado' e o status_id para 17 - Cancelado pelo cliente)
+        motivo_texto = f"Cancelamento via Agente de WhatsApp. Motivo: {motivo_cancelamento}" if motivo_cancelamento else "Cancelamento via Agente de WhatsApp."
+        laudo_atual = (resultado.get('laudo_tecnico') or '').strip()
+        novo_laudo = f"{laudo_atual}\n{motivo_texto}".strip() if laudo_atual else motivo_texto
+
+        # 2. Executa o UPDATE (sincroniza o status enum para 'Cancelado', status_id para 17 e grava o motivo)
         sql_update = """UPDATE protocolos_recompra 
-                        SET status = 'Recusado', status_id = 17 
+                        SET status = 'Cancelado', status_id = 17, laudo_tecnico = %s 
                         WHERE numero_protocolo = %s"""
-        cursor.execute(sql_update, (protocolo_str,))
+        cursor.execute(sql_update, (novo_laudo, protocolo_str))
         db.commit()
         
         logging.info(f"Webhook C2: Protocolo {protocolo_str} cancelado com sucesso. Motivo: {motivo_cancelamento}")
