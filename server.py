@@ -55,6 +55,7 @@
 # - 04/11/2026: Inclusão da data_expiracao no dicionário dados_email na rota /finalizar para envio ao cliente.
 # - 04/11/2026: Inclusão da data_promessa no dicionário dados_email na rota /finalizar.
 # - 09/11/2026: Criação do endpoint POST /api/webhook/agente/cancelar_protocolo para tratar o Gatilho C2 (Cancelamento via WhatsApp).
+# - 21/11/2026: Padronização da validação Bearer Token (N8N_BEARER_TOKEN) e criação dos endpoints POST /api/webhook/agente/reagendar_postagem e POST /api/webhook/agente/falta_contato para o fluxo de repescagem.
 # ==============================================================================
 
 import os
@@ -85,6 +86,25 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
 Session(app)
+
+# --- FUNÇÃO AUXILIAR: VALIDAÇÃO DE BEARER TOKEN N8N ---
+def _validar_token_webhook_n8n(req):
+    """
+    Valida o cabeçalho Authorization: Bearer <TOKEN> utilizando o padrão unificado N8N_BEARER_TOKEN
+    (com fallback seguro para AGENTE_TOKEN_ENVIO).
+    """
+    auth_header = req.headers.get('Authorization', '')
+    token_bruto = os.getenv('N8N_BEARER_TOKEN') or os.getenv('AGENTE_TOKEN_ENVIO') or ''
+    token_esperado = str(token_bruto).strip().strip('"').strip("'").strip()
+
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return False, 401, 'Token de autorização ausente ou mal formatado'
+
+    token_recebido = auth_header.split(' ', 1)[1].strip()
+    if not token_esperado or token_recebido != token_esperado:
+        return False, 403, 'Token de autorização inválido'
+
+    return True, 200, 'OK'
 
 # --- FUNÇÃO AUXILIAR: VALIDAÇÃO MATEMÁTICA DE CPF ---
 def validar_cpf(cpf):
@@ -774,36 +794,13 @@ def api_buscar_produtos():
 def webhook_cancelar_protocolo():
     """
     Endpoint seguro para receber a solicitação de cancelamento via Agente de WhatsApp.
-    Requer Header: Authorization: Bearer <AGENTE_TOKEN_ENVIO>
+    Requer Header: Authorization: Bearer <N8N_BEARER_TOKEN>
     """
-    # 1. Validação de Segurança (Bearer Token)
-    auth_header = request.headers.get('Authorization')
-    token_esperado = os.getenv('AGENTE_TOKEN_ENVIO')
-    
-    # --- LOG PARA DEBUG DO TOKEN ---
-    print("\n--- DEBUG WEBHOOK N8N (GATILHO C2) ---")
-    print(f"Header Authorization recebido: '{auth_header}'")
-    print(f"Token esperado pelo sistema:   '{token_esperado}'")
-    
-    if not auth_header or not auth_header.startswith('Bearer '):
-        print("Resultado: FALHA (Header ausente ou não começa com 'Bearer ')")
-        print("--------------------------------------\n")
-        return jsonify({'erro': 'Token de autorização ausente ou mal formatado'}), 401
-        
-    token_recebido = auth_header.split(' ')[1].strip()
-    print(f"Token extraído da requisição:  '{token_recebido}'")
-    
-    if token_recebido != token_esperado:
-        print("Resultado: FALHA (Tokens não conferem)")
-        print("--------------------------------------\n")
-        return jsonify({'erro': 'Token de autorização inválido'}), 403
+    autorizado, status_auth, msg_auth = _validar_token_webhook_n8n(request)
+    if not autorizado:
+        return jsonify({'erro': msg_auth}), status_auth
 
-    print("Resultado: SUCESSO (Tokens conferem!)")
-    print("--------------------------------------\n")
-    # -------------------------------
-
-    # 2. Validação do Payload (Estrutura JSON esperada)
-    dados = request.get_json()
+    dados = request.get_json(silent=True)
     if not dados:
         return jsonify({'erro': 'Payload JSON ausente'}), 400
         
@@ -814,7 +811,6 @@ def webhook_cancelar_protocolo():
     if evento != 'cancelar_protocolo' or not protocolo:
         return jsonify({'erro': 'Payload inválido: evento incorreto ou protocolo ausente'}), 400
 
-    # 3. Interação com a camada de persistência (engine.py)
     try:
         sucesso = engine.cancelar_protocolo_por_webhook(protocolo, motivo)
         
@@ -826,6 +822,107 @@ def webhook_cancelar_protocolo():
     except Exception as e:
         print(f"Erro ao processar webhook de cancelamento: {e}")
         return jsonify({'erro': 'Erro interno no servidor ao processar o cancelamento.'}), 500
+
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (REPESCAGEM: REAGENDAMENTO DE POSTAGEM) ---
+# ==============================================================================
+@app.route('/api/webhook/agente/reagendar_postagem', methods=['POST'])
+def webhook_reagendar_postagem():
+    """
+    Endpoint seguro para receber a nova data prevista de postagem via Agente de WhatsApp.
+    Requer Header: Authorization: Bearer <N8N_BEARER_TOKEN>
+    """
+    autorizado, status_auth, msg_auth = _validar_token_webhook_n8n(request)
+    if not autorizado:
+        return jsonify({'status': 'erro', 'detalhe': msg_auth}), status_auth
+
+    dados = request.get_json(silent=True)
+    if not dados:
+        return jsonify({'status': 'erro', 'detalhe': 'Payload JSON ausente'}), 400
+
+    evento = dados.get('evento')
+    protocolo = dados.get('protocolo')
+    nova_data_prevista = dados.get('nova_data_prevista')
+
+    if evento != 'reagendar_postagem' or not protocolo or not nova_data_prevista:
+        return jsonify({'status': 'erro', 'detalhe': 'Payload inválido: evento, protocolo ou nova_data_prevista ausente'}), 400
+
+    try:
+        resultado = engine.reagendar_protocolo_por_webhook(protocolo, nova_data_prevista)
+        codigo_http = resultado.get('codigo_http', 500)
+
+        if resultado.get('sucesso'):
+            return jsonify({
+                'status': 'sucesso',
+                'nova_data_prevista': resultado['nova_data_prevista']
+            }), 200
+
+        if codigo_http == 409:
+            return jsonify({
+                'status': 'erro',
+                'status_atual': resultado.get('status_atual', 'Encerrado')
+            }), 409
+
+        return jsonify({
+            'status': 'erro',
+            'detalhe': resultado.get('detalhe', 'Erro ao reagendar postagem')
+        }), codigo_http
+
+    except Exception as e:
+        print(f"Erro ao processar webhook de reagendamento: {e}")
+        return jsonify({'status': 'erro', 'detalhe': 'Erro interno no servidor ao processar o reagendamento.'}), 500
+
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (REPESCAGEM: FALTA DE CONTATO APÓS 3 TENTATIVAS) ---
+# ==============================================================================
+@app.route('/api/webhook/agente/falta_contato', methods=['POST'])
+def webhook_falta_contato():
+    """
+    Endpoint seguro para receber a notificação de falta de contato após 3 tentativas,
+    iniciando a janela de carência configurada em PRAZO_CARENCIA_EXPIRACAO_DIAS.
+    Requer Header: Authorization: Bearer <N8N_BEARER_TOKEN>
+    """
+    autorizado, status_auth, msg_auth = _validar_token_webhook_n8n(request)
+    if not autorizado:
+        return jsonify({'status': 'erro', 'detalhe': msg_auth}), status_auth
+
+    dados = request.get_json(silent=True)
+    if not dados:
+        return jsonify({'status': 'erro', 'detalhe': 'Payload JSON ausente'}), 400
+
+    evento = str(dados.get('evento', '')).strip()
+    protocolo = dados.get('protocolo')
+
+    if evento not in ('falta_contato', 'falta de contato') or not protocolo:
+        return jsonify({'status': 'erro', 'detalhe': 'Payload inválido: evento ou protocolo ausente'}), 400
+
+    try:
+        resultado = engine.registrar_falta_contato_por_webhook(protocolo)
+        codigo_http = resultado.get('codigo_http', 500)
+
+        if resultado.get('sucesso'):
+            return jsonify({
+                'status': 'sucesso',
+                'dias_carencia': resultado.get('dias_carencia', 10)
+            }), 200
+
+        if codigo_http == 409:
+            return jsonify({
+                'status': 'erro',
+                'status_atual': resultado.get('status_atual', 'Encerrado')
+            }), 409
+
+        return jsonify({
+            'status': 'erro',
+            'detalhe': resultado.get('detalhe', 'Erro ao registrar falta de contato')
+        }), codigo_http
+
+    except Exception as e:
+        print(f"Erro ao processar webhook de falta de contato: {e}")
+        return jsonify({'status': 'erro', 'detalhe': 'Erro interno no servidor ao processar falta de contato.'}), 500
+
     
 # --- ENDPOINTS DE HANDOFF E UPLOAD REMOTO (MOBILE) ---
 

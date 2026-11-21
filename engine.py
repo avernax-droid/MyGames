@@ -62,15 +62,18 @@
 # - 11/11/2026: Implementação de política de retentativas (backoff 1m, 5m, 15m, 60m) na função enviar_webhook_novo_protocolo conforme contrato N8N de produção.
 # - 13/11/2026: Padronização e sanitização da leitura de variáveis .env (N8N_WEBHOOK_URL, N8N_BEARER_TOKEN, AMBIENTE_EXECUCAO, PILOTO_TELEFONE_OVERRIDE) em enviar_webhook_novo_protocolo e registro de motivo no cancelamento via webhook C2.
 # - 16/11/2026: Atualização da função cancelar_protocolo_por_webhook para gravar status = 'Cancelado' (novo valor do ENUM) juntamente com status_id = 17 e validar estados terminais ('Finalizado', 'Cancelado', 'Expirado', 'Recusado').
+# - 21/11/2026: Implementação das funções reagendar_protocolo_por_webhook (status_id = 20) e registrar_falta_contato_por_webhook (status_id = 21) para o fluxo de repescagem pós-expiração com o N8N.
 # ==============================================================================
 
 import mysql.connector
 from mysql.connector import Error
 from decimal import Decimal
 import datetime
+from zoneinfo import ZoneInfo
 import time
 import smtplib
 import json
+import re
 import requests
 import base64
 import logging
@@ -919,6 +922,139 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
     except Error as e:
         logging.error(f"Erro no banco de dados ao tentar cancelar o protocolo {protocolo_str}: {e}")
         return False
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (REPESCAGEM: REAGENDAMENTO DE POSTAGEM) ---
+# ==============================================================================
+def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
+    """
+    Atualiza o protocolo para status_id = 20 (Reagendado - Aguardando postagem),
+    validando que nova_data_str (DD/MM/AAAA) seja igual ou posterior à data atual (America/Sao_Paulo).
+    Grava a tag estruturada [REAGENDADO_ATE: AAAA-MM-DD] no laudo_tecnico e registra histórico.
+    """
+    try:
+        dt_nova = datetime.datetime.strptime(str(nova_data_str).strip(), "%d/%m/%Y").date()
+        hoje_sp = datetime.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+        if dt_nova < hoje_sp:
+            return {"sucesso": False, "codigo_http": 400, "detalhe": "Data inválida ou anterior à data atual"}
+    except (ValueError, TypeError):
+        return {"sucesso": False, "codigo_http": 400, "detalhe": "Data inválida ou anterior à data atual"}
+
+    db = conectar_bd()
+    if not db:
+        return {"sucesso": False, "codigo_http": 500, "detalhe": "Erro interno de conexão com banco de dados"}
+
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, status, status_id, laudo_tecnico FROM protocolos_recompra WHERE numero_protocolo = %s",
+            (protocolo_str,)
+        )
+        resultado = cursor.fetchone()
+
+        if not resultado:
+            logging.warning(f"Webhook Reagendar: Protocolo {protocolo_str} não encontrado.")
+            return {"sucesso": False, "codigo_http": 404, "detalhe": "Protocolo não encontrado"}
+
+        if resultado['status'] in ('Finalizado', 'Cancelado', 'Expirado', 'Recusado'):
+            logging.warning(f"Webhook Reagendar: Conflito para {protocolo_str} com status '{resultado['status']}'.")
+            return {"sucesso": False, "codigo_http": 409, "status_atual": resultado['status']}
+
+        if resultado.get('status_id') not in (1, 19, 20, 21):
+            logging.warning(f"Webhook Reagendar: Protocolo {protocolo_str} já avançou na esteira (status_id={resultado.get('status_id')}).")
+            return {"sucesso": False, "codigo_http": 409, "status_atual": "Postado/Em Análise"}
+
+        data_iso = dt_nova.strftime("%Y-%m-%d")
+        data_br = dt_nova.strftime("%d/%m/%Y")
+        tag_reagendamento = f"[REAGENDADO_ATE: {data_iso}]"
+
+        laudo_atual = (resultado.get('laudo_tecnico') or '').strip()
+        laudo_limpo = re.sub(r'\[REAGENDADO_ATE:\s*\d{4}-\d{2}-\d{2}\]', '', laudo_atual).strip()
+        nota_log = f"{tag_reagendamento} Postagem reagendada via Agente WhatsApp para {data_br}."
+        novo_laudo = f"{laudo_limpo}\n{nota_log}".strip() if laudo_limpo else nota_log
+
+        cursor.execute(
+            "UPDATE protocolos_recompra SET status_id = 20, laudo_tecnico = %s WHERE id = %s",
+            (novo_laudo, resultado['id'])
+        )
+        cursor.execute(
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 20, NULL, NOW())",
+            (resultado['id'],)
+        )
+        db.commit()
+
+        logging.info(f"Webhook Reagendar: Protocolo {protocolo_str} reagendado até {data_br} (status_id=20).")
+        return {"sucesso": True, "codigo_http": 200, "nova_data_prevista": data_br}
+
+    except Error as e:
+        logging.error(f"Erro no banco de dados ao reagendar protocolo {protocolo_str}: {e}")
+        return {"sucesso": False, "codigo_http": 500, "detalhe": "Erro interno ao atualizar banco de dados"}
+    finally:
+        if db and db.is_connected():
+            cursor.close()
+            db.close()
+
+# ==============================================================================
+# --- INTEGRAÇÃO N8N (REPESCAGEM: FALTA DE CONTATO / CARÊNCIA) ---
+# ==============================================================================
+def registrar_falta_contato_por_webhook(protocolo_str):
+    """
+    Atualiza o protocolo para status_id = 21 (Aguardando postagem (Carência)),
+    registrando a data/hora na tabela historico_status_protocolo para contagem dos dias de carência.
+    """
+    try:
+        dias_carencia = int(_limpar_env('PRAZO_CARENCIA_EXPIRACAO_DIAS', '10'))
+    except ValueError:
+        dias_carencia = 10
+
+    db = conectar_bd()
+    if not db:
+        return {"sucesso": False, "codigo_http": 500, "detalhe": "Erro interno de conexão com banco de dados"}
+
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, status, status_id, laudo_tecnico FROM protocolos_recompra WHERE numero_protocolo = %s",
+            (protocolo_str,)
+        )
+        resultado = cursor.fetchone()
+
+        if not resultado:
+            logging.warning(f"Webhook Falta Contato: Protocolo {protocolo_str} não encontrado.")
+            return {"sucesso": False, "codigo_http": 404, "detalhe": "Protocolo não encontrado"}
+
+        if resultado['status'] in ('Finalizado', 'Cancelado', 'Expirado', 'Recusado'):
+            logging.warning(f"Webhook Falta Contato: Conflito para {protocolo_str} com status '{resultado['status']}'.")
+            return {"sucesso": False, "codigo_http": 409, "status_atual": resultado['status']}
+
+        if resultado.get('status_id') not in (1, 19, 20, 21):
+            logging.warning(f"Webhook Falta Contato: Protocolo {protocolo_str} já avançou na esteira (status_id={resultado.get('status_id')}).")
+            return {"sucesso": False, "codigo_http": 409, "status_atual": "Postado/Em Análise"}
+
+        laudo_atual = (resultado.get('laudo_tecnico') or '').strip()
+        nota_log = f"Falta de contato após 3 tentativas (Agente WhatsApp). Iniciada carência de {dias_carencia} dias corridos."
+        novo_laudo = f"{laudo_atual}\n{nota_log}".strip() if laudo_atual else nota_log
+
+        cursor.execute(
+            "UPDATE protocolos_recompra SET status_id = 21, laudo_tecnico = %s WHERE id = %s",
+            (novo_laudo, resultado['id'])
+        )
+        cursor.execute(
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 21, NULL, NOW())",
+            (resultado['id'],)
+        )
+        db.commit()
+
+        logging.info(f"Webhook Falta Contato: Protocolo {protocolo_str} movido para carência de {dias_carencia} dias (status_id=21).")
+        return {"sucesso": True, "codigo_http": 200, "dias_carencia": dias_carencia}
+
+    except Error as e:
+        logging.error(f"Erro no banco de dados ao registrar falta de contato do protocolo {protocolo_str}: {e}")
+        return {"sucesso": False, "codigo_http": 500, "detalhe": "Erro interno ao atualizar banco de dados"}
     finally:
         if db and db.is_connected():
             cursor.close()
