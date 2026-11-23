@@ -63,6 +63,7 @@
 # - 13/11/2026: Padronização e sanitização da leitura de variáveis .env (N8N_WEBHOOK_URL, N8N_BEARER_TOKEN, AMBIENTE_EXECUCAO, PILOTO_TELEFONE_OVERRIDE) em enviar_webhook_novo_protocolo e registro de motivo no cancelamento via webhook C2.
 # - 16/11/2026: Atualização da função cancelar_protocolo_por_webhook para gravar status = 'Cancelado' (novo valor do ENUM) juntamente com status_id = 17 e validar estados terminais ('Finalizado', 'Cancelado', 'Expirado', 'Recusado').
 # - 21/11/2026: Implementação das funções reagendar_protocolo_por_webhook (status_id = 20) e registrar_falta_contato_por_webhook (status_id = 21) para o fluxo de repescagem pós-expiração com o N8N.
+# - 23/11/2026: Correção do usuario_admin_id (de NULL para 1) nos inserts de historico_status_protocolo das funções de repescagem.
 # ==============================================================================
 
 import mysql.connector
@@ -982,7 +983,7 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 20, NULL, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 20, 1, NOW())",
             (resultado['id'],)
         )
         db.commit()
@@ -1044,7 +1045,7 @@ def registrar_falta_contato_por_webhook(protocolo_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 21, NULL, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 21, 1, NOW())",
             (resultado['id'],)
         )
         db.commit()

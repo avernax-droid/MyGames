@@ -20,6 +20,9 @@ DOCS/
 !requirements.txt
 !carga_configs.sql
 
+# 1. Adiciona *.log ao .gitignore do MyGames
+echo "*.log" >> /home/userverna/MyGames/.gitignore
+
 # Arquivos temporários e uploads locais
 *:Zone.Identifier
 static/uploads/
