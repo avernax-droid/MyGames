@@ -64,6 +64,7 @@
 # - 16/11/2026: Atualização da função cancelar_protocolo_por_webhook para gravar status = 'Cancelado' (novo valor do ENUM) juntamente com status_id = 17 e validar estados terminais ('Finalizado', 'Cancelado', 'Expirado', 'Recusado').
 # - 21/11/2026: Implementação das funções reagendar_protocolo_por_webhook (status_id = 20) e registrar_falta_contato_por_webhook (status_id = 21) para o fluxo de repescagem pós-expiração com o N8N.
 # - 23/11/2026: Correção do usuario_admin_id (de NULL para 1) nos inserts de historico_status_protocolo das funções de repescagem.
+# - 24/11/2026: Realinhamento dos IDs de status para compatibilidade com a base de produção (Cancelado pelo cliente=21, Reagendado=24, Carência=25; elegibilidade de repescagem=1, 23, 24, 25).
 # ==============================================================================
 
 import mysql.connector
@@ -885,7 +886,7 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
     """
     Localiza o protocolo no banco e altera o seu status para "Cancelado".
     Rejeita a alteração se o protocolo já estiver em estado terminal ("Finalizado", "Cancelado", "Expirado" ou "Recusado") ou se não existir.
-    O status_id = 17 é o status mapeado para "Cancelado pelo cliente" na tabela status_protocolos.
+    O status_id = 21 é o status mapeado para "Cancelado pelo cliente" na tabela status_protocolos.
     """
     db = conectar_bd()
     if not db: return False
@@ -909,9 +910,9 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
         laudo_atual = (resultado.get('laudo_tecnico') or '').strip()
         novo_laudo = f"{laudo_atual}\n{motivo_texto}".strip() if laudo_atual else motivo_texto
 
-        # 2. Executa o UPDATE (sincroniza o status enum para 'Cancelado', status_id para 17 e grava o motivo)
+        # 2. Executa o UPDATE (sincroniza o status enum para 'Cancelado', status_id para 21 e grava o motivo)
         sql_update = """UPDATE protocolos_recompra 
-                        SET status = 'Cancelado', status_id = 17, laudo_tecnico = %s 
+                        SET status = 'Cancelado', status_id = 21, laudo_tecnico = %s 
                         WHERE numero_protocolo = %s"""
         cursor.execute(sql_update, (novo_laudo, protocolo_str))
         db.commit()
@@ -933,7 +934,7 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
 # ==============================================================================
 def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
     """
-    Atualiza o protocolo para status_id = 20 (Reagendado - Aguardando postagem),
+    Atualiza o protocolo para status_id = 24 (Reagendado - Aguardando postagem),
     validando que nova_data_str (DD/MM/AAAA) seja igual ou posterior à data atual (America/Sao_Paulo).
     Grava a tag estruturada [REAGENDADO_ATE: AAAA-MM-DD] no laudo_tecnico e registra histórico.
     """
@@ -965,7 +966,7 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
             logging.warning(f"Webhook Reagendar: Conflito para {protocolo_str} com status '{resultado['status']}'.")
             return {"sucesso": False, "codigo_http": 409, "status_atual": resultado['status']}
 
-        if resultado.get('status_id') not in (1, 19, 20, 21):
+        if resultado.get('status_id') not in (1, 23, 24, 25):
             logging.warning(f"Webhook Reagendar: Protocolo {protocolo_str} já avançou na esteira (status_id={resultado.get('status_id')}).")
             return {"sucesso": False, "codigo_http": 409, "status_atual": "Postado/Em Análise"}
 
@@ -979,16 +980,16 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
         novo_laudo = f"{laudo_limpo}\n{nota_log}".strip() if laudo_limpo else nota_log
 
         cursor.execute(
-            "UPDATE protocolos_recompra SET status_id = 20, laudo_tecnico = %s WHERE id = %s",
+            "UPDATE protocolos_recompra SET status_id = 24, laudo_tecnico = %s WHERE id = %s",
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 20, 1, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 24, 1, NOW())",
             (resultado['id'],)
         )
         db.commit()
 
-        logging.info(f"Webhook Reagendar: Protocolo {protocolo_str} reagendado até {data_br} (status_id=20).")
+        logging.info(f"Webhook Reagendar: Protocolo {protocolo_str} reagendado até {data_br} (status_id=24).")
         return {"sucesso": True, "codigo_http": 200, "nova_data_prevista": data_br}
 
     except Error as e:
@@ -1004,7 +1005,7 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
 # ==============================================================================
 def registrar_falta_contato_por_webhook(protocolo_str):
     """
-    Atualiza o protocolo para status_id = 21 (Aguardando postagem (Carência)),
+    Atualiza o protocolo para status_id = 25 (Aguardando postagem (Carência)),
     registrando a data/hora na tabela historico_status_protocolo para contagem dos dias de carência.
     """
     try:
@@ -1032,7 +1033,7 @@ def registrar_falta_contato_por_webhook(protocolo_str):
             logging.warning(f"Webhook Falta Contato: Conflito para {protocolo_str} com status '{resultado['status']}'.")
             return {"sucesso": False, "codigo_http": 409, "status_atual": resultado['status']}
 
-        if resultado.get('status_id') not in (1, 19, 20, 21):
+        if resultado.get('status_id') not in (1, 23, 24, 25):
             logging.warning(f"Webhook Falta Contato: Protocolo {protocolo_str} já avançou na esteira (status_id={resultado.get('status_id')}).")
             return {"sucesso": False, "codigo_http": 409, "status_atual": "Postado/Em Análise"}
 
@@ -1041,16 +1042,16 @@ def registrar_falta_contato_por_webhook(protocolo_str):
         novo_laudo = f"{laudo_atual}\n{nota_log}".strip() if laudo_atual else nota_log
 
         cursor.execute(
-            "UPDATE protocolos_recompra SET status_id = 21, laudo_tecnico = %s WHERE id = %s",
+            "UPDATE protocolos_recompra SET status_id = 25, laudo_tecnico = %s WHERE id = %s",
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 21, 1, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 25, 1, NOW())",
             (resultado['id'],)
         )
         db.commit()
 
-        logging.info(f"Webhook Falta Contato: Protocolo {protocolo_str} movido para carência de {dias_carencia} dias (status_id=21).")
+        logging.info(f"Webhook Falta Contato: Protocolo {protocolo_str} movido para carência de {dias_carencia} dias (status_id=25).")
         return {"sucesso": True, "codigo_http": 200, "dias_carencia": dias_carencia}
 
     except Error as e:
