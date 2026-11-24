@@ -1,3 +1,4 @@
+cat << 'EOF' > /home/userverna/MyGames/.gitignore
 __pycache__/
 env/
 venv/
@@ -20,8 +21,8 @@ DOCS/
 !requirements.txt
 !carga_configs.sql
 
-# 1. Adiciona *.log ao .gitignore do MyGames
-echo "*.log" >> /home/userverna/MyGames/.gitignore
+# Arquivos de log
+*.log
 
 # Arquivos temporários e uploads locais
 *:Zone.Identifier
@@ -29,3 +30,9 @@ static/uploads/
 flask_session/
 instance/ # <- Flask cria essa pasta se usar sqlite em app.instance_path
 utils/run_etl_docker.sh
+EOF
+
+cd /home/userverna/MyGames
+git add .gitignore
+git commit -m "chore: corrige regra *.log no .gitignore"
+git push origin main
