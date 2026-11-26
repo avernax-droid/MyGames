@@ -35,4 +35,4 @@ EOF
 cd /home/userverna/MyGames
 git add .gitignore
 git commit -m "chore: corrige regra *.log no .gitignore"
-git push origin main
+git push origin mainstatic/images/catalogo
