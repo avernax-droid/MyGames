@@ -65,6 +65,7 @@
 # - 21/11/2026: Implementação das funções reagendar_protocolo_por_webhook (status_id = 20) e registrar_falta_contato_por_webhook (status_id = 21) para o fluxo de repescagem pós-expiração com o N8N.
 # - 23/11/2026: Correção do usuario_admin_id (de NULL para 1) nos inserts de historico_status_protocolo das funções de repescagem.
 # - 24/11/2026: Realinhamento dos IDs de status para compatibilidade com a base de produção (Cancelado pelo cliente=21, Reagendado=24, Carência=25; elegibilidade de repescagem=1, 23, 24, 25).
+# - 27/11/2026: Substituição do usuario_admin_id fixo (1) por subconsulta dinâmica do primeiro administrador válido nos inserts de historico_status_protocolo das funções de repescagem.
 # ==============================================================================
 
 import mysql.connector
@@ -984,7 +985,7 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 24, 1, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 24, (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1), NOW())",
             (resultado['id'],)
         )
         db.commit()
@@ -1046,7 +1047,7 @@ def registrar_falta_contato_por_webhook(protocolo_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 25, 1, NOW())",
+            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 25, (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1), NOW())",
             (resultado['id'],)
         )
         db.commit()
