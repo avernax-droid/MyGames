@@ -66,6 +66,7 @@
 # - 23/11/2026: Correção do usuario_admin_id (de NULL para 1) nos inserts de historico_status_protocolo das funções de repescagem.
 # - 24/11/2026: Realinhamento dos IDs de status para compatibilidade com a base de produção (Cancelado pelo cliente=21, Reagendado=24, Carência=25; elegibilidade de repescagem=1, 23, 24, 25).
 # - 27/11/2026: Substituição do usuario_admin_id fixo (1) por subconsulta dinâmica do primeiro administrador válido nos inserts de historico_status_protocolo das funções de repescagem.
+# - 28/11/2026: Direcionamento do usuario_admin_id para o usuário de serviço dedicado webhooks_n8n (com fallback seguro) nas funções de webhook C2 e repescagem, incluindo registro de histórico no cancelamento C2.
 # ==============================================================================
 
 import mysql.connector
@@ -916,6 +917,13 @@ def cancelar_protocolo_por_webhook(protocolo_str, motivo_cancelamento):
                         SET status = 'Cancelado', status_id = 21, laudo_tecnico = %s 
                         WHERE numero_protocolo = %s"""
         cursor.execute(sql_update, (novo_laudo, protocolo_str))
+
+        # 3. Registra o evento na trilha de auditoria atribuído ao usuário de serviço webhooks_n8n
+        cursor.execute(
+            """INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao)
+               VALUES (%s, 21, COALESCE((SELECT id FROM usuarios_admin WHERE usuario_login = 'webhooks_n8n' LIMIT 1), (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1)), NOW())""",
+            (resultado['id'],)
+        )
         db.commit()
         
         logging.info(f"Webhook C2: Protocolo {protocolo_str} cancelado com sucesso. Motivo: {motivo_cancelamento}")
@@ -985,7 +993,8 @@ def reagendar_protocolo_por_webhook(protocolo_str, nova_data_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 24, (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1), NOW())",
+            """INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao)
+               VALUES (%s, 24, COALESCE((SELECT id FROM usuarios_admin WHERE usuario_login = 'webhooks_n8n' LIMIT 1), (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1)), NOW())""",
             (resultado['id'],)
         )
         db.commit()
@@ -1047,7 +1056,8 @@ def registrar_falta_contato_por_webhook(protocolo_str):
             (novo_laudo, resultado['id'])
         )
         cursor.execute(
-            "INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao) VALUES (%s, 25, (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1), NOW())",
+            """INSERT INTO historico_status_protocolo (protocolo_id, status_id, usuario_admin_id, data_alteracao)
+               VALUES (%s, 25, COALESCE((SELECT id FROM usuarios_admin WHERE usuario_login = 'webhooks_n8n' LIMIT 1), (SELECT id FROM usuarios_admin ORDER BY id ASC LIMIT 1)), NOW())""",
             (resultado['id'],)
         )
         db.commit()
